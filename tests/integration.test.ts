@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { query, pool } from '../src/lib/db';
 import { searchCatalog, history } from '../src/lib/catalog';
 import { mergeMetadata } from '../src/lib/providers';
+import { processPlex } from '../src/lib/plex';
 import { GET as sitemapIndex } from '../src/app/sitemap.xml/route';
 import { GET as sitemapPage } from '../src/app/sitemaps/[page]/route';
 test('ratings and published reviews are public; drafts and watch events remain private', async () => {
@@ -73,8 +74,37 @@ test('ratings and published reviews are public; drafts and watch events remain p
       if (previous === undefined) delete process.env.PUBLIC_URL;
       else process.env.PUBLIC_URL = previous;
     }
+    const receivedAt = new Date(Date.now() + 1000).toISOString();
+    const metadata = {
+      type: 'movie',
+      title: 'Plex fixture',
+      guid: `plex://movie/${suffix}`,
+      Guid: [{ id: `imdb://tt${suffix}` }],
+      lastViewedAt: Math.floor(Date.now() / 1000),
+    };
+    const event = { event: 'media.scrobble', metadata, receivedAt, eventId: 'test-' + suffix };
+    await processPlex(event);
+    await processPlex(event);
+    assert.equal(
+      Number(
+        (await query("SELECT count(*) FROM watches WHERE media_id=$1 AND source='plex'", [id]))[0].count,
+      ),
+      1,
+    );
+    await processPlex({ ...event, eventId: 'repeat-' + suffix });
+    assert.equal(
+      Number(
+        (await query("SELECT count(*) FROM watches WHERE media_id=$1 AND source='plex'", [id]))[0].count,
+      ),
+      2,
+    );
+    await processPlex({ ...event, event: 'media.rate', metadata: { ...metadata, userRating: 9 } });
+    assert.equal((await query('SELECT rating FROM ratings WHERE media_id=$1', [id]))[0].rating, 9);
+    await processPlex({ ...event, event: 'media.rate', metadata: { ...metadata, userRating: 0 } });
+    assert.equal((await query('SELECT 1 FROM ratings WHERE media_id=$1', [id])).length, 0);
   } finally {
     if (id) {
+      await query("DELETE FROM jobs WHERE payload->>'mediaId'=$1", [id]);
       await query('DELETE FROM reviews WHERE media_id=$1', [id]);
       await query('DELETE FROM ratings WHERE media_id=$1', [id]);
       await query('DELETE FROM watches WHERE media_id=$1', [id]);
