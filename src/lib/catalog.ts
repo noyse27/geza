@@ -12,15 +12,19 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
   const q = (params.get('q') || '').trim().slice(0, 160),
     type = params.get('type') || 'all';
   const filters: string[] = [];
+  let candidates = '';
   let rank = 'm.title ASC,m.id ASC';
   if (type === 'movie') filters.push("m.kind='movie'");
   else if (type === 'show') filters.push("m.kind IN ('show','season','episode')");
   if (q) {
     const term = add(q.toLowerCase()),
       pattern = add('%' + q.toLowerCase().replace(/[\\%_]/g, '\\$&') + '%');
-    filters.push(
-      `(m.search_text LIKE ${pattern} OR m.search_vector @@ websearch_to_tsquery('simple',${term}) OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id ${admin ? '' : 'AND rv.is_public'} AND to_tsvector('simple',rv.body) @@ websearch_to_tsquery('simple',${term})))`,
-    );
+    // Independent indexed candidate sets avoid a correlated OR scan of every media row.
+    candidates = `WITH candidates AS MATERIALIZED (
+      SELECT id FROM media WHERE search_text LIKE ${pattern}
+      UNION SELECT id FROM media WHERE search_vector @@ websearch_to_tsquery('simple',${term})
+      UNION SELECT media_id AS id FROM reviews WHERE ${admin ? 'true' : 'is_public'} AND to_tsvector('simple',body) @@ websearch_to_tsquery('simple',${term})
+    )`;
     rank = `(lower(m.title)=${term}) DESC,(m.ids->>'imdb'=${term}) DESC,(m.kind IN ('movie','show')) DESC,similarity(lower(m.title),${term}) DESC,m.title,m.id`;
   } else filters.push("m.kind IN ('movie','show')");
   for (const [param, op, col] of [
@@ -48,7 +52,7 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
   const page = Math.max(0, Math.min(10000, Number(params.get('page')) || 0)),
     limit = params.get('live') === '1' ? 10 : 30;
   const rows = await query<Media>(
-    `SELECT ${cardColumns},r.rating FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings r ON r.media_id=m.id WHERE ${filters.length ? filters.join(' AND ') : 'true'} ORDER BY ${rank} LIMIT ${add(limit + 1)} OFFSET ${add(page * limit)}`,
+    `${candidates} SELECT ${cardColumns},r.rating FROM ${q ? 'candidates c JOIN media m ON m.id=c.id' : 'media m'} LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings r ON r.media_id=m.id WHERE ${filters.length ? filters.join(' AND ') : 'true'} ORDER BY ${rank} LIMIT ${add(limit + 1)} OFFSET ${add(page * limit)}`,
     values,
   );
   return {
