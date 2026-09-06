@@ -17,7 +17,7 @@ services:
   migrate:
     build: .
     image: geza:local
-    command: [npm, run, db:migrate]
+    command: [node, --import, tsx, scripts/migrate.ts]
     env_file: .env
     environment:
       DATABASE_URL: postgres://geza:${POSTGRES_PASSWORD}@db:5432/geza
@@ -33,18 +33,24 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3080
     ports:
-      - "127.0.0.1:${GEZA_PORT:-3080}:3080"
+      - '127.0.0.1:${GEZA_PORT:-3080}:3080'
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
-      test: [CMD, node, -e, "fetch('http://127.0.0.1:3080/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3080/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
   worker:
     image: geza:local
     restart: unless-stopped
-    command: [npm, run, worker]
+    command: [node, --import, tsx, scripts/worker.ts]
     env_file: .env
     environment:
       DATABASE_URL: postgres://geza:${POSTGRES_PASSWORD}@db:5432/geza

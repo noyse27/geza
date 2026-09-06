@@ -1,0 +1,18 @@
+# Optional direct hosting. DNS must point to this server, TCP 80 and 777 must be reachable.
+# Do not use when your host already has a reverse proxy; proxy to 127.0.0.1:3080 instead.
+services:
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '777:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app: { condition: service_healthy }
+volumes:
+  caddy_data:
+  caddy_config:

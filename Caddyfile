@@ -1,0 +1,10 @@
+{
+  auto_https disable_redirects
+}
+http://geza.schwarzesherz.info {
+  redir https://geza.schwarzesherz.info:777{uri} permanent
+}
+https://geza.schwarzesherz.info {
+  encode zstd gzip
+  reverse_proxy app:3080
+}

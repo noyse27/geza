@@ -1,6 +1,89 @@
 import { requireAdmin } from '@/lib/auth';
-import { getSetting,settingKeys } from '@/lib/settings';
+import { getSetting, settingKeys } from '@/lib/settings';
 import { query } from '@/lib/db';
 import { AdminControls } from '@/components/admin';
-export const metadata={title:'Admin',robots:{index:false,follow:false}};
-export default async function Page(){await requireAdmin();const configured=Object.fromEntries(await Promise.all(settingKeys.map(async k=>[k,!!await getSetting(k)])));const [jobs,imports,errors]=await Promise.all([query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),query("SELECT kind,error,updated_at FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 8")]);return <div className="page"><div className="page-heading"><span className="eyebrow accent">HINTER DEN KULISSEN</span><h1>Admin<span className="accent">.</span></h1><p>Deine Verbindungen. Deine Daten. Deine Kontrolle.</p></div><AdminControls configured={configured}/><div className="stats-columns"><section className="panel"><h2>Verarbeitung</h2>{jobs.length?jobs.map((j,i)=><p key={i} className="status-row"><span>{j.kind==='enrich'?'Metadaten':'Plex'} · {j.status}</span><strong>{j.count.toLocaleString('de-DE')}</strong></p>):<p className="muted">Keine offenen Aufgaben.</p>}{errors.map((e,i)=><p key={i} className="error">{e.kind}: {e.error}</p>)}</section><section className="panel"><h2>Letzte Importe</h2>{imports.length?imports.map((r,i)=><div key={i}><p>{new Date(r.started_at).toLocaleString('de-DE',{timeZone:'Europe/Berlin'})}</p><p className="muted">{r.report?.watches?.toLocaleString('de-DE')} Ereignisse · {r.report?.ratings?.toLocaleString('de-DE')} Bewertungen · {r.report?.reviews} Kommentare</p><p className="small muted">{r.report?.unknownDates} ungeklärte Anschauzeitpunkte bleiben erhalten.</p></div>):<p className="muted">Noch kein Import durchgeführt.</p>}</section></div><section className="panel"><h2>Plex-Webhook</h2><p>Die Webhook-Adresse lautet nach dem Hosting <code>https://geza.schwarzesherz.info:777/api/plex/DEIN-WEBHOOK-GEHEIMNIS</code>. Hinterlege dieselbe zufällige Zeichenfolge oben als Webhook-Geheimnis. Account-ID und Server-UUID müssen ebenfalls gesetzt sein.</p><p className="muted small">Plex-Reviews benötigen eine separate Schnittstelle. Der Server-Webhook überträgt derzeit Anschauereignisse und Bewertungen.</p></section></div>;}
+export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
+export default async function Page() {
+  await requireAdmin();
+  const configured = Object.fromEntries(
+    await Promise.all(settingKeys.map(async (k) => [k, !!(await getSetting(k))])),
+  );
+  const [jobs, imports, errors] = await Promise.all([
+    query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
+    query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
+    query("SELECT kind,error,updated_at FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 8"),
+  ]);
+  return (
+    <div className="page">
+      <div className="page-heading">
+        <span className="eyebrow accent">HINTER DEN KULISSEN</span>
+        <h1>
+          Admin<span className="accent">.</span>
+        </h1>
+        <p>Deine Verbindungen. Deine Daten. Deine Kontrolle.</p>
+      </div>
+      <AdminControls configured={configured} />
+      <p>
+        <a className="button" href="/api/export">
+          Alle persönlichen Daten als JSON exportieren
+        </a>
+      </p>
+      <div className="stats-columns">
+        <section className="panel">
+          <h2>Verarbeitung</h2>
+          {jobs.length ? (
+            jobs.map((j, i) => (
+              <p key={i} className="status-row">
+                <span>
+                  {j.kind === 'enrich' ? 'Metadaten' : 'Plex'} · {j.status}
+                </span>
+                <strong>{j.count.toLocaleString('de-DE')}</strong>
+              </p>
+            ))
+          ) : (
+            <p className="muted">Keine offenen Aufgaben.</p>
+          )}
+          {errors.map((e, i) => (
+            <p key={i} className="error">
+              {e.kind}: {e.error}
+            </p>
+          ))}
+        </section>
+        <section className="panel">
+          <h2>Letzte Importe</h2>
+          {imports.length ? (
+            imports.map((r, i) => (
+              <div key={i}>
+                <p>{new Date(r.started_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</p>
+                <p className="muted">
+                  {r.report?.watches?.toLocaleString('de-DE')} Ereignisse ·{' '}
+                  {r.report?.ratings?.toLocaleString('de-DE')} Bewertungen · {r.report?.reviews} Kommentare
+                </p>
+                <p className="small muted">
+                  {r.report?.unknownDates} ungeklärte Anschauzeitpunkte bleiben erhalten.{' '}
+                  {r.report?.providerCollisions?.length || 0} mehrfach zugeordnete Plex-IDs werden beim
+                  Abgleich nicht automatisch zusammengeführt.
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="muted">Noch kein Import durchgeführt.</p>
+          )}
+        </section>
+      </div>
+      <section className="panel">
+        <h2>Plex-Webhook</h2>
+        <p>
+          Die Webhook-Adresse lautet nach dem Hosting{' '}
+          <code>https://geza.schwarzesherz.info:777/api/plex/DEIN-WEBHOOK-GEHEIMNIS</code>. Hinterlege
+          dieselbe zufällige Zeichenfolge oben als Webhook-Geheimnis. Account-ID und Server-UUID müssen
+          ebenfalls gesetzt sein.
+        </p>
+        <p className="muted small">
+          Plex-Reviews benötigen eine separate Schnittstelle. Der Server-Webhook überträgt derzeit
+          Anschauereignisse und Bewertungen.
+        </p>
+      </section>
+    </div>
+  );
+}

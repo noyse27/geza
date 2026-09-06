@@ -1,4 +1,17 @@
 import { query } from '@/lib/db';
 import { xmlEscape } from '@/lib/security';
-export const dynamic='force-dynamic';
-export async function GET(_req:Request,{params}:{params:Promise<{page:string}>}) { const base=process.env.PUBLIC_URL,{page}=await params; if(!base || !/^\d{1,6}$/.test(page)) return new Response(null,{status:404}); const rows=await query('SELECT m.id,GREATEST(m.updated_at,(SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public)) AS updated_at FROM media m ORDER BY m.id LIMIT 10000 OFFSET $1',[Number(page)*10000]); if(!rows.length) return new Response(null,{status:404}); return new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows.map(r=>`<url><loc>${xmlEscape(base)}/title/${r.id}</loc><lastmod>${new Date(r.updated_at).toISOString()}</lastmod></url>`).join('')}</urlset>`,{headers:{'Content-Type':'application/xml','Cache-Control':'public, max-age=300'}}); }
+export const dynamic = 'force-dynamic';
+export async function GET(_req: Request, { params }: { params: Promise<{ page: string }> }) {
+  const base = process.env.PUBLIC_URL,
+    { page } = await params;
+  if (!base || !/^\d{1,6}$/.test(page)) return new Response(null, { status: 404 });
+  const rows = await query(
+    'SELECT m.id,GREATEST(m.updated_at,(SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public)) AS updated_at FROM media m ORDER BY m.id LIMIT 10000 OFFSET $1',
+    [Number(page) * 10000],
+  );
+  if (!rows.length) return new Response(null, { status: 404 });
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows.map((r) => `<url><loc>${xmlEscape(base)}/title/${r.id}</loc><lastmod>${new Date(r.updated_at).toISOString()}</lastmod></url>`).join('')}</urlset>`,
+    { headers: { 'Content-Type': 'application/xml', 'Cache-Control': 'public, max-age=300' } },
+  );
+}

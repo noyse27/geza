@@ -2,7 +2,9 @@ node_modules
 .next
 .git
 .env*
-data
+/data
+!src/app/data
+!src/app/data/**
 backups
 *.log
 test-results
