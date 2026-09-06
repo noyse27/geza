@@ -52,6 +52,16 @@ test('ratings and published reviews are public; drafts and watch events remain p
       id,
     ]);
     await mergeMetadata(id!, { summary: 'Provider summary', original_title: 'Provider original' }, 'tmdb');
+    await mergeMetadata(id!, { poster: '/api/posters/private' }, 'plex');
+    assert.equal((await query('SELECT poster FROM media WHERE id=$1', [id]))[0].poster, null);
+    await mergeMetadata(id!, { poster: 'https://artworks.thetvdb.com/test.jpg' }, 'tvdb');
+    await mergeMetadata(id!, { poster: 'https://image.tmdb.org/test.jpg' }, 'tmdb');
+    await mergeMetadata(id!, { poster: '/api/posters/private' }, 'plex');
+    await mergeMetadata(id!, { poster: 'https://artworks.thetvdb.com/other.jpg' }, 'tvdb');
+    assert.equal(
+      (await query('SELECT poster FROM media WHERE id=$1', [id]))[0].poster,
+      'https://image.tmdb.org/test.jpg',
+    );
     const edited = (await query('SELECT summary,original_title FROM media WHERE id=$1', [id]))[0];
     assert.equal(edited.summary, 'My manual summary');
     assert.equal(edited.original_title, 'Provider original');

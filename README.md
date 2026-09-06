@@ -49,7 +49,7 @@ Exporte, Zugangsdaten, Backups und lokale Protokolle sind von Git und Docker-Bui
 
 Unter **Admin → Verbindungen** TMDB Read Access Token, optional TVDB API-Key/PIN und Plex-URL/Token eintragen. Zugangsdaten werden mit `SESSION_SECRET` verschlüsselt gespeichert. Leere Felder behalten bestehende Werte. Alternativ funktionieren die Umgebungsvariablen aus `.env.example`.
 
-Danach **Fehlende Metadaten laden** wählen. Priorität je Feld: manuelle Korrektur → Plex → TVDB bei Serien → TMDB. Jüngste Anschauereignisse werden zuerst bearbeitet. Der Hintergrundprozess wiederholt Fehler; Suche und History warten nicht auf Provider. Plex-Poster werden serverseitig gespeichert und enthalten keine Token in ihrer öffentlichen URL.
+Danach **Fehlende Metadaten laden** wählen. Priorität je Feld: manuelle Korrektur → Plex → TVDB bei Serien → TMDB. Jüngste Anschauereignisse werden zuerst bearbeitet. Der Hintergrundprozess wiederholt Fehler; Suche und History warten nicht auf Provider. Cover stammen ausschließlich von TMDB, ersatzweise TVDB. Angepasste Plex-Cover werden weder importiert noch bei Webhooks übernommen; bereits importierte Plex-Cover werden durch Migration 007 entfernt und zur Neuanreicherung vorgemerkt.
 
 Für Webhooks müssen zusätzlich Account-ID, Server-UUID und ein zufälliges Webhook-Geheimnis gesetzt sein:
 

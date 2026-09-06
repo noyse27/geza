@@ -1,7 +1,6 @@
 import { query } from './db';
 import { getSetting } from './settings';
 import { findPlex } from './plex';
-import { createHash } from 'node:crypto';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
 type Raw = Record<string, any>;
 const fields = [
@@ -19,30 +18,6 @@ const fields = [
 ] as const;
 const tags = (items: Raw[] | undefined) =>
   items?.map((x) => String(x.tag || x.name || '')).filter(Boolean) || [];
-export async function plexPoster(id: string, m: Raw) {
-  const path = m.type === 'episode' ? m.grandparentThumb || m.thumb : m.thumb;
-  if (typeof path !== 'string' || !path.startsWith('/library/metadata/')) return;
-  const base = await getSetting('PLEX_URL'),
-    token = await getSetting('PLEX_TOKEN');
-  if (!base || !token) return;
-  const current = (await query('SELECT locked_fields,field_sources FROM media WHERE id=$1', [id]))[0];
-  if (current?.locked_fields.includes('poster') || current?.field_sources.poster === 'plex') return;
-  const r = await fetch(new URL(path, base), {
-    headers: { 'X-Plex-Token': token },
-    signal: AbortSignal.timeout(12000),
-    redirect: 'error',
-  });
-  const type = r.headers.get('content-type')?.split(';')[0];
-  if (!r.ok || !['image/jpeg', 'image/png', 'image/webp'].includes(type || '')) return;
-  if (Number(r.headers.get('content-length')) > 5000000) return;
-  const bytes = Buffer.from(await r.arrayBuffer());
-  if (bytes.length > 5000000) return;
-  await query(
-    'INSERT INTO posters(media_id,content_type,data,etag) VALUES($1,$2,$3,$4) ON CONFLICT(media_id) DO UPDATE SET data=excluded.data,etag=excluded.etag,content_type=excluded.content_type,updated_at=now()',
-    [id, type, bytes, createHash('sha256').update(bytes).digest('hex')],
-  );
-  await mergeMetadata(id, { poster: `/api/posters/${id}` }, 'plex');
-}
 export function fromPlex(m: Raw): Raw {
   return {
     title: m.title,
@@ -61,15 +36,18 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex') {
   const current = (await query('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!current) return;
   const priority: Record<string, number> = { plex: 3, tvdb: 2, tmdb: 1 };
+  const coverPriority: Record<string, number> = { tmdb: 3, tvdb: 2 };
   const keys = fields.filter(
     (k) =>
+      (k !== 'poster' || source === 'tmdb' || source === 'tvdb') &&
       !current.locked_fields.includes(k) &&
       data[k] != null &&
       data[k] !== '' &&
       (!Array.isArray(data[k]) || data[k].length) &&
       (!current[k] ||
         (Array.isArray(current[k]) && !current[k].length) ||
-        (priority[source] || 0) > (priority[current.field_sources?.[k]] || 0)),
+        ((k === 'poster' ? coverPriority : priority)[source] || 0) >
+          ((k === 'poster' ? coverPriority : priority)[current.field_sources?.[k]] || 0)),
   );
   if (keys.length)
     await query(
@@ -198,7 +176,7 @@ export async function enrichMedia(id: string) {
       if (p) {
         await mergeMetadata(id, fromPlex(p));
         await savePlexRatings(id, p, m.ids);
-        await plexPoster(id, p);
+
         available = true;
       }
     } catch (e) {

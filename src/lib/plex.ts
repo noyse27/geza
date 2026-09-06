@@ -84,9 +84,9 @@ export async function processPlex(payload: {
   const id = await ensurePlexMedia(m, parent);
   const { savePlexRatings } = await import('./provider-ratings');
   await savePlexRatings(id, m, plexIds(m));
-  const { mergeMetadata, fromPlex, plexPoster } = await import('./providers');
+  const { mergeMetadata, fromPlex } = await import('./providers');
   await mergeMetadata(id, fromPlex(m));
-  await plexPoster(id, m);
+
   if (payload.event === 'media.scrobble') {
     const at =
       typeof m.lastViewedAt === 'number' ? watchedTime(new Date(m.lastViewedAt * 1000).toISOString()) : null;
