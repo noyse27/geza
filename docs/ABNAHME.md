@@ -10,7 +10,7 @@ Stand: 6. September 2026. Geza läuft als Docker-Paket auf `http://localhost:308
 
 1. Ohne Login nach „Arrival“, „Dark“ oder einer IMDb-ID suchen; Live-Treffer und Enter-Ergebnisse vergleichen.
 2. Öffentliche Detailseite öffnen: Bewertung und Reviews sichtbar, keine Anschauinformationen.
-3. Mit `data/admin-access.txt` anmelden. Home zeigt zehn neueste Ereignisse.
+3. Beim ersten Start unter `/login` den Admin anlegen und anmelden. Home zeigt zehn neueste Ereignisse.
 4. History auf April 2020 setzen, Film/Serie filtern, weitere Einträge laden.
 5. Detailseite öffnen und zurück zur vorherigen Ansicht navigieren.
 6. Unter Data Erscheinungsjahr, Anschaujahr und Bewertung kombinieren.
