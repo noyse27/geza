@@ -24,13 +24,12 @@ Voraussetzung: Docker mit Compose. Kein separates Node.js oder PostgreSQL erford
 sh setup.sh
 ```
 
-Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten, bauen das Image und richten den ersten Administrator ein. Vorhandene Einstellungen bleiben erhalten.
-Ohne vorhandenes Admin-Konto zeigt `/login` beim ersten Start automatisch eine Maske zum Anlegen des
-Admins. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
+Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten und bauen das Image. Vorhandene Einstellungen
+bleiben erhalten. Ohne vorhandenes Admin-Konto zeigt `/login` beim ersten Start automatisch eine Maske
+zum Anlegen des Admins. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
 
 - Anwendung: <http://localhost:3080>
-- Anmeldung: <http://localhost:3080/login>
-- Zugangsdaten: `data/admin-access.txt` auf dem eigenen Rechner
+- Erster Admin und Anmeldung: <http://localhost:3080/login>
 - Provider-Zugänge: nach Anmeldung unter **Admin**
 
 Die lokale App ist nur an `127.0.0.1` gebunden. Der Datenbankport ist im normalen Betrieb geschlossen; `compose.dev.yaml` stellt bei Bedarf PostgreSQL auf `127.0.0.1:5439` bereit.
