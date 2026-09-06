@@ -25,6 +25,8 @@ sh setup.sh
 ```
 
 Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten, bauen das Image und richten den ersten Administrator ein. Vorhandene Einstellungen bleiben erhalten.
+Ohne vorhandenes Admin-Konto zeigt `/login` beim ersten Start automatisch eine Maske zum Anlegen des
+Admins. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
 
 - Anwendung: <http://localhost:3080>
 - Anmeldung: <http://localhost:3080/login>
