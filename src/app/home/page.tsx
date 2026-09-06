@@ -1,0 +1,9 @@
+import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
+import { requireAdmin } from '@/lib/auth';
+import { history } from '@/lib/catalog';
+import { query } from '@/lib/db';
+import { Search } from '@/components/search';
+import { MediaRow } from '@/components/media';
+export const metadata={title:'Dein Tagebuch',robots:{index:false,follow:false}};
+export default async function Page(){await requireAdmin();const [result,counts]=await Promise.all([history(new URLSearchParams(),10),query("SELECT count(*) FILTER(WHERE m.kind='movie')::int AS movies,count(*) FILTER(WHERE m.kind='episode')::int AS episodes,count(DISTINCT m.id) FILTER(WHERE m.kind='movie')::int AS unique_movies FROM watches w JOIN media m ON m.id=w.media_id")]);const c=counts[0];return <div className="page"><section className="hero private-hero"><div className="hero-top"><span className="eyebrow accent">DEIN PERSÖNLICHES FILMTAGEBUCH</span><span className="private-badge">Nur für dich</span></div><h1>Zuletzt gesehen<span className="accent">.</span></h1><p>Großes Kino. Kleine Entdeckungen. Alles an einem Ort.</p><Search/><div className="mini-stats"><span><strong>{Number(c.unique_movies).toLocaleString('de-DE')}</strong> Filme entdeckt</span><span><strong>{Number(c.movies).toLocaleString('de-DE')}</strong> Filmabende</span><span><strong>{Number(c.episodes).toLocaleString('de-DE')}</strong> Episoden</span></div></section><section><div className="section-heading"><div><span className="eyebrow">DIE LETZTEN ZEHN</span><h2>Deine jüngsten Filmabende</h2></div><Link className="text-link" href="/history">Zur History <ArrowUpRight size={16}/></Link></div><div className="media-list">{result.items.map((m,i)=><MediaRow key={m.watch_id} item={m} watched index={i}/>)}</div>{!result.items.length&&<div className="empty">Noch keine Anschauereignisse. Importiere deinen Trakt-Export oder verbinde Plex.</div>}</section></div>;}

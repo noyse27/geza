@@ -1,0 +1,5 @@
+# Optional: database access for local development and integration tests.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5439:5432"
