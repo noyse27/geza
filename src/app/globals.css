@@ -1661,3 +1661,16 @@ footer > a:nth-of-type(2) {
     width: 15px;
   }
 }
+
+.friend-reviews {
+  margin-top: 3rem;
+}
+.friend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.friend-grid h3 {
+  margin-top: 0;
+}

@@ -2,6 +2,7 @@ import { isAdmin, validOrigin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { setSetting, settingKeys } from '@/lib/settings';
 import { z } from 'zod';
+import { friendUrl } from '@/lib/friend-reviews';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -19,7 +20,35 @@ export async function POST(req: Request) {
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
   try {
     const body = await req.json();
-    if (body.action === 'media') {
+    if (body.action === 'friend-review') {
+      const data = z
+        .object({
+          provider: z.string().regex(/^(wortvogel|filmdienst|custom-[a-z0-9-]{1,50})$/),
+          name: z.string().trim().min(1).max(100),
+          scale: z.number().min(1).max(100),
+          url: z.string().max(2000),
+          rating: z.number().min(0).max(100).nullable(),
+        })
+        .parse(body.data);
+      const url = friendUrl(data.provider, data.url);
+      if (data.rating !== null && data.rating > data.scale) throw Error('Bewertung außerhalb der Skala');
+      if (data.provider === 'filmdienst' && data.scale !== 5) throw Error('Filmdienst verwendet fünf Sterne');
+      if (!url && data.provider.startsWith('custom-')) {
+        await query('DELETE FROM friend_reviews WHERE media_id=$1 AND provider=$2', [body.id, data.provider]);
+        return Response.json({ ok: true });
+      }
+      await query(
+        `INSERT INTO friend_reviews(media_id,provider,url,rating,name,scale,manual,status,checked_at) VALUES($1,$2,$3,$4,$5,$6,true,'manual',now()) ON CONFLICT(media_id,provider) DO UPDATE SET url=excluded.url,rating=excluded.rating,name=excluded.name,scale=excluded.scale,manual=true,status='manual',checked_at=now()`,
+        [
+          body.id,
+          data.provider,
+          url,
+          url && data.provider !== 'wortvogel' ? data.rating : null,
+          data.name,
+          data.scale,
+        ],
+      );
+    } else if (body.action === 'media') {
       const data = mediaSchema.parse(body.data),
         fields = Object.keys(data);
       const values = Object.values(data);

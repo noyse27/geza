@@ -10,6 +10,38 @@ import {
   decrypt,
 } from '../src/lib/security';
 import { plexIds } from '../src/lib/plex';
+import { friendUrl, parseFilmdienst } from '../src/lib/friend-reviews';
+import { plexImdbRating } from '../src/lib/provider-ratings';
+
+test('external review links cannot use scripts or impersonate the fixed providers', () => {
+  assert.throws(() => friendUrl('wortvogel', 'https://wortvogel.de.evil.test/review'));
+  assert.throws(() => friendUrl('custom-test', 'javascript:alert(1)'));
+  assert.throws(() => friendUrl('filmdienst', 'https://www.filmdienst.de/suche/alle'));
+  assert.equal(friendUrl('custom-test', 'https://example.org/review'), 'https://example.org/review');
+  assert.equal(friendUrl('wortvogel', ''), null);
+});
+test('Filmdienst requires matching title and production year, preserves half-stars', () => {
+  const html =
+    '<script type="application/ld+json">' +
+    JSON.stringify({
+      '@type': 'Movie',
+      name: 'Lola (2022)',
+      copyrightYear: 2022,
+      review: { reviewRating: { bestRating: 5, ratingValue: 3.5 } },
+    }) +
+    '</script>';
+  assert.deepEqual(parseFilmdienst(html, ['LOLA'], 2022), { rating: 3.5 });
+  assert.equal(parseFilmdienst(html, ['LOLA'], 1981), null);
+  assert.equal(parseFilmdienst(html, ['Other movie'], 2022), null);
+});
+test('IMDb community rating never comes from personal or unrelated ratings', () => {
+  assert.equal(
+    plexImdbRating({ userRating: 10, rating: 9, ratingImage: 'rottentomatoes://image.rating' }),
+    null,
+  );
+  assert.equal(plexImdbRating({ audienceRating: 7.3, audienceRatingImage: 'imdb://image.rating' }), 7.3);
+  assert.equal(plexImdbRating({ Rating: [{ image: 'imdb://image.rating', value: 6.5 }] }), 6.5);
+});
 test('passwords are salted and wrong passwords are rejected', () => {
   const a = hashPassword('long-test-password'),
     b = hashPassword('long-test-password');

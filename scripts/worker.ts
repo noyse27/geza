@@ -1,5 +1,6 @@
 import { query, pool } from '../src/lib/db';
 import { enrichMedia } from '../src/lib/providers';
+import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex } from '../src/lib/plex';
 let running = true;
 process.on('SIGTERM', () => {
@@ -9,6 +10,16 @@ process.on('SIGINT', () => {
   running = false;
 });
 console.log('Geza worker ready');
+const friendsLoop = (async () => {
+  while (running) {
+    try {
+      await discoverFriendReview();
+    } catch {
+      /* Retry later without interrupting Plex jobs. */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+})();
 while (running) {
   try {
     await query(
@@ -44,4 +55,5 @@ while (running) {
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
+await friendsLoop;
 await pool.end();

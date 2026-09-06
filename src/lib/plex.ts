@@ -82,6 +82,8 @@ export async function processPlex(payload: {
     if (p?.MediaContainer?.Metadata?.[0]) parent = await ensurePlexMedia(p.MediaContainer.Metadata[0]);
   }
   const id = await ensurePlexMedia(m, parent);
+  const { savePlexRatings } = await import('./provider-ratings');
+  await savePlexRatings(id, m, plexIds(m));
   const { mergeMetadata, fromPlex, plexPoster } = await import('./providers');
   await mergeMetadata(id, fromPlex(m));
   await plexPoster(id, m);

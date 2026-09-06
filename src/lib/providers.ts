@@ -2,6 +2,7 @@ import { query } from './db';
 import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { createHash } from 'node:crypto';
+import { saveProviderRating, savePlexRatings } from './provider-ratings';
 type Raw = Record<string, any>;
 const fields = [
   'title',
@@ -108,6 +109,14 @@ async function tmdb(m: Raw): Promise<Raw | null> {
     `https://api.themoviedb.org/3/${path}?language=de-DE&append_to_response=credits,release_dates,content_ratings,external_ids`,
     headers,
   );
+  if (Number(d.vote_count) > 0)
+    await saveProviderRating(
+      String(m.id),
+      'tmdb',
+      d.vote_average,
+      `https://www.themoviedb.org/${path}`,
+      Number(d.vote_count),
+    );
   let overview = d.overview;
   if (!overview) {
     const en = await json(`https://api.themoviedb.org/3/${path}?language=en-US`, headers);
@@ -188,6 +197,7 @@ export async function enrichMedia(id: string) {
       const p = await findPlex(m.ids, m.kind);
       if (p) {
         await mergeMetadata(id, fromPlex(p));
+        await savePlexRatings(id, p, m.ids);
         await plexPoster(id, p);
         available = true;
       }

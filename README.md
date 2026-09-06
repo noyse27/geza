@@ -115,3 +115,13 @@ docker compose exec -T app node --import tsx scripts/scale-check.ts
 ```
 
 Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt und entfernt ausschließlich seine eigene temporäre Testdatenbank. Siehe [Abnahmehinweise](docs/ABNAHME.md).
+
+### Externe Reviews und Anbieterbewertungen
+
+Unter den eigenen Reviews stehen öffentliche Blöcke „Reviews bei Freunden“. Als Admin lassen sich mit „＋ Neu“ weitere Quellen mit Name, HTTPS-Link und optionaler Bewertung samt Skala anlegen. Zum Entfernen den Link leeren. Wortvogel wird ausschließlich manuell gepflegt; für eigene Quellen gibt es ebenfalls keine automatischen Abrufe. Manuelle Angaben bleiben bei Hintergrundläufen erhalten.
+
+Filmdienst wird für aufgerufene Filme im Hintergrund gesucht. Geza speichert nur Link und Sterne, keine fremden Review-Texte. Titel und Produktionsjahr beziehungsweise eine passende IMDb-ID dienen zur Zuordnung. Höchstens drei Kandidaten werden geprüft; unsichere Treffer werden nicht veröffentlicht. Zwischen Abrufen liegen mindestens zehn Sekunden. Treffer bleiben gespeichert, fehlende Treffer werden frühestens nach 30 Tagen, Fehler nach einem Tag erneut geprüft. Geänderte robots.txt-Sperren stoppen die automatische Suche. Die vorhandenen Plex-Aufgaben laufen davon unabhängig.
+
+Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
+
+Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).

@@ -8,6 +8,7 @@ import { Star } from 'lucide-react';
 import { Back } from '@/components/navigation';
 import { MediaEditor, ReviewBody, ReviewEditor, RatingEditor } from '@/components/editor';
 import type { Media } from '@/lib/types';
+import { FriendReviews } from '@/components/friend-reviews';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params,
     m = await getMedia(id);
@@ -23,6 +24,24 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     m = await getMedia(id);
   if (!m) notFound();
   const admin = await isAdmin();
+  if (['movie', 'show', 'episode'].includes(m.kind))
+    await query(
+      `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),updated_at=now() WHERE jobs.status IN ('done','failed') AND jobs.updated_at<now()-interval '7 days'`,
+      [`detail-enrich:${id}`, JSON.stringify({ mediaId: id })],
+    );
+  const providerRatings = await query('SELECT provider,rating,url FROM provider_ratings WHERE media_id=$1', [
+    id,
+  ]);
+  if (m.kind === 'movie' && m.year) {
+    await query(
+      `INSERT INTO friend_reviews(media_id,provider) VALUES($1,'filmdienst') ON CONFLICT DO NOTHING`,
+      [id],
+    );
+  }
+  const friends = await query(
+    'SELECT provider,url,rating,status,name,scale FROM friend_reviews WHERE media_id=$1 ORDER BY provider',
+    [id],
+  );
   const reviews = await query(
     `SELECT id,body,spoiler,is_public,parent_source_id,created_at FROM reviews WHERE media_id=$1 ${admin ? '' : 'AND is_public'} ORDER BY created_at DESC`,
     [id],
@@ -123,6 +142,30 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <p className="synopsis">
             {m.summary || 'Für diesen Titel ist noch keine Zusammenfassung hinterlegt.'}
           </p>
+          <div className="external-links" aria-label="Bewertungen anderer Anbieter">
+            {['imdb', 'tmdb', 'tvdb'].map((provider) => {
+              const value = providerRatings.find((r) => r.provider === provider);
+              const url =
+                value?.url ||
+                (provider === 'imdb' && m.ids.imdb
+                  ? `https://www.imdb.com/title/${m.ids.imdb}/ratings/`
+                  : provider === 'tmdb' && m.ids.tmdb && ['movie', 'show'].includes(m.kind)
+                    ? `https://www.themoviedb.org/${m.kind === 'movie' ? 'movie' : 'tv'}/${m.ids.tmdb}`
+                    : provider === 'tvdb' && m.ids.tvdb && ['movie', 'show', 'episode'].includes(m.kind)
+                      ? `https://thetvdb.com/dereferrer/${m.kind === 'movie' ? 'movie' : m.kind === 'episode' ? 'episode' : 'series'}/${m.ids.tvdb}`
+                      : null);
+              const label = `${provider === 'imdb' ? 'IMDb' : provider.toUpperCase()}: ${value ? Number(value.rating).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' / 10 ★' : 'Bewertung nicht verfügbar'}`;
+              return url ? (
+                <a key={provider} href={url} target="_blank" rel="noopener noreferrer">
+                  {label} ↗
+                </a>
+              ) : (
+                <span className="muted small" key={provider}>
+                  {label}
+                </span>
+              );
+            })}
+          </div>
           <div className="detail-credits">
             <div>
               <span className="eyebrow">REGIE</span>
@@ -175,6 +218,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 : 'Zu diesem Titel gibt es noch kein öffentliches Review.'}
             </div>
           )}
+          <FriendReviews
+            mediaId={id}
+            rows={JSON.parse(JSON.stringify(friends))}
+            admin={admin}
+            title={m.title}
+            year={m.year}
+          />
         </section>
         {admin && (
           <aside className="panel private-panel">
