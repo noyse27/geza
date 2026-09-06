@@ -32,6 +32,36 @@ export async function findPlex(ids: Record<string, unknown>, kind: string) {
   const data = await plexRequest(`/library/all?guid=${encodeURIComponent(`plex://${kind}/${ids.plex}`)}`);
   return data?.MediaContainer?.Metadata?.[0] || null;
 }
+const reviewQuery = `query GetReview($metadataID: ID!) {
+  metadataReviewV2(metadata: { id: $metadataID }) {
+    ... on ActivityReview { rating hasSpoilers message status }
+    ... on ActivityWatchReview { rating hasSpoilers message status }
+  }
+}`;
+export async function fetchPlexReview(metadataID: string) {
+  const token = await getSetting('PLEX_TOKEN');
+  if (!token) return null;
+  const r = await fetch('https://community.plex.tv/api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Plex-Token': token },
+    body: JSON.stringify({ operationName: 'GetReview', query: reviewQuery, variables: { metadataID } }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!r.ok) throw Error(`Plex Community HTTP ${r.status}`);
+  const data = await r.json();
+  if (data.errors) throw Error(data.errors[0]?.message || 'Plex Community GraphQL-Fehler');
+  return data.data?.metadataReviewV2 || null;
+}
+async function syncPlexReview(mediaId: string, plexId: string | undefined) {
+  if (!plexId) return;
+  const review = await fetchPlexReview(plexId);
+  if (review?.message)
+    await query(
+      `INSERT INTO reviews(media_id,source,source_id,body,spoiler,updated_at) VALUES($1,'plex',$2,$3,$4,now()) ON CONFLICT(source,source_id) DO UPDATE SET body=excluded.body,spoiler=excluded.spoiler,updated_at=now()`,
+      [mediaId, plexId, review.message, !!review.hasSpoilers],
+    );
+  else await query(`DELETE FROM reviews WHERE source='plex' AND source_id=$1`, [plexId]);
+}
 export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promise<string> {
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');
@@ -106,6 +136,9 @@ export async function processPlex(payload: {
         `INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,$2,$3,'plex') ON CONFLICT(media_id) DO UPDATE SET rating=excluded.rating,rated_at=excluded.rated_at,source='plex' WHERE ratings.rated_at<=excluded.rated_at`,
         [id, Math.round(n), payload.receivedAt],
       );
+    await syncPlexReview(id, plexIds(m).plex).catch((e) =>
+      console.error('Plex-Review konnte nicht synchronisiert werden:', e),
+    );
   }
   await query(
     `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,

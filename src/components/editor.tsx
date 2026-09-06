@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, Save, X, Globe, LockKeyhole } from 'lucide-react';
 import type { Media } from '@/lib/types';
@@ -117,7 +117,10 @@ type Review = {
 export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: string }) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [loadingPlexReview, setLoadingPlexReview] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null),
+    spoilerRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   return (
     <>
@@ -158,6 +161,7 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
           }}
         >
           <textarea
+            ref={bodyRef}
             name="body"
             rows={7}
             required
@@ -166,8 +170,35 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
             aria-label="Dein Review"
             placeholder="Was bleibt von diesem Film?"
           />
+          <button
+            type="button"
+            className="text-link"
+            disabled={loadingPlexReview}
+            onClick={async () => {
+              setLoadingPlexReview(true);
+              setError('');
+              try {
+                const r = await fetch('/api/admin', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'plex-review', mediaId }),
+                });
+                const data = await r.json();
+                if (!r.ok) throw Error(data.error || 'Laden fehlgeschlagen');
+                if (bodyRef.current) bodyRef.current.value = data.body;
+                if (spoilerRef.current) spoilerRef.current.checked = data.spoiler;
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setLoadingPlexReview(false);
+              }
+            }}
+          >
+            {loadingPlexReview ? 'Lädt …' : 'Review laden'}
+          </button>
           <label className="checkbox">
-            <input name="spoiler" type="checkbox" defaultChecked={review?.spoiler} /> Enthält Spoiler
+            <input ref={spoilerRef} name="spoiler" type="checkbox" defaultChecked={review?.spoiler} /> Enthält
+            Spoiler
           </label>
           <label className="checkbox">
             <input name="is_public" type="checkbox" defaultChecked={review?.is_public ?? true} />

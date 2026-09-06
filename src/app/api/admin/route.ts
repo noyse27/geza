@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { setSetting, settingKeys } from '@/lib/settings';
 import { z } from 'zod';
 import { friendUrl } from '@/lib/friend-reviews';
+import { fetchPlexReview } from '@/lib/plex';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -72,6 +73,23 @@ export async function POST(req: Request) {
           "INSERT INTO reviews(media_id,source,source_id,body,spoiler,is_public) VALUES($1,'geza',$2,$3,$4,$5)",
           [body.mediaId, crypto.randomUUID(), data.body, data.spoiler, data.is_public],
         );
+    } else if (body.action === 'plex-review') {
+      const [media] = await query<{ ids: Record<string, string> }>('SELECT ids FROM media WHERE id=$1', [
+        body.mediaId,
+      ]);
+      const plexId = media?.ids?.plex;
+      if (!plexId) return Response.json({ error: 'Kein Plex-Verweis für diesen Titel vorhanden.' }, { status: 400 });
+      try {
+        const review = await fetchPlexReview(plexId);
+        if (!review?.message) return Response.json({ error: 'Keine Plex-Review gefunden.' }, { status: 404 });
+        return Response.json({ body: review.message, spoiler: !!review.hasSpoilers });
+      } catch (e) {
+        console.error('Plex-Review-Abruf fehlgeschlagen:', e);
+        return Response.json(
+          { error: 'Plex-Anfrage fehlgeschlagen: ' + (e instanceof Error ? e.message : String(e)) },
+          { status: 502 },
+        );
+      }
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
       if (rating === null) await query('DELETE FROM ratings WHERE media_id=$1', [body.id]);
