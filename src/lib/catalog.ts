@@ -72,13 +72,17 @@ export async function getMedia(id: string) {
     )[0] || null
   );
 }
-export async function history(params: URLSearchParams, limit = 50) {
+export async function history(params: URLSearchParams, admin = false, limit = 50) {
   const values: unknown[] = [];
   const add = (v: unknown) => {
     values.push(v);
     return `$${values.length}`;
   };
   const filters = ['w.watched_at IS NOT NULL'];
+  if (!admin)
+    filters.push(
+      "(r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public))",
+    );
   if (params.get('type') === 'movie') filters.push("m.kind='movie'");
   if (params.get('type') === 'show') filters.push("m.kind='episode'");
   const month = params.get('month');
@@ -110,8 +114,8 @@ export async function history(params: URLSearchParams, limit = 50) {
         : null,
   };
 }
-export async function months(type: string) {
+export async function months(type: string, admin = false) {
   return query(
-    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id WHERE w.watched_at IS NOT NULL ${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
+    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id LEFT JOIN ratings r ON r.media_id=m.id WHERE w.watched_at IS NOT NULL ${admin ? '' : "AND (r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public)) "}${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
   );
 }

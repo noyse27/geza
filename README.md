@@ -6,9 +6,9 @@ Film- und Serienportal mit öffentlichen Bewertungen und Reviews sowie einem pri
 
 ## Sichtbarkeit
 
-**Öffentlich:** Katalog, Suche, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden.
+**Öffentlich:** Katalog, Suche, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
-**Nach Login:** Watched-Status, Zeitpunkte, Wiederholungen, Home, History, Data, persönliche Statistik, Bearbeitung und Export. Öffentliche APIs liefern keine Anschauinformationen. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
+**Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
 
 ## Lokal starten
 

@@ -9,7 +9,7 @@ export const metadata = { title: 'Dein Tagebuch', robots: { index: false, follow
 export default async function Page() {
   await requireAdmin();
   const [result, counts] = await Promise.all([
-    history(new URLSearchParams(), 10),
+    history(new URLSearchParams(), true, 10),
     query(
       "SELECT count(*) FILTER(WHERE m.kind='movie')::int AS movies,count(*) FILTER(WHERE m.kind='episode')::int AS episodes,count(DISTINCT m.id) FILTER(WHERE m.kind='movie')::int AS unique_movies FROM watches w JOIN media m ON m.id=w.media_id",
     ),

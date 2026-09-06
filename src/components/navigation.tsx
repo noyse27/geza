@@ -16,6 +16,7 @@ export function Navigation({ admin }: { admin: boolean }) {
     : [
         ['/', 'Entdecken'],
         ['/search', 'Suche'],
+        ['/history', 'History'],
       ];
   return (
     <nav aria-label="Hauptnavigation">

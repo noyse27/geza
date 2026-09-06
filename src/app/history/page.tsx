@@ -1,11 +1,14 @@
-import { requireAdmin } from '@/lib/auth';
+import { isAdmin } from '@/lib/auth';
 import { history, months } from '@/lib/catalog';
 import { HistoryBrowser } from '@/components/history';
 export const metadata = { title: 'History', robots: { index: false, follow: false } };
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireAdmin();
+  const admin = await isAdmin();
   const p = new URLSearchParams(await searchParams);
-  const [initial, list] = await Promise.all([history(p), months(p.get('type') || 'all')]);
+  const [initial, list] = await Promise.all([
+    history(p, admin),
+    months(p.get('type') || 'all', admin),
+  ]);
   return (
     <div className="page">
       <div className="page-heading">

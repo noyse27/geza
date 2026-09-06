@@ -43,11 +43,24 @@ test('ratings and published reviews are public; drafts and watch events remain p
         "INSERT INTO watches(media_id,source,source_id,watched_at) VALUES($1,'test',$2,'2199-01-01T12:00:00Z')",
         [id, suffix + i],
       );
-    const first = await history(new URLSearchParams(), 2);
+    const first = await history(new URLSearchParams(), true, 2);
     assert.equal(first.items.length, 2);
     assert.ok(first.cursor);
-    const second = await history(new URLSearchParams({ cursor: first.cursor! }), 2);
+    const second = await history(new URLSearchParams({ cursor: first.cursor! }), true, 2);
     assert.ok(!second.items.some((x) => first.items.some((y) => y.watch_id === x.watch_id)));
+    assert.ok((await history(new URLSearchParams(), false)).items.some((x) => x.id === id));
+    const unratedId = (
+      await query("INSERT INTO media(kind,title,year,ids) VALUES('movie',$1,2020,$2) RETURNING id", [
+        'Unrated ' + suffix,
+        JSON.stringify({ imdb: 'ttu' + suffix }),
+      ])
+    )[0].id;
+    await query(
+      "INSERT INTO watches(media_id,source,source_id,watched_at) VALUES($1,'test',$2,'2199-01-01T12:00:00Z')",
+      [unratedId, 'unrated' + suffix],
+    );
+    assert.ok(!(await history(new URLSearchParams(), false)).items.some((x) => x.id === unratedId));
+    assert.ok((await history(new URLSearchParams(), true)).items.some((x) => x.id === unratedId));
     await query("UPDATE media SET summary='My manual summary',locked_fields=ARRAY['summary'] WHERE id=$1", [
       id,
     ]);
