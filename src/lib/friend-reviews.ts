@@ -25,12 +25,11 @@ const normalize = (s: string) =>
     .replace(/\p{M}/gu, '')
     .replace(/[^\p{L}\p{N}]/gu, '');
 export function parseFilmdienst(html: string, titles: string[], year: number, imdb?: string) {
-  const identityMatch =
-    imdb &&
-    /^tt\d+$/.test(imdb) &&
-    [...html.matchAll(/href=["'](https:\/\/(?:www\.)?imdb\.com\/title\/tt\d+\/?)["']/gi)].some(
-      (m) => new URL(m[1]).pathname.replace(/\/$/, '') === `/title/${imdb}`,
-    );
+  const linkedIds = [...html.matchAll(/href=["']https:\/\/(?:www\.)?imdb\.com\/title\/(tt\d+)\/?["']/gi)].map(
+    (match) => match[1],
+  );
+  const identityMatch = Boolean(imdb && linkedIds.includes(imdb));
+  if (imdb && linkedIds.length && !identityMatch) return null;
   for (const match of html.matchAll(
     /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
   )) {
@@ -62,16 +61,21 @@ export function parseFilmdienst(html: string, titles: string[], year: number, im
 }
 
 let lastRequest = 0;
-async function fetchPage(url: string) {
+async function fetchPage(url: string, redirects = 0): Promise<string> {
   const u = new URL(url);
   if (u.origin !== 'https://www.filmdienst.de') throw Error('Unzulässige Quelle');
   await new Promise((resolve) => setTimeout(resolve, Math.max(0, 10000 - (Date.now() - lastRequest))));
   lastRequest = Date.now();
   const response = await fetch(u, {
-    redirect: 'error',
+    redirect: 'manual',
     signal: AbortSignal.timeout(30000),
     headers: { 'User-Agent': 'Geza/0.1 (film review link discovery)' },
   });
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    await response.body?.cancel();
+    if (redirects >= 3 || !response.headers.get('location')) throw Error('Zu viele Weiterleitungen');
+    return fetchPage(new URL(response.headers.get('location')!, u).href, redirects + 1);
+  }
   if (!response.ok) throw Error('Quelle momentan nicht verfügbar');
   const reader = response.body!.getReader();
   let size = 0;
@@ -101,12 +105,35 @@ export async function discoverFriendReview() {
     // Conservative: suspend discovery if the publisher introduces any disallowed paths.
     if (/^[\t ]*Disallow:[\t ]*[^\s]/im.test(robots)) throw Error('Abrufregeln geändert');
     const titles = [m.title, m.original_title].filter(Boolean);
-    const html = await fetchPage(
+    let html = await fetchPage(
       `https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(`${m.title} ${m.year}`)}`,
     );
-    const paths = [
-      ...new Set([...html.matchAll(/href=["'](\/film\/details\/\d+\/[^"'#?]+)["']/g)].map((m) => m[1])),
-    ].slice(0, 3);
+    const candidates = (page: string) => [
+      ...new Set(
+        [...page.matchAll(/<a\s+[^>]*href="(\/film\/details\/\d+\/[^"#?]+)"[^>]*title="([^"]+)"/g)]
+          .filter((match) =>
+            titles.some((title) => normalize(title) === normalize(match[2].replace(/\s*\(\d{4}\)\s*$/, ''))),
+          )
+          .map((match) => match[1]),
+      ),
+    ];
+    let paths = candidates(html);
+    if (!paths.length) {
+      html = await fetchPage(
+        `https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(m.title)}`,
+      );
+      paths = candidates(html);
+    }
+    if (paths.length > 3)
+      paths = m.ids.imdb
+        ? paths
+            .sort(
+              (a, b) =>
+                Math.abs(Number(a.match(/-(\d{4})$/)?.[1] || 0) - m.year) -
+                Math.abs(Number(b.match(/-(\d{4})$/)?.[1] || 0) - m.year),
+            )
+            .slice(0, 3)
+        : [];
     const matches: { url: string; rating: number | null }[] = [];
     for (const path of paths) {
       const url = `https://www.filmdienst.de${path}`;
@@ -118,7 +145,8 @@ export async function discoverFriendReview() {
       `UPDATE friend_reviews SET url=$2,rating=$3,status=$4,checked_at=now(),next_check_at=now()+interval '30 days' WHERE media_id=$1 AND provider='filmdienst' AND NOT manual`,
       [id, found?.url || null, found?.rating ?? null, found ? 'found' : 'missing'],
     );
-  } catch {
+  } catch (error) {
+    console.warn('Filmdienst discovery failed:', error instanceof Error ? error.message : 'Unknown error');
     await query(
       `UPDATE friend_reviews SET status='error',checked_at=now(),next_check_at=now()+interval '1 day' WHERE media_id=$1 AND provider='filmdienst' AND NOT manual`,
       [id],

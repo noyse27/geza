@@ -33,6 +33,9 @@ test('Filmdienst requires matching title and production year, preserves half-sta
   assert.deepEqual(parseFilmdienst(html, ['LOLA'], 2022), { rating: 3.5 });
   assert.equal(parseFilmdienst(html, ['LOLA'], 1981), null);
   assert.equal(parseFilmdienst(html, ['Other movie'], 2022), null);
+  const identified = html + '<a href="https://www.imdb.com/title/tt11366674">IMDb</a>';
+  assert.deepEqual(parseFilmdienst(identified, ['LOLA'], 2023, 'tt11366674'), { rating: 3.5 });
+  assert.equal(parseFilmdienst(identified, ['LOLA'], 2022, 'tt12345'), null);
 });
 test('IMDb community rating never comes from personal or unrelated ratings', () => {
   assert.equal(
