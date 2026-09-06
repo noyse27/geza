@@ -35,7 +35,11 @@ Die lokale App ist nur an `127.0.0.1` gebunden. Der Datenbankport ist im normale
 
 ## Trakt-Import
 
-Den entpackten Export in `data/trakt-export-noyse` ablegen:
+Nach der Anmeldung unter **Admin → Trakt-Export importieren** die ZIP-Datei aus dem Trakt-Export
+hochladen. Geza entpackt die ZIP in ein temporäres Verzeichnis, übernimmt nur passende JSON-Dateien
+für History, Bewertungen, Kommentare und Sammlung und entfernt die temporären Dateien danach wieder.
+
+Als CLI-Alternative den entpackten Export in `data/trakt-export-noyse` ablegen:
 
 ```sh
 docker compose exec -T worker node --import tsx scripts/import.ts /imports/trakt-export-noyse

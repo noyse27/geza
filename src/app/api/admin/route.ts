@@ -4,6 +4,7 @@ import { setSetting, settingKeys } from '@/lib/settings';
 import { z } from 'zod';
 import { friendUrl } from '@/lib/friend-reviews';
 import { fetchPlexReview } from '@/lib/plex';
+import { randomBytes } from 'node:crypto';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -107,6 +108,13 @@ export async function POST(req: Request) {
       for (const key of settingKeys)
         if (typeof body.data?.[key] === 'string' && body.data[key].trim())
           await setSetting(key, body.data[key].trim());
+    } else if (body.action === 'generate-webhook-secret') {
+      const secret = randomBytes(32).toString('base64url');
+      await setSetting('PLEX_WEBHOOK_SECRET', secret);
+      return Response.json(
+        { ok: true, settings: { PLEX_WEBHOOK_SECRET: secret } },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     } else if (body.action === 'enrich') {
       await query(
         `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'enrich','enrich:'||m.id,jsonb_build_object('mediaId',m.id) FROM media m LEFT JOIN (SELECT media_id,max(watched_at) latest FROM watches GROUP BY media_id) w ON w.media_id=m.id WHERE m.kind IN ('movie','show','episode') AND m.enriched_at IS NULL ORDER BY w.latest DESC NULLS LAST,CASE m.kind WHEN 'show' THEN 0 WHEN 'movie' THEN 1 ELSE 2 END,m.id ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),error=NULL WHERE jobs.status='failed'`,

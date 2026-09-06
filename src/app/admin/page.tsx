@@ -5,9 +5,10 @@ import { AdminControls } from '@/components/admin';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
-  const configured = Object.fromEntries(
-    await Promise.all(settingKeys.map(async (k) => [k, !!(await getSetting(k))])),
+  const settings = Object.fromEntries(
+    await Promise.all(settingKeys.map(async (k) => [k, await getSetting(k)])),
   );
+  const configured = Object.fromEntries(settingKeys.map((k) => [k, !!settings[k]]));
   const [jobs, imports, errors] = await Promise.all([
     query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
@@ -22,7 +23,7 @@ export default async function Page() {
         </h1>
         <p>Deine Verbindungen. Deine Daten. Deine Kontrolle.</p>
       </div>
-      <AdminControls configured={configured} />
+      <AdminControls configured={configured} values={settings} publicUrl={process.env.PUBLIC_URL || ''} />
       <p>
         <a className="button" href="/api/export">
           Alle persönlichen Daten als JSON exportieren
@@ -74,10 +75,8 @@ export default async function Page() {
       <section className="panel">
         <h2>Plex-Webhook</h2>
         <p>
-          Die Webhook-Adresse lautet nach dem Hosting{' '}
-          <code>https://geza.schwarzesherz.info:777/api/plex/DEIN-WEBHOOK-GEHEIMNIS</code>. Hinterlege
-          dieselbe zufällige Zeichenfolge oben als Webhook-Geheimnis. Account-ID und Server-UUID müssen
-          ebenfalls gesetzt sein.
+          Die Webhook-Adresse wird oben aus deinem gespeicherten Webhook-Geheimnis gebaut. Account-ID,
+          Server-UUID und das Geheimnis kannst du in den Verbindungen per Auge sichtbar machen.
         </p>
         <p className="muted small">
           Plex-Reviews benötigen eine separate Schnittstelle. Der Server-Webhook überträgt derzeit
