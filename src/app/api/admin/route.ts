@@ -82,7 +82,12 @@ export async function POST(req: Request) {
       try {
         const review = await fetchPlexReview(plexId);
         if (!review?.message) return Response.json({ error: 'Keine Plex-Review gefunden.' }, { status: 404 });
-        return Response.json({ body: review.message, spoiler: !!review.hasSpoilers });
+        const rating = Number(review.rating);
+        return Response.json({
+          body: review.message,
+          spoiler: !!review.hasSpoilers,
+          rating: Number.isFinite(rating) && rating >= 0 && rating <= 10 ? Math.round(rating) : null,
+        });
       } catch (e) {
         console.error('Plex-Review-Abruf fehlgeschlagen:', e);
         return Response.json(

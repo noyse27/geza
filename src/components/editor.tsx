@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, Save, X, Globe, LockKeyhole } from 'lucide-react';
 import type { Media } from '@/lib/types';
@@ -187,6 +187,10 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
                 if (!r.ok) throw Error(data.error || 'Laden fehlgeschlagen');
                 if (bodyRef.current) bodyRef.current.value = data.body;
                 if (spoilerRef.current) spoilerRef.current.checked = data.spoiler;
+                if (typeof data.rating === 'number')
+                  window.dispatchEvent(
+                    new CustomEvent('plex-rating', { detail: { mediaId, rating: data.rating } }),
+                  );
               } catch (e) {
                 setError((e as Error).message);
               } finally {
@@ -215,22 +219,36 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
 }
 export function RatingEditor({ id, rating }: { id: string; rating: number | null }) {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''),
+    [value, setValue] = useState(rating),
+    [pending, setPending] = useState<number | null>(null);
+  useEffect(() => setValue(rating), [rating]);
+  useEffect(() => {
+    function onPlexRating(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.mediaId === id && typeof detail.rating === 'number') setPending(detail.rating);
+    }
+    window.addEventListener('plex-rating', onPlexRating);
+    return () => window.removeEventListener('plex-rating', onPlexRating);
+  }, [id]);
+  async function save(n: number | null) {
+    try {
+      await post({ action: 'rating', id, rating: n });
+      setValue(n);
+      setPending(null);
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   return (
     <div>
       <label>
         Deine Bewertung
         <select
           aria-label="Deine Bewertung"
-          value={rating ?? ''}
-          onChange={async (e) => {
-            try {
-              await post({ action: 'rating', id, rating: e.target.value ? Number(e.target.value) : null });
-              router.refresh();
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
+          value={pending ?? value ?? ''}
+          onChange={(e) => save(e.target.value ? Number(e.target.value) : null)}
         >
           <option value="">Nicht bewertet</option>
           {Array.from({ length: 10 }, (_, i) => (
@@ -240,6 +258,17 @@ export function RatingEditor({ id, rating }: { id: string; rating: number | null
           ))}
         </select>
       </label>
+      {pending != null && pending !== value && (
+        <p className="muted small">
+          Aus Plex geladen ({pending}/10), noch nicht gespeichert.{' '}
+          <button type="button" className="text-link" onClick={() => save(pending)}>
+            Übernehmen
+          </button>{' '}
+          <button type="button" className="text-link" onClick={() => setPending(null)}>
+            Verwerfen
+          </button>
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </div>
   );
