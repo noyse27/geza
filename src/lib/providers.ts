@@ -1,3 +1,4 @@
+import { loggedFetch, logEvent, logContext } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
 import { findPlex } from './plex';
@@ -56,13 +57,13 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex') {
     );
 }
 async function json(url: string, headers: Record<string, string> = {}, body?: unknown) {
-  const r = await fetch(url, {
+  const r = await loggedFetch(new URL(url).hostname.includes('themoviedb') ? 'TMDB' : 'TVDB', url, {
     method: body ? 'POST' : 'GET',
     headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(12000),
   });
-  if (!r.ok) throw Error(`Metadatenanbieter HTTP ${r.status}`);
+
   return r.json();
 }
 async function tmdb(m: Raw): Promise<Raw | null> {
@@ -168,41 +169,78 @@ async function tvdb(m: Raw): Promise<Raw | null> {
 export async function enrichMedia(id: string) {
   const m = (await query('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!m) return;
-  let available = false;
-  const errors: string[] = [];
-  if (await getSetting('PLEX_URL'))
-    try {
-      const p = await findPlex(m.ids, m.kind);
-      if (p) {
-        await mergeMetadata(id, fromPlex(p));
-        await savePlexRatings(id, p, m.ids);
+  return logContext.run(
+    { ...logContext.getStore(), mediaId: id, title: m.title, kind: m.kind, ids: m.ids },
+    async () => {
+      await logEvent('info', 'enrich', 'Metadaten laden', {
+        mediaId: id,
+        title: m.title,
+        kind: m.kind,
+        ids: m.ids,
+      });
+      let available = false;
+      const errors: string[] = [];
+      if (await getSetting('PLEX_URL'))
+        try {
+          const p = await findPlex(m.ids, m.kind);
+          if (p) {
+            await mergeMetadata(id, fromPlex(p));
+            await savePlexRatings(id, p, m.ids);
 
-        available = true;
-      }
-    } catch (e) {
-      errors.push((e as Error).message);
-    }
-  if (m.kind !== 'movie' && (await getSetting('TVDB_API_KEY')))
-    try {
-      const d = await tvdb(m);
-      if (d) {
-        await mergeMetadata(id, d, 'tvdb');
-        available = true;
-      }
-    } catch (e) {
-      errors.push((e as Error).message);
-    }
-  if (await getSetting('TMDB_TOKEN'))
-    try {
-      const d = await tmdb(m);
-      if (d) {
-        await mergeMetadata(id, d, 'tmdb');
-        available = true;
-      }
-    } catch (e) {
-      errors.push((e as Error).message);
-    }
-  if (!available)
-    throw Error(errors[0] || 'Kein Metadatenanbieter eingerichtet oder keine passende Provider-ID.');
-  await query('UPDATE media SET enriched_at=now() WHERE id=$1', [id]);
+            available = true;
+          }
+        } catch (e) {
+          errors.push((e as Error).message);
+          await logEvent(
+            'warn',
+            'enrich',
+            'Anbieter konnte keine Metadaten liefern; weitere Anbieter werden geprï¿½ft',
+            { mediaId: id, title: m.title, ids: m.ids, error: e },
+          );
+        }
+      if (m.kind !== 'movie' && (await getSetting('TVDB_API_KEY')))
+        try {
+          const d = await tvdb(m);
+          if (d) {
+            await mergeMetadata(id, d, 'tvdb');
+            available = true;
+          }
+        } catch (e) {
+          errors.push((e as Error).message);
+          await logEvent(
+            'warn',
+            'enrich',
+            'Anbieter konnte keine Metadaten liefern; weitere Anbieter werden geprï¿½ft',
+            { mediaId: id, title: m.title, ids: m.ids, error: e },
+          );
+        }
+      if (await getSetting('TMDB_TOKEN'))
+        try {
+          const d = await tmdb(m);
+          if (d) {
+            await mergeMetadata(id, d, 'tmdb');
+            available = true;
+          }
+        } catch (e) {
+          errors.push((e as Error).message);
+          await logEvent(
+            'warn',
+            'enrich',
+            'Anbieter konnte keine Metadaten liefern; weitere Anbieter werden geprï¿½ft',
+            { mediaId: id, title: m.title, ids: m.ids, error: e },
+          );
+        }
+      if (!available)
+        throw Error(
+          `${m.title} (${m.kind}, ${id}): ${errors.join('; ') || 'Kein Metadatenanbieter eingerichtet oder keine passende Provider-ID.'}`,
+        );
+      await query('UPDATE media SET enriched_at=now() WHERE id=$1', [id]);
+      await logEvent(
+        errors.length ? 'warn' : 'info',
+        'enrich',
+        errors.length ? 'Metadaten mit Anbieterfehlern teilweise geladen' : 'Metadaten gespeichert',
+        { errors },
+      );
+    },
+  );
 }
