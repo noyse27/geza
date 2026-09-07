@@ -60,6 +60,9 @@ jobs:
       - name: Assignment and deletion regression tests
         run: node --import tsx scripts/assignment-check.ts
 
+      - name: Scrobble regression tests
+        run: node --import tsx scripts/scrobble-check.ts
+
       - name: Build
         run: npm run build
 

@@ -61,6 +61,13 @@ export default async function Logs({
           Filtern
         </button>
       </form>
+      {requestId && (
+        <p>
+          <a className="button" href={`/api/admin/logs/export?requestId=${encodeURIComponent(requestId)}`}>
+            Gesamten Anfrageverlauf als JSON exportieren
+          </a>
+        </p>
+      )}
       {!rows.length && <p>Keine Ereignisse für diese Auswahl vorhanden.</p>}
       {rows.slice(0, 100).map((row) => (
         <section className="panel" key={row.id}>
@@ -75,6 +82,10 @@ export default async function Logs({
               <Link href={`/admin/logs?requestId=${encodeURIComponent(row.context.requestId)}`}>
                 Gesamten Verlauf dieser Anfrage anzeigen
               </Link>
+              {' · '}
+              <a href={`/api/admin/logs/export?requestId=${encodeURIComponent(row.context.requestId)}`}>
+                JSON exportieren
+              </a>
             </p>
           )}
           <details>
