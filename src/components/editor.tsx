@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, Save, X, Globe, LockKeyhole } from 'lucide-react';
+import { Pencil, Save, X, Globe, LockKeyhole, Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
@@ -292,6 +292,13 @@ function berlinLocalInputValue(iso: string) {
   const get = (t: string) => parts.find((p) => p.type === t)?.value;
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
+function invalidateHistoryCache() {
+  try {
+    sessionStorage.setItem('history:invalidated', String(Date.now()));
+  } catch {
+    /* Storage-Zugriff darf die Aktion nicht blockieren. */
+  }
+}
 type Watch = { id: string; watched_at: string | null; time_estimated: boolean };
 export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch }) {
   const [open, setOpen] = useState(false),
@@ -318,6 +325,27 @@ export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch 
         >
           <Pencil size={13} />
         </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Anschauzeitpunkt löschen"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError('');
+            try {
+              await post({ action: 'watch-delete', id: watch.id, mediaId });
+              invalidateHistoryCache();
+              router.refresh();
+            } catch (e) {
+              setError((e as Error).message);
+              setBusy(false);
+            }
+          }}
+        >
+          <Trash2 size={13} />
+        </button>
+        {error && <p className="error">{error}</p>}
       </>
     );
   return (
@@ -334,11 +362,7 @@ export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch 
             mediaId,
             data: { watched_at: inputRef.current?.value || null },
           });
-          try {
-            sessionStorage.setItem('history:invalidated', String(Date.now()));
-          } catch {
-            /* Storage-Zugriff darf das Speichern nicht blockieren. */
-          }
+          invalidateHistoryCache();
           setOpen(false);
           router.refresh();
         } catch (e) {
@@ -357,6 +381,53 @@ export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch 
       <button disabled={busy} className="button primary">
         <Save size={14} />
         {busy ? 'Speichert …' : 'Speichern'}
+      </button>
+      <button type="button" className="button" onClick={() => setOpen(false)}>
+        Abbrechen
+      </button>
+      {error && <p className="error">{error}</p>}
+    </form>
+  );
+}
+export function WatchCreator({ mediaId }: { mediaId: string }) {
+  const [open, setOpen] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  if (!open)
+    return (
+      <button type="button" className="text-link" onClick={() => setOpen(true)}>
+        ＋ Anschauzeitpunkt hinzufügen
+      </button>
+    );
+  return (
+    <form
+      className="watch-edit-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError('');
+        try {
+          await post({
+            action: 'watch-create',
+            mediaId,
+            data: { watched_at: inputRef.current?.value || null },
+          });
+          invalidateHistoryCache();
+          setOpen(false);
+          router.refresh();
+        } catch (e) {
+          setError((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <input ref={inputRef} type="datetime-local" aria-label="Anschauzeitpunkt" />
+      <button disabled={busy} className="button primary">
+        <Save size={14} />
+        {busy ? 'Speichert …' : 'Hinzufügen'}
       </button>
       <button type="button" className="button" onClick={() => setOpen(false)}>
         Abbrechen

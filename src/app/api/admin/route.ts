@@ -149,6 +149,25 @@ export async function POST(req: Request) {
         [body.id, data.watched_at, body.mediaId],
       );
       if (!updated.length) throw Error('Anschauereignis nicht gefunden');
+    } else if (body.action === 'watch-delete') {
+      const deleted = await query('DELETE FROM watches WHERE id=$1 AND media_id=$2 RETURNING id', [
+        body.id,
+        body.mediaId,
+      ]);
+      if (!deleted.length) throw Error('Anschauereignis nicht gefunden');
+    } else if (body.action === 'watch-create') {
+      const data = z
+        .object({
+          watched_at: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+            .nullable(),
+        })
+        .parse(body.data);
+      await query(
+        `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'geza',$2,CASE WHEN $3::text IS NULL THEN NULL ELSE ($3::timestamp AT TIME ZONE 'Europe/Berlin') END,false)`,
+        [body.mediaId, crypto.randomUUID(), data.watched_at],
+      );
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
       if (rating === null) await query('DELETE FROM ratings WHERE media_id=$1', [body.id]);
