@@ -1,6 +1,6 @@
 # Reviewanbieter
 
-Unter Admin → Reviewanbieter → Neu werden Anbieter global konfiguriert. Migration 009 seedet Filmdienst und wortvogel.de als Boxen, da beide vor dieser Umstellung fest codiert und für jeden Film aktiv waren — bestehende friend_reviews-Daten bleiben so beim Update sichtbar. Das Dropdown enthält das mitgelieferte Filmdienst-Plugin und die Möglichkeit, einen eigenen manuellen Anbieter mit Name und Bewertungsskala anzulegen. Pro Plugin ist genau eine Box möglich.
+Unter Admin → Reviewanbieter → Neu werden Anbieter global konfiguriert. Erstinstallationen starten ohne Reviewboxen. Migration 009 übernimmt bei vorhandenen Reviewdaten die bisherigen fest eingebauten Anbieter Filmdienst und wortvogel.de sowie eigene Anbieter. Bestehende Links und Bewertungen bleiben unverändert. Die Migration läuft nur einmal; spätere Updates verändern die konfigurierte Anbieterliste nicht. Das Dropdown enthält das mitgelieferte Filmdienst-Plugin und die Möglichkeit, einen eigenen manuellen Anbieter mit Name und Bewertungsskala anzulegen. Pro Plugin ist genau eine Box möglich.
 
 Alle konfigurierten Boxen erscheinen auf Filmseiten. Beim Filmaufruf wird für Filmdienst bei bekanntem Erscheinungsjahr eine Hintergrundsuche vorgemerkt. Links und Bewertungen können angemeldete Administratoren direkt beim Film bearbeiten. Neue Anbieter und deren Löschung werden ausschließlich im Adminbereich verwaltet.
 
