@@ -16,7 +16,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "import:trakt": "tsx scripts/import.ts",
     "worker": "tsx scripts/worker.ts",
-    "benchmark": "tsx scripts/benchmark.ts"
+    "benchmark": "tsx scripts/benchmark.ts",
+    "reviews:dedupe": "tsx scripts/dedupe-reviews.ts"
   },
   "dependencies": {
     "@fontsource/syne": "^5.3.0",

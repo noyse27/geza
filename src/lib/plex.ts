@@ -58,7 +58,10 @@ async function syncPlexReview(mediaId: string, plexId: string | undefined) {
   const review = await fetchPlexReview(plexId);
   if (review?.message)
     await query(
-      `INSERT INTO reviews(media_id,source,source_id,body,spoiler,updated_at) VALUES($1,'plex',$2,$3,$4,now()) ON CONFLICT(source,source_id) DO UPDATE SET body=excluded.body,spoiler=excluded.spoiler,updated_at=now()`,
+      `INSERT INTO reviews(media_id,source,source_id,body,spoiler,updated_at)
+       SELECT $1,'plex',$2,$3,$4,now()
+       WHERE NOT EXISTS(SELECT 1 FROM reviews WHERE media_id=$1 AND NOT(source='plex' AND source_id=$2))
+       ON CONFLICT(source,source_id) DO UPDATE SET body=excluded.body,spoiler=excluded.spoiler,updated_at=now()`,
       [mediaId, plexId, review.message, !!review.hasSpoilers],
     );
   else await query(`DELETE FROM reviews WHERE source='plex' AND source_id=$1`, [plexId]);
