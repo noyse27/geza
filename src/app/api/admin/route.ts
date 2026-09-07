@@ -40,6 +40,17 @@ export async function POST(req: Request) {
     } else if (body.action === 'review-box-delete') {
       const provider = z.string().min(1).max(100).parse(body.data?.provider);
       await query('DELETE FROM review_boxes WHERE provider=$1', [provider]);
+    } else if (body.action === 'review-box-edit') {
+      const provider = z.string().min(1).max(100).parse(body.data?.provider);
+      if (reviewModule(provider)) throw Error('Name und Skala sind durch das Plugin vorgegeben');
+      const name = z.string().trim().min(1).max(100).parse(body.data?.name);
+      const scale = z.number().int().min(1).max(100).parse(body.data?.scale);
+      const updated = await query('UPDATE review_boxes SET name=$2,scale=$3 WHERE provider=$1 RETURNING provider', [
+        provider,
+        name,
+        scale,
+      ]);
+      if (!updated.length) throw Error('Unbekannter Anbieter');
     } else if (body.action === 'review-box-add') {
       const provider = z.string().min(1).max(100).parse(body.data?.provider);
       const module = reviewModule(provider);

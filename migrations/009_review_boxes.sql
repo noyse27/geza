@@ -3,5 +3,9 @@ CREATE TABLE review_boxes (
  name text NOT NULL,
  scale numeric NOT NULL DEFAULT 5 CHECK(scale BETWEEN 1 AND 100)
 );
--- Intentionally empty: installing a module does not configure a box.
--- Existing per-title links are retained, but only configured providers are displayed.
+-- Before this migration, filmdienst and wortvogel were hardcoded and always active,
+-- so upgrading installs keep both boxes configured to preserve existing friend_reviews.
+-- Removing a box afterwards is a deliberate admin action from here on.
+INSERT INTO review_boxes(provider,name,scale) VALUES
+ ('filmdienst','Filmdienst.de',5),
+ ('wortvogel','wortvogel.de',5);
