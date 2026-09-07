@@ -11,6 +11,7 @@ export function ReviewBoxAdmin({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState('');
+  const [editing, setEditing] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function save(action: string, data: object) {
@@ -25,6 +26,7 @@ export function ReviewBoxAdmin({
       if (!response.ok) throw Error('Bitte Eingaben prüfen.');
       setOpen(false);
       setSelected('');
+      setEditing('');
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -93,24 +95,73 @@ export function ReviewBoxAdmin({
       )}
       {!boxes.length && <p className="muted">Keine Reviewanbieter konfiguriert.</p>}
       <div className="friend-grid">
-        {boxes.map((box) => (
-          <article className="panel" key={box.provider}>
-            <h3>{box.name}</h3>
-            <p className="muted">
-              {modules.some((module) => module.id === box.provider)
-                ? 'Automatische Reviews'
-                : 'Manuelle Reviews'}{' '}
-              · {box.scale} Punkte
-            </p>
-            <button
-              className="text-link"
-              disabled={busy}
-              onClick={() => void save('review-box-delete', { provider: box.provider })}
-            >
-              Reviewanbieter löschen
-            </button>
-          </article>
-        ))}
+        {boxes.map((box) => {
+          const isModule = modules.some((module) => module.id === box.provider);
+          return (
+            <article className="panel" key={box.provider}>
+              <h3>{box.name}</h3>
+              <p className="muted">
+                {isModule ? 'Automatische Reviews' : 'Manuelle Reviews'} · {box.scale} Punkte
+              </p>
+              {editing === box.provider ? (
+                <form
+                  className="review-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const data = new FormData(e.currentTarget);
+                    void save('review-box-edit', {
+                      provider: box.provider,
+                      name: data.get('name'),
+                      scale: Number(data.get('scale') || 5),
+                    });
+                  }}
+                >
+                  <label>
+                    Name der Quelle
+                    <input name="name" required maxLength={100} defaultValue={box.name} />
+                  </label>
+                  <label>
+                    Maximale Sterne / Punkte
+                    <input name="scale" type="number" required min="1" max="100" defaultValue={box.scale} />
+                  </label>
+                  <button className="button primary" disabled={busy}>
+                    Speichern
+                  </button>
+                  <button
+                    type="button"
+                    className="text-link"
+                    disabled={busy}
+                    onClick={() => setEditing('')}
+                  >
+                    Abbrechen
+                  </button>
+                </form>
+              ) : (
+                <div className="button-row">
+                  {!isModule && (
+                    <button
+                      className="text-link"
+                      disabled={busy}
+                      onClick={() => {
+                        setError('');
+                        setEditing(box.provider);
+                      }}
+                    >
+                      Bearbeiten
+                    </button>
+                  )}
+                  <button
+                    className="text-link"
+                    disabled={busy}
+                    onClick={() => void save('review-box-delete', { provider: box.provider })}
+                  >
+                    Reviewanbieter löschen
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
