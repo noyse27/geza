@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, Save, X, Globe, LockKeyhole } from 'lucide-react';
 import type { Media } from '@/lib/types';
+import { AssignmentEditor } from './assignment-editor';
+import { DeleteMediaButton } from './delete-media-button';
 async function post(body: unknown) {
   const r = await fetch('/api/admin', {
     method: 'POST',
@@ -18,9 +20,13 @@ export function MediaEditor({ item }: { item: Media }) {
   const router = useRouter();
   return (
     <>
-      <button className="button" onClick={() => setOpen(!open)}>
-        <Pencil size={15} /> Details bearbeiten
-      </button>
+      <div className="button-row media-actions">
+        <button className="button" onClick={() => setOpen(!open)}>
+          <Pencil size={15} /> Details bearbeiten
+        </button>
+        {['episode', 'season'].includes(item.kind) && <AssignmentEditor item={item} />}
+        <DeleteMediaButton item={item} />
+      </div>
       {open && (
         <div className="modal-backdrop">
           <section role="dialog" aria-modal="true" aria-label="Details bearbeiten" className="modal">

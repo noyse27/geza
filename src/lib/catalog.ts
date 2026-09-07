@@ -15,6 +15,7 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
   let candidates = '';
   let rank = 'm.title ASC,m.id ASC';
   if (type === 'movie') filters.push("m.kind='movie'");
+  else if (type === 'series') filters.push("m.kind='show'");
   else if (type === 'show') filters.push("m.kind IN ('show','season','episode')");
   if (q) {
     const term = add(q.toLowerCase()),

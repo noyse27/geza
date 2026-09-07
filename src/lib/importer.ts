@@ -84,7 +84,7 @@ export async function importTrakt(directory: string) {
       .filter((r) => r.parent)
       .map((r) => ({ id: idMap.get(`${r.kind}:${r.trakt_id}`), parent_id: idMap.get(r.parent) }));
     await client.query(
-      `UPDATE media m SET parent_id=x.parent_id FROM jsonb_to_recordset($1::jsonb) AS x(id bigint,parent_id bigint) WHERE m.id=x.id AND m.parent_id IS DISTINCT FROM x.parent_id`,
+      `UPDATE media m SET parent_id=x.parent_id FROM jsonb_to_recordset($1::jsonb) AS x(id bigint,parent_id bigint) WHERE m.id=x.id AND NOT ('parent_id'=ANY(m.locked_fields)) AND m.parent_id IS DISTINCT FROM x.parent_id`,
       [JSON.stringify(parents)],
     );
     for (let i = 0; i < history.length; i += 1000)
