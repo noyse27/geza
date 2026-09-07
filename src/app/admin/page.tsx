@@ -50,7 +50,12 @@ export default async function Page() {
             jobs.map((j, i) => (
               <p key={i} className="status-row">
                 <span>
-                  {j.kind === 'enrich' ? 'Metadaten' : 'Plex'} · {j.status}
+                  {j.kind === 'enrich'
+                    ? 'Metadaten'
+                    : j.kind === 'plex-review-sync'
+                      ? 'Plex-Reviews'
+                      : 'Plex'}{' '}
+                  · {j.status}
                 </span>
                 <strong>{j.count.toLocaleString('de-DE')}</strong>
               </p>
@@ -93,8 +98,8 @@ export default async function Page() {
           Server-UUID und das Geheimnis kannst du in den Verbindungen per Auge sichtbar machen.
         </p>
         <p className="muted small">
-          Plex-Reviews benötigen eine separate Schnittstelle. Der Server-Webhook überträgt derzeit
-          Anschauereignisse und Bewertungen.
+          Der Server-Webhook überträgt Anschauereignisse, Bewertungen und die dazugehörige Plex-Review
+          fortlaufend. Für einen einmaligen Abgleich aller Titel siehe „Plex-Reviews nachziehen“ oben.
         </p>
       </section>
     </div>

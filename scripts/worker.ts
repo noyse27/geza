@@ -2,7 +2,7 @@ import { logContext, logEvent, redact } from '../src/lib/logging';
 import { query, pool } from '../src/lib/db';
 import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
-import { processPlex } from '../src/lib/plex';
+import { processPlex, processPlexReviewSync } from '../src/lib/plex';
 let running = true;
 process.on('SIGTERM', () => {
   running = false;
@@ -53,6 +53,7 @@ while (running) {
         try {
           if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
           else if (job.kind === 'plex') await processPlex(job.payload);
+          else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
           else throw Error('Unbekannter Aufgabentyp');
           await query("UPDATE jobs SET status='done',updated_at=now(),error=NULL WHERE id=$1", [job.id]);
           await logEvent('info', job.kind, 'Verarbeitung erfolgreich abgeschlossen');

@@ -63,6 +63,12 @@ async function syncPlexReview(mediaId: string, plexId: string | undefined) {
     );
   else await query(`DELETE FROM reviews WHERE source='plex' AND source_id=$1`, [plexId]);
 }
+export async function processPlexReviewSync(payload: { mediaId: string }) {
+  const [media] = await query<{ ids: Record<string, string> }>('SELECT ids FROM media WHERE id=$1', [
+    payload.mediaId,
+  ]);
+  await syncPlexReview(payload.mediaId, media?.ids?.plex);
+}
 export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promise<string> {
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');

@@ -195,6 +195,10 @@ export async function POST(req: Request) {
       await query(
         "UPDATE jobs SET status='pending',attempts=0,available_at=now(),error=NULL WHERE status='failed'",
       );
+    } else if (body.action === 'plex-review-batch') {
+      await query(
+        `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'plex-review-sync','plex-review-sync:'||id,jsonb_build_object('mediaId',id) FROM media WHERE ids ? 'plex' ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),error=NULL`,
+      );
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
