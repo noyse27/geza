@@ -60,6 +60,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ secret:
           {
             accountMatches: String(raw.Account?.id) === account,
             serverMatches: String(raw.Server?.uuid) === server,
+            receivedAccountId: raw.Account?.id,
+            receivedServerUuid: raw.Server?.uuid,
           },
         );
       if (!['media.scrobble', 'media.rate'].includes(raw.event))
