@@ -135,6 +135,20 @@ export async function POST(req: Request) {
           { status: 502 },
         );
       }
+    } else if (body.action === 'watch') {
+      const data = z
+        .object({
+          watched_at: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+            .nullable(),
+        })
+        .parse(body.data);
+      const updated = await query(
+        `UPDATE watches SET watched_at=CASE WHEN $2::text IS NULL THEN NULL ELSE ($2::timestamp AT TIME ZONE 'Europe/Berlin') END,time_estimated=false WHERE id=$1 AND media_id=$3 RETURNING id`,
+        [body.id, data.watched_at, body.mediaId],
+      );
+      if (!updated.length) throw Error('Anschauereignis nicht gefunden');
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
       if (rating === null) await query('DELETE FROM ratings WHERE media_id=$1', [body.id]);
