@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { friendUrl } from '@/lib/friend-reviews';
 import { fetchPlexReview } from '@/lib/plex';
 import { randomBytes } from 'node:crypto';
+import { correctAssignment } from '@/lib/assignment';
+import { deleteMedia } from '@/lib/delete-media';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -22,7 +24,19 @@ export async function POST(req: Request) {
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
   try {
     const body = await req.json();
-    if (body.action === 'friend-review') {
+    if (body.action === 'delete-media') {
+      const result = await deleteMedia(body.data);
+      return Response.json(result, {
+        status: result.error ? 400 : 200,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    } else if (body.action === 'assignment') {
+      if (!(await correctAssignment(body.data)))
+        return Response.json(
+          { error: 'Bitte eine vorhandene Serie und gültige Staffel/Episode auswählen.' },
+          { status: 400 },
+        );
+    } else if (body.action === 'friend-review') {
       const data = z
         .object({
           provider: z.string().regex(/^(wortvogel|filmdienst|custom-[a-z0-9-]{1,50})$/),
@@ -55,7 +69,7 @@ export async function POST(req: Request) {
         fields = Object.keys(data);
       const values = Object.values(data);
       await query(
-        `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=$${values.length + 1},updated_at=now() WHERE id=$${values.length + 2}`,
+        `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,
         [...values, fields, body.id],
       );
     } else if (body.action === 'review') {
@@ -79,7 +93,8 @@ export async function POST(req: Request) {
         body.mediaId,
       ]);
       const plexId = media?.ids?.plex;
-      if (!plexId) return Response.json({ error: 'Kein Plex-Verweis für diesen Titel vorhanden.' }, { status: 400 });
+      if (!plexId)
+        return Response.json({ error: 'Kein Plex-Verweis für diesen Titel vorhanden.' }, { status: 400 });
       try {
         const review = await fetchPlexReview(plexId);
         if (!review?.message) return Response.json({ error: 'Keine Plex-Review gefunden.' }, { status: 404 });

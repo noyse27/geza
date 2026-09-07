@@ -52,6 +52,10 @@ Exporte, Zugangsdaten, Backups und lokale Protokolle sind von Git und Docker-Bui
 
 ## Metadaten und Plex
 
+Auf Episoden- und Staffelseiten können angemeldete Admins über **Zuordnung korrigieren** eine vorhandene Serie suchen und Staffel sowie Episodennummer ändern. Cover, Jahr, Datensatz-ID und ein Link zur Serienansicht helfen bei gleichnamigen Treffern. Anschauereignisse, Bewertungen und Reviews bleiben am bisherigen Datensatz erhalten; erneute Trakt-Importe überschreiben die korrigierte Zuordnung nicht. Die Funktion führt keine doppelten Episoden zusammen.
+
+Regressionstest mit einer automatisch angelegten und anschließend entfernten Testdatenbank: `node --import tsx scripts/assignment-check.ts` (benötigt `DATABASE_URL` und Berechtigung zum Anlegen einer Datenbank).
+
 Unter **Admin → Verbindungen** TMDB Read Access Token, optional TVDB API-Key/PIN und Plex-URL/Token eintragen. Zugangsdaten werden mit `SESSION_SECRET` verschlüsselt gespeichert. Leere Felder behalten bestehende Werte. Alternativ funktionieren die Umgebungsvariablen aus `.env.example`.
 
 Danach **Fehlende Metadaten laden** wählen. Priorität je Feld: manuelle Korrektur → Plex → TVDB bei Serien → TMDB. Jüngste Anschauereignisse werden zuerst bearbeitet. Der Hintergrundprozess wiederholt Fehler; Suche und History warten nicht auf Provider. Cover stammen ausschließlich von TMDB, ersatzweise TVDB. Angepasste Plex-Cover werden weder importiert noch bei Webhooks übernommen; bereits importierte Plex-Cover werden durch Migration 007 entfernt und zur Neuanreicherung vorgemerkt.
