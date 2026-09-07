@@ -25,6 +25,11 @@ export default async function Page() {
       </div>
       <AdminControls configured={configured} values={settings} publicUrl={process.env.PUBLIC_URL || ''} />
       <p>
+        <a className="button" href="/admin/logs">
+          Ereignisprotokoll: Webhooks und Fehler ansehen
+        </a>
+      </p>
+      <p>
         <a className="button" href="/api/export">
           Alle persönlichen Daten als JSON exportieren
         </a>

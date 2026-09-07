@@ -68,6 +68,8 @@ https://geza.schwarzesherz.info:777/api/plex/DEIN-WEBHOOK-GEHEIMNIS
 
 Unterstützt sind `media.scrobble` und `media.rate`. `userRating` wird als 0–10 interpretiert; 0 entfernt die Bewertung. Ohne verlässlichen Ereigniszeitpunkt wird die Empfangszeit als geschätzt gekennzeichnet. Die tatsächlichen Payloads des eigenen Plex-Servers müssen bei der Einrichtung geprüft werden.
 
+Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und Ablehnungsgründe, Anbieterabfragen mit URL/HTTP-Status sowie Job-Ergebnisse und Wiederholungsversuche. Über die Anfrage-ID lässt sich ein Webhook bis zur Verarbeitung verfolgen. Filter und ältere Einträge sind verfügbar; zum Nachladen die Seite aktualisieren. Zugangsdaten, Cookies und vollständige Request-Bodies werden nicht gespeichert. Der Worker löscht stündlich Einträge, die älter als 14 Tage sind. Bei Datenbankausfällen schreibt der Logger ersatzweise in die Container-Konsole; deren Aufbewahrung richtet sich nach der Docker-Konfiguration. Anfragen, die Geza gar nicht erreichen, können hier nicht erscheinen. Bestehende alte Jobfehler erhalten nachträglich keine zusätzlichen Details.
+
 **Neue Plex-Reviewtexte:** Ihre automatische Übernahme ist weiterhin offen, weil kein dokumentierter Review-Webhook vorliegt. Trakt-Reviews und in Geza geschriebene Reviews funktionieren unabhängig davon.
 
 ## Hosting und Google

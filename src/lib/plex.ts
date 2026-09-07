@@ -1,3 +1,4 @@
+import { loggedFetch, logEvent } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
 import { watchedTime } from './security';
@@ -19,7 +20,7 @@ export async function plexRequest(path: string) {
   if (!base || !token) return null;
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
-  const r = await fetch(url, {
+  const r = await loggedFetch('Plex', url.toString(), {
     headers: { 'X-Plex-Token': token, Accept: 'application/json' },
     signal: AbortSignal.timeout(12000),
     redirect: 'error',
@@ -41,7 +42,7 @@ const reviewQuery = `query GetReview($metadataID: ID!) {
 export async function fetchPlexReview(metadataID: string) {
   const token = await getSetting('PLEX_TOKEN');
   if (!token) return null;
-  const r = await fetch('https://community.plex.tv/api', {
+  const r = await loggedFetch('Plex Community', 'https://community.plex.tv/api', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Plex-Token': token },
     body: JSON.stringify({ operationName: 'GetReview', query: reviewQuery, variables: { metadataID } }),
@@ -137,7 +138,10 @@ export async function processPlex(payload: {
         [id, Math.round(n), payload.receivedAt],
       );
     await syncPlexReview(id, plexIds(m).plex).catch((e) =>
-      console.error('Plex-Review konnte nicht synchronisiert werden:', e),
+      logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
+        mediaId: id,
+        error: e,
+      }),
     );
   }
   await query(

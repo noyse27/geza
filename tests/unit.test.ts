@@ -76,3 +76,22 @@ test('stored secrets are authenticated and XML is escaped', () => {
   assert.throws(() => decrypt(value.slice(0, -4) + 'AAAA'));
   assert.equal(xmlEscape('A&B <C>'), 'A&amp;B &lt;C&gt;');
 });
+import { redact } from '../src/lib/logging';
+
+test('diagnostic logs remove credentials while preserving useful provider details', () => {
+  const output = JSON.stringify(
+    redact({
+      token: 'private-token',
+      nested: { password: 'private-password' },
+      error: new Error('GET https://host/api/plex/private-secret?X-Plex-Token=private-query'),
+      url: 'https://user:private-pass@host/movie/42?api_key=private-key&language=de-DE',
+      authorization: 'Bearer private-bearer',
+      title: 'Example',
+      status: 404,
+    }),
+  );
+  assert.ok(!output.includes('private-'));
+  assert.ok(output.includes('/movie/42'));
+  assert.ok(output.includes('language=de-DE'));
+  assert.ok(output.includes('404'));
+});
