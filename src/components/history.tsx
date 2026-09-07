@@ -3,13 +3,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MediaRow } from './media';
 import type { Media } from '@/lib/types';
+import { ScrobbleDialog } from './scrobble-dialog';
 type Result = { items: Media[]; cursor: string | null };
 export function HistoryBrowser({
   initial,
   months,
+  admin = false,
+  openScrobbles = 0,
 }: {
   initial: Result;
   months: { month: string; count: number }[];
+  admin?: boolean;
+  openScrobbles?: number;
 }) {
   const params = useSearchParams(),
     router = useRouter(),
@@ -19,6 +24,7 @@ export function HistoryBrowser({
   const sentinel = useRef<HTMLDivElement>(null);
   const lock = useRef(false);
   const scrollPosition = useRef(0);
+  const loadedAt = useRef(Date.now());
   const key = params.toString();
   useEffect(() => {
     const stored = sessionStorage.getItem('history:' + key);
@@ -43,6 +49,7 @@ export function HistoryBrowser({
     };
     const save = () => {
       try {
+        if (Number(sessionStorage.getItem('history:invalidated') || 0) > loadedAt.current) return;
         sessionStorage.setItem(
           'history:' + key,
           JSON.stringify({ result, scroll: scrollPosition.current, savedAt: Date.now() }),
@@ -113,6 +120,7 @@ export function HistoryBrowser({
             </button>
           ))}
         </div>
+        {admin && <ScrobbleDialog initialCount={openScrobbles} />}
         <select
           aria-label="Zum Monat springen"
           value={selected}

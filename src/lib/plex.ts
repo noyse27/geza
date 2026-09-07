@@ -75,10 +75,22 @@ export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promi
   const ids = plexIds(m);
   if (!Object.keys(ids).length) throw Error('Keine verlässliche Medien-ID im Plex-Ereignis');
   const matches = await query(
-    `SELECT DISTINCT id FROM media WHERE kind=$1 AND EXISTS(SELECT 1 FROM jsonb_each_text($2::jsonb) x WHERE ids->>x.key=x.value)`,
+    `SELECT id,title,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND EXISTS(SELECT 1 FROM jsonb_each_text($2::jsonb) x WHERE ids->>x.key=x.value) ORDER BY id`,
     [kind, JSON.stringify(ids)],
   );
-  if (matches.length > 1) throw Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich');
+  if (matches.length > 1) {
+    await logEvent('error', 'plex', 'Medienzuordnung wegen widersprüchlicher Provider-IDs abgebrochen', {
+      type: kind,
+      title: m.title,
+      providerIds: ids,
+      parentId,
+      season: m.parentIndex,
+      episode: m.index,
+      matchCount: matches.length,
+      matches,
+    });
+    throw Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich');
+  }
   if (matches.length) {
     await query('UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3', [
       JSON.stringify(ids),

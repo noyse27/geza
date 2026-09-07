@@ -9,6 +9,7 @@ import '@fontsource/syne/800.css';
 import './globals.css';
 import { isAdmin } from '@/lib/auth';
 import { Navigation, Logout, RestoreScroll } from '@/components/navigation';
+import { ScrollTop } from '@/components/scroll-top';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: { default: 'Geza — Film & Serie', template: '%s · Geza' },
@@ -52,6 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <span className="footer-note">{admin ? 'Privater Bereich verfügbar' : 'Film & Serie'}</span>
         </footer>
         <RestoreScroll />
+        <ScrollTop />
       </body>
     </html>
   );
