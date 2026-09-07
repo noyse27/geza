@@ -1,3 +1,5 @@
+import { ReviewBoxAdmin } from '@/components/review-box-admin';
+import { reviewModules } from '@/lib/review-modules';
 import { requireAdmin } from '@/lib/auth';
 import { getSetting, settingKeys } from '@/lib/settings';
 import { query } from '@/lib/db';
@@ -5,6 +7,7 @@ import { AdminControls } from '@/components/admin';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
+  const boxes = await query('SELECT provider,name,scale FROM review_boxes ORDER BY provider');
   const settings = Object.fromEntries(
     await Promise.all(settingKeys.map(async (k) => [k, await getSetting(k)])),
   );
@@ -22,6 +25,12 @@ export default async function Page() {
           Admin<span className="accent">.</span>
         </h1>
         <p>Deine Verbindungen. Deine Daten. Deine Kontrolle.</p>
+      </div>
+      <div id="reviewanbieter">
+        <ReviewBoxAdmin
+          boxes={JSON.parse(JSON.stringify(boxes))}
+          modules={reviewModules.map(({ id, name }) => ({ id, name }))}
+        />
       </div>
       <AdminControls configured={configured} values={settings} publicUrl={process.env.PUBLIC_URL || ''} />
       <p>

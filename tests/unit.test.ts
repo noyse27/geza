@@ -95,3 +95,20 @@ test('diagnostic logs remove credentials while preserving useful provider detail
   assert.ok(output.includes('language=de-DE'));
   assert.ok(output.includes('404'));
 });
+
+test('bundled review modules constrain automatic discovery to supported media', async () => {
+  const { reviewModule, reviewModules } = await import('../src/lib/review-modules');
+  assert.equal(new Set(reviewModules.map((module) => module.id)).size, reviewModules.length);
+  const filmdienst = reviewModule('filmdienst')!;
+  const movie = { kind: 'movie', title: 'LOLA', original_title: '', year: 2022, ids: {} };
+  assert.ok(filmdienst.discover);
+  assert.ok(filmdienst.supports(movie));
+  assert.equal(filmdienst.supports({ ...movie, kind: 'show' }), false);
+  assert.equal(filmdienst.supports({ ...movie, year: null }), false);
+  assert.equal(reviewModule('wortvogel'), undefined);
+  assert.equal(reviewModule('unknown'), undefined);
+  assert.equal(
+    friendUrl('filmdienst', 'https://www.filmdienst.de/film/details/123/lola'),
+    'https://www.filmdienst.de/film/details/123/lola',
+  );
+});
