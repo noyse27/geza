@@ -27,32 +27,19 @@ export function FriendReviews({
   const [editing, setEditing] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [newProvider, setNewProvider] = useState('');
+  if (!rows.length) return null;
   return (
     <section className="friend-reviews">
       <span className="eyebrow">ANDERE PERSPEKTIVEN</span>
       <h2>Reviews bei Freunden</h2>
-      {admin && (
-        <button
-          className="button"
-          onClick={() => {
-            const key = 'custom-' + crypto.randomUUID();
-            setNewProvider(key);
-            setEditing(key);
-            setError('');
-          }}
-        >
-          ＋ Neu
-        </button>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
       )}
       <div className="friend-grid">
-        {[
-          'wortvogel',
-          'filmdienst',
-          ...rows.filter((r) => r.provider.startsWith('custom-')).map((r) => r.provider),
-          ...(newProvider && !rows.some((r) => r.provider === newProvider) ? [newProvider] : []),
-        ].map((provider) => {
-          const row = rows.find((r) => r.provider === provider);
+        {rows.map((row) => {
+          const provider = row.provider;
           const name =
             provider === 'wortvogel'
               ? 'wortvogel.de'
@@ -125,7 +112,7 @@ export function FriendReviews({
                               data: {
                                 provider,
                                 name: String(data.get('name') || name),
-                                scale: Number(data.get('scale') || 5),
+                                scale: Number(scale),
                                 url: String(data.get('url') || ''),
                                 rating: data.get('rating') ? Number(data.get('rating')) : null,
                               },
@@ -133,7 +120,6 @@ export function FriendReviews({
                           });
                           if (!response.ok) throw Error('Bitte Link und Bewertung prüfen.');
                           setEditing('');
-                          setNewProvider('');
                           router.refresh();
                         } catch (e) {
                           setError((e as Error).message);
@@ -142,12 +128,6 @@ export function FriendReviews({
                         }
                       }}
                     >
-                      {provider.startsWith('custom-') && (
-                        <label>
-                          Name der Quelle
-                          <input name="name" required maxLength={100} defaultValue={row?.name || ''} />
-                        </label>
-                      )}
                       <label>
                         Review-Link (leer lassen zum Entfernen)
                         <input
@@ -166,20 +146,9 @@ export function FriendReviews({
                               name="rating"
                               type="number"
                               min="0"
-                              max="100"
+                              max={scale}
                               step="0.1"
                               defaultValue={row?.rating ?? ''}
-                            />
-                          </label>
-                          <label>
-                            Maximale Sterne / Punkte
-                            <input
-                              name="scale"
-                              type="number"
-                              required
-                              min="1"
-                              max="100"
-                              defaultValue={scale}
                             />
                           </label>
                         </>

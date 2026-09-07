@@ -2,6 +2,7 @@ import { isAdmin, validOrigin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { setSetting, settingKeys } from '@/lib/settings';
 import { z } from 'zod';
+import { reviewModule } from '@/lib/review-modules';
 import { friendUrl } from '@/lib/friend-reviews';
 import { fetchPlexReview } from '@/lib/plex';
 import { randomBytes } from 'node:crypto';
@@ -36,33 +37,45 @@ export async function POST(req: Request) {
           { error: 'Bitte eine vorhandene Serie und gültige Staffel/Episode auswählen.' },
           { status: 400 },
         );
+    } else if (body.action === 'review-box-delete') {
+      const provider = z.string().min(1).max(100).parse(body.data?.provider);
+      await query('DELETE FROM review_boxes WHERE provider=$1', [provider]);
+    } else if (body.action === 'review-box-add') {
+      const provider = z.string().min(1).max(100).parse(body.data?.provider);
+      const module = reviewModule(provider);
+      if (module) {
+        await query('INSERT INTO review_boxes(provider,name,scale) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+          provider,
+          module.name,
+          module.scale,
+        ]);
+      } else {
+        if (!/^custom-[a-z0-9-]{1,50}$/.test(provider)) throw Error('Unbekanntes Plugin');
+        const name = z.string().trim().min(1).max(100).parse(body.data?.name);
+        const scale = z.number().int().min(1).max(100).parse(body.data?.scale);
+        await query('INSERT INTO review_boxes(provider,name,scale) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+          provider,
+          name,
+          scale,
+        ]);
+      }
     } else if (body.action === 'friend-review') {
       const data = z
         .object({
-          provider: z.string().regex(/^(wortvogel|filmdienst|custom-[a-z0-9-]{1,50})$/),
-          name: z.string().trim().min(1).max(100),
-          scale: z.number().min(1).max(100),
+          provider: z.string().min(1).max(100),
           url: z.string().max(2000),
           rating: z.number().min(0).max(100).nullable(),
         })
         .parse(body.data);
+      const [box] = await query('SELECT * FROM review_boxes WHERE provider=$1', [data.provider]);
+      if (!box || (data.rating !== null && data.rating > Number(box.scale)))
+        throw Error('Ungültige Reviewbox');
       const url = friendUrl(data.provider, data.url);
-      if (data.rating !== null && data.rating > data.scale) throw Error('Bewertung außerhalb der Skala');
-      if (data.provider === 'filmdienst' && data.scale !== 5) throw Error('Filmdienst verwendet fünf Sterne');
-      if (!url && data.provider.startsWith('custom-')) {
-        await query('DELETE FROM friend_reviews WHERE media_id=$1 AND provider=$2', [body.id, data.provider]);
-        return Response.json({ ok: true });
-      }
       await query(
-        `INSERT INTO friend_reviews(media_id,provider,url,rating,name,scale,manual,status,checked_at) VALUES($1,$2,$3,$4,$5,$6,true,'manual',now()) ON CONFLICT(media_id,provider) DO UPDATE SET url=excluded.url,rating=excluded.rating,name=excluded.name,scale=excluded.scale,manual=true,status='manual',checked_at=now()`,
-        [
-          body.id,
-          data.provider,
-          url,
-          url && data.provider !== 'wortvogel' ? data.rating : null,
-          data.name,
-          data.scale,
-        ],
+        `INSERT INTO friend_reviews(media_id,provider,url,rating,name,scale,manual,status,checked_at)
+        SELECT $1,provider,$3,$4,name,scale,true,'manual',now() FROM review_boxes WHERE provider=$2
+        ON CONFLICT(media_id,provider) DO UPDATE SET url=excluded.url,rating=excluded.rating,name=excluded.name,scale=excluded.scale,manual=true,status='manual',checked_at=now()`,
+        [body.id, data.provider, url, url ? data.rating : null],
       );
     } else if (body.action === 'media') {
       const data = mediaSchema.parse(body.data),

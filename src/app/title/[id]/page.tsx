@@ -1,3 +1,4 @@
+import { configuredFriendReviews } from '@/lib/friend-reviews';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getMedia, publicColumns } from '@/lib/catalog';
@@ -32,16 +33,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const providerRatings = await query('SELECT provider,rating,url FROM provider_ratings WHERE media_id=$1', [
     id,
   ]);
-  if (m.kind === 'movie' && m.year) {
-    await query(
-      `INSERT INTO friend_reviews(media_id,provider) VALUES($1,'filmdienst') ON CONFLICT DO NOTHING`,
-      [id],
-    );
-  }
-  const friends = await query(
-    'SELECT provider,url,rating,status,name,scale FROM friend_reviews WHERE media_id=$1 ORDER BY provider',
-    [id],
-  );
+
+  const friends = await configuredFriendReviews(id, m);
   const reviews = await query(
     `SELECT id,body,spoiler,is_public,parent_source_id,created_at FROM reviews WHERE media_id=$1 ${admin ? '' : 'AND is_public'} ORDER BY created_at DESC`,
     [id],
