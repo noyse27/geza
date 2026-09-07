@@ -267,6 +267,22 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
           </button>
         </div>
       </div>
+      <div className="panel">
+        <h2>Plex-Reviews nachziehen</h2>
+        <p className="muted">
+          Ruft für alle Titel mit Plex-Verweis die persönliche Plex-Review erneut ab und speichert sie.
+          Läuft im Hintergrund über die Warteschlange, ein erneuter Klick stößt einen frischen Abgleich an.
+        </p>
+        <div className="button-row">
+          <button
+            className="button primary"
+            disabled={busy}
+            onClick={() => action({ action: 'plex-review-batch' })}
+          >
+            Plex-Reviews für alle Titel abgleichen
+          </button>
+        </div>
+      </div>
       {message && (
         <p className="notice" role="status">
           {message}
