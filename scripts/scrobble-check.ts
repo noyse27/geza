@@ -67,6 +67,6 @@ try {
 } finally {
   await appPool?.end();
   await target?.end();
-  await source.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await source.query(`DROP DATABASE IF EXISTS ${name}`);
   await source.end();
 }

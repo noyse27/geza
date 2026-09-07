@@ -89,7 +89,8 @@ try {
 } finally {
   await appPool?.end();
   await target?.end();
-  if (/^geza_assignment_\d+$/.test(name)) await source.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  // Let closing pool connections finish instead of terminating their sockets.
+  if (/^geza_assignment_\d+$/.test(name)) await source.query(`DROP DATABASE IF EXISTS ${name}`);
   await source.end();
   await rm(directory, { recursive: true, force: true });
 }
