@@ -279,6 +279,92 @@ export function RatingEditor({ id, rating }: { id: string; rating: number | null
     </div>
   );
 }
+function berlinLocalInputValue(iso: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+}
+type Watch = { id: string; watched_at: string | null; time_estimated: boolean };
+export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch }) {
+  const [open, setOpen] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  if (!open)
+    return (
+      <>
+        {watch.watched_at
+          ? new Date(watch.watched_at).toLocaleString('de-DE', {
+              timeZone: 'Europe/Berlin',
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })
+          : 'Zeitpunkt ungeklärt'}
+        {watch.time_estimated && <small>Empfangszeit verwendet</small>}
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Anschauzeitpunkt bearbeiten"
+          onClick={() => setOpen(true)}
+        >
+          <Pencil size={13} />
+        </button>
+      </>
+    );
+  return (
+    <form
+      className="watch-edit-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError('');
+        try {
+          await post({
+            action: 'watch',
+            id: watch.id,
+            mediaId,
+            data: { watched_at: inputRef.current?.value || null },
+          });
+          try {
+            sessionStorage.setItem('history:invalidated', String(Date.now()));
+          } catch {
+            /* Storage-Zugriff darf das Speichern nicht blockieren. */
+          }
+          setOpen(false);
+          router.refresh();
+        } catch (e) {
+          setError((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="datetime-local"
+        aria-label="Anschauzeitpunkt"
+        defaultValue={watch.watched_at ? berlinLocalInputValue(watch.watched_at) : ''}
+      />
+      <button disabled={busy} className="button primary">
+        <Save size={14} />
+        {busy ? 'Speichert …' : 'Speichern'}
+      </button>
+      <button type="button" className="button" onClick={() => setOpen(false)}>
+        Abbrechen
+      </button>
+      {error && <p className="error">{error}</p>}
+    </form>
+  );
+}
 export function ReviewBody({ review, admin = false }: { review: Review; admin?: boolean }) {
   return (
     <article className="review">

@@ -990,10 +990,27 @@ nav .active:after {
 .watch-dates li {
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .watch-dates small {
   display: block;
   font-size: 10px;
+}
+.watch-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.watch-edit-form input[type='datetime-local'] {
+  flex: 1;
+  min-width: 0;
+}
+.watch-edit-form .error {
+  width: 100%;
 }
 .review {
   border-bottom: 1px solid var(--line);

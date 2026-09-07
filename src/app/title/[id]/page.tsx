@@ -7,7 +7,7 @@ import { isAdmin } from '@/lib/auth';
 import { Poster, kindLabel, MediaRow, Stars } from '@/components/media';
 import { Star } from 'lucide-react';
 import { Back } from '@/components/navigation';
-import { MediaEditor, ReviewBody, ReviewEditor, RatingEditor } from '@/components/editor';
+import { MediaEditor, ReviewBody, ReviewEditor, RatingEditor, WatchEditor } from '@/components/editor';
 import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +41,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   );
   const watches = admin
     ? await query(
-        'SELECT watched_at,time_estimated FROM watches WHERE media_id=$1 ORDER BY watched_at DESC NULLS LAST',
+        'SELECT id,watched_at,time_estimated FROM watches WHERE media_id=$1 ORDER BY watched_at DESC NULLS LAST',
         [id],
       )
     : [];
@@ -227,16 +227,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <h3>Anschauereignisse</h3>
             {watches.length ? (
               <ul className="watch-dates">
-                {watches.map((w, i) => (
-                  <li key={i}>
-                    {w.watched_at
-                      ? new Date(w.watched_at).toLocaleString('de-DE', {
-                          timeZone: 'Europe/Berlin',
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })
-                      : 'Zeitpunkt ungeklärt'}
-                    {w.time_estimated && <small>Empfangszeit verwendet</small>}
+                {watches.map((w) => (
+                  <li key={w.id}>
+                    <WatchEditor mediaId={id} watch={JSON.parse(JSON.stringify(w))} />
                   </li>
                 ))}
               </ul>

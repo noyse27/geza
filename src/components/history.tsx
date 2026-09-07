@@ -22,15 +22,20 @@ export function HistoryBrowser({
   const key = params.toString();
   useEffect(() => {
     const stored = sessionStorage.getItem('history:' + key);
+    const invalidatedAt = Number(sessionStorage.getItem('history:invalidated') || 0);
     if (stored) {
       try {
         const saved = JSON.parse(stored);
-        setResult(saved.result);
-        requestAnimationFrame(() => window.scrollTo(0, saved.scroll));
+        if (saved.savedAt && saved.savedAt >= invalidatedAt) {
+          setResult(saved.result);
+          requestAnimationFrame(() => window.scrollTo(0, saved.scroll));
+          return;
+        }
       } catch {
-        setResult(initial);
+        /* fall through to fresh data below */
       }
-    } else setResult(initial);
+    }
+    setResult(initial);
   }, [initial, key]);
   useEffect(() => {
     const track = () => {
@@ -38,7 +43,10 @@ export function HistoryBrowser({
     };
     const save = () => {
       try {
-        sessionStorage.setItem('history:' + key, JSON.stringify({ result, scroll: scrollPosition.current }));
+        sessionStorage.setItem(
+          'history:' + key,
+          JSON.stringify({ result, scroll: scrollPosition.current, savedAt: Date.now() }),
+        );
       } catch {
         /* Storage quota must not interrupt navigation. */
       }

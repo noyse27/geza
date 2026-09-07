@@ -46,6 +46,11 @@ export function DeleteMediaButton({ item }: { item: Media }) {
                     body: JSON.stringify({ action: 'delete-media', data: { id: item.id, title } }),
                   });
                   if (!response.ok) throw Error((await response.json()).error || 'Löschen fehlgeschlagen.');
+                  try {
+                    sessionStorage.setItem('history:invalidated', String(Date.now()));
+                  } catch {
+                    /* Storage-Zugriff darf das Löschen nicht blockieren. */
+                  }
                   router.replace(item.parent_id ? `/title/${item.parent_id}` : '/search');
                   router.refresh();
                 } catch (e) {
