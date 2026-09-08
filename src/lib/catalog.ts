@@ -86,6 +86,8 @@ export async function history(params: URLSearchParams, admin = false, limit = 50
     );
   if (params.get('type') === 'movie') filters.push("m.kind='movie'");
   if (params.get('type') === 'show') filters.push("m.kind='episode'");
+  if (admin && params.get('reviews') === '1')
+    filters.push('EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id)');
   const month = params.get('month');
   if (month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month))
     filters.push(
@@ -115,8 +117,8 @@ export async function history(params: URLSearchParams, admin = false, limit = 50
         : null,
   };
 }
-export async function months(type: string, admin = false) {
+export async function months(type: string, admin = false, reviewsOnly = false) {
   return query(
-    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id LEFT JOIN ratings r ON r.media_id=m.id WHERE w.watched_at IS NOT NULL ${admin ? '' : "AND (r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public)) "}${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
+    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id LEFT JOIN ratings r ON r.media_id=m.id WHERE w.watched_at IS NOT NULL ${admin ? '' : "AND (r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public)) "}${admin && reviewsOnly ? 'AND EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id) ' : ''}${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
   );
 }

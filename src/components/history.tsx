@@ -121,6 +121,14 @@ export function HistoryBrowser({
           ))}
         </div>
         {admin && <ScrobbleDialog initialCount={openScrobbles} />}
+        {admin && (
+          <button
+            className={'button' + (params.get('reviews') === '1' ? ' primary' : '')}
+            onClick={() => change('reviews', params.get('reviews') === '1' ? '' : '1')}
+          >
+            Nur mit Review
+          </button>
+        )}
         <select
           aria-label="Zum Monat springen"
           value={selected}
