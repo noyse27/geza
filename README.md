@@ -135,4 +135,15 @@ Filmdienst wird für aufgerufene Filme im Hintergrund gesucht. Geza speichert nu
 
 Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
 
+## Changelog
+
+### v1.0 (current)
+- Öffentlicher Katalog mit Suche, Detailseiten, Zehnerbewertungen und Reviews; privates Anschautagebuch nach Login
+- Trakt-Import per ZIP-Upload im Admin oder CLI für History, Bewertungen, Kommentare und Sammlung
+- Plex-Webhook-Sync für Anschauereignisse sowie persönliche Reviews via community.plex.tv, mit Schutz vor doppelten Reviews
+- Zuordnungskorrektur für Episoden/Staffeln und Löschen von Mediendatensätzen im Admin
+- Externe Reviews und Anbieterbewertungen über pluggable Provider-Module (TMDB, TVDB, Filmdienst, Wortvogel, eigene Quellen)
+- History-Filter im Adminmodus: nach Typ, Monat und (neu) „Nur mit Review"
+- Docker-Compose-Setup mit Sicherung/Wiederherstellung, Erstadmin-Einrichtung und CI mit Typprüfung, Tests, Trivy, Gitleaks, CodeQL und Image-Scan
+
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
