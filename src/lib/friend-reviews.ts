@@ -2,12 +2,11 @@ import { query } from './db';
 import { reviewModule, reviewModules } from './review-modules';
 import type { ReviewMedia } from './review-modules/types';
 export { parseFilmdienst } from './review-modules/filmdienst';
+export { parseWortvogel } from './review-modules/wortvogel';
 export function friendUrl(provider: string, value: string) {
   if (!value.trim()) return null;
   const url = new URL(value.trim());
   if (url.protocol !== 'https:' || url.username || url.password || url.port)
-    throw Error('Ungültiger Review-Link');
-  if (provider === 'wortvogel' && !['wortvogel.de', 'www.wortvogel.de'].includes(url.hostname))
     throw Error('Ungültiger Review-Link');
   reviewModule(provider)?.validateUrl(url);
   return url.href;
