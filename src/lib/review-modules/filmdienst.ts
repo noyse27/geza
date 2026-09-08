@@ -27,12 +27,12 @@ export function parseFilmdienst(html: string, titles: string[], year: number, im
           continue;
         const rating = item.review?.reviewRating;
         const value = Number(rating?.ratingValue);
-        return {
-          rating:
-            rating && Number(rating.bestRating) === 5 && Number.isFinite(value) && value >= 0 && value <= 5
-              ? value
-              : null,
-        };
+        if (rating && Number(rating.bestRating) === 5 && Number.isFinite(value) && value >= 0 && value <= 5)
+          return { rating: value };
+        // Some reviews carry no reviewRating in the JSON-LD even though the page renders stars.
+        const stars = html.match(/<div class="star-rating[^"]*" title="([\d,]+) Sterne"/);
+        const starValue = stars ? Number(stars[1].replace(',', '.')) : NaN;
+        return { rating: Number.isFinite(starValue) && starValue >= 0 && starValue <= 5 ? starValue : null };
       }
     } catch {
       /* Malformed third-party metadata is not a match. */

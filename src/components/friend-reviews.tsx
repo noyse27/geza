@@ -67,7 +67,7 @@ export function FriendReviews({
               )}
               {admin && (
                 <>
-                  {provider === 'filmdienst' && (
+                  {(provider === 'filmdienst' || provider === 'wortvogel') && (
                     <p className="muted small">
                       {row?.status === 'pending'
                         ? 'Suche im Hintergrund vorgemerkt.'
@@ -76,13 +76,23 @@ export function FriendReviews({
                           : row?.status === 'error'
                             ? 'Quelle derzeit nicht abrufbar. Neuer Versuch frühestens nach einem Tag.'
                             : ''}{' '}
-                      <a
-                        href={`https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(`${title} ${year || ''}`)}#results`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Bei Filmdienst suchen ↗
-                      </a>
+                      {provider === 'filmdienst' ? (
+                        <a
+                          href={`https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(`${title} ${year || ''}`)}#results`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Bei Filmdienst suchen ↗
+                        </a>
+                      ) : (
+                        <a
+                          href={`https://wortvogel.de/?s=${encodeURIComponent(`${title} "kino kritik"`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Bei wortvogel.de suchen ↗
+                        </a>
+                      )}
                     </p>
                   )}
                   <button
