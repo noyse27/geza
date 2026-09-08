@@ -7,7 +7,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const admin = await isAdmin();
   const p = new URLSearchParams(await searchParams);
   const openScrobbles = admin ? await openScrobbleCount() : 0;
-  const [initial, list] = await Promise.all([history(p, admin), months(p.get('type') || 'all', admin)]);
+  const [initial, list] = await Promise.all([
+    history(p, admin),
+    months(p.get('type') || 'all', admin, p.get('reviews') === '1'),
+  ]);
   return (
     <div className="page">
       <div className="page-heading">
