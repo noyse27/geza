@@ -96,6 +96,36 @@ export async function POST(req: Request) {
         `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,
         [...values, fields, body.id],
       );
+      const series = z.string().max(300).optional().parse(body.data?.series)?.trim();
+      if (!series) await query('DELETE FROM film_series_members WHERE media_id=$1', [body.id]);
+      else {
+        const [{ id: seriesId }] = await query<{ id: string }>(
+          'INSERT INTO film_series(title) VALUES($1) ON CONFLICT(title) DO UPDATE SET title=excluded.title RETURNING id',
+          [series],
+        );
+        await query(
+          `INSERT INTO film_series_members(series_id,media_id,position)
+           VALUES($1,$2,COALESCE((SELECT max(position)+1 FROM film_series_members WHERE series_id=$1),1))
+           ON CONFLICT(media_id) DO UPDATE SET series_id=excluded.series_id,position=excluded.position`,
+          [seriesId, body.id],
+        );
+      }
+    } else if (body.action === 'series-reorder') {
+      const data = z
+        .object({
+          seriesId: z.string().regex(/^\d+$/),
+          order: z
+            .array(z.string().regex(/^\d+$/))
+            .min(1)
+            .max(500),
+        })
+        .parse(body.data);
+      await query(
+        `UPDATE film_series_members SET position=v.position
+         FROM (SELECT unnest($2::bigint[]) AS media_id,generate_series(1,array_length($2::bigint[],1)) AS position) v
+         WHERE film_series_members.series_id=$1 AND film_series_members.media_id=v.media_id`,
+        [data.seriesId, data.order],
+      );
     } else if (body.action === 'review') {
       const data = z
         .object({ body: z.string().min(1).max(30000), spoiler: z.boolean(), is_public: z.boolean() })

@@ -13,7 +13,13 @@ async function post(body: unknown) {
   });
   if (!r.ok) throw Error((await r.json()).error || 'Speichern fehlgeschlagen');
 }
-export function MediaEditor({ item }: { item: Media }) {
+export function MediaEditor({
+  item,
+  seriesOptions = [],
+}: {
+  item: Media;
+  seriesOptions?: { id: string; title: string }[];
+}) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -54,6 +60,7 @@ export function MediaEditor({ item }: { item: Media }) {
                     .split(',')
                     .map((x) => x.trim())
                     .filter(Boolean);
+                data.series = String(form.get('series') || '').trim();
                 try {
                   await post({ action: 'media', id: item.id, data });
                   setOpen(false);
@@ -91,6 +98,21 @@ export function MediaEditor({ item }: { item: Media }) {
                     />
                   </label>
                 ))}
+                <label>
+                  Filmreihe
+                  <input
+                    name="series"
+                    list="film-series-options"
+                    autoComplete="off"
+                    defaultValue={item.series_title ?? ''}
+                    placeholder="Neue Filmreihe anlegen oder bestehende wählen"
+                  />
+                  <datalist id="film-series-options">
+                    {seriesOptions.map((s) => (
+                      <option key={s.id} value={s.title} />
+                    ))}
+                  </datalist>
+                </label>
               </div>
               <label>
                 Zusammenfassung
