@@ -8,6 +8,7 @@ import { fetchPlexReview } from '@/lib/plex';
 import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
+import { normalizeCertification } from '@/lib/certification';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -89,8 +90,9 @@ export async function POST(req: Request) {
         [body.id, data.provider, url, url ? data.rating : null],
       );
     } else if (body.action === 'media') {
-      const data = mediaSchema.parse(body.data),
-        fields = Object.keys(data);
+      const data = mediaSchema.parse(body.data);
+      data.certification = normalizeCertification(data.certification) ?? null;
+      const fields = Object.keys(data);
       const values = Object.values(data);
       await query(
         `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,

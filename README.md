@@ -155,6 +155,8 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 - Filmreihen mit Zuordnung und bearbeitbarer Reihenfolge; bestehende Reihen werden in Sammlungen übernommen
 - Filmicon als Favicon und im Footer
 - Datenbankmigration 011 für schnelle Sammlungsabfragen und neue Regressionstests in der CI
+- Neue Sammlungen für Regie und Besetzung, direkt aus den Filmdetails klickbar
+- FSK-Angaben werden beim Anbieterabgleich und bei manueller Bearbeitung einheitlich auf „FSK <Wert>" normalisiert; Filme ohne Altersangabe erscheinen in einer eigenen Sammlung „Keine Altersangabe" statt zu fehlen
 
 ### v1.0.2
 - Titel-Links in Reviews grün hervorgehoben (Akzentfarbe mit Pfeil), analog zu den anderen Geza-Links

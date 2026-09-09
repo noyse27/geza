@@ -5,6 +5,8 @@ export const collectionCategories = {
   country: 'Länder',
   year: 'Erscheinungsjahre',
   rating: 'GEZA-Bewertungen',
+  director: 'Regie',
+  actor: 'Besetzung',
 } as const;
 export type CollectionCategory = keyof typeof collectionCategories;
 export function isCollectionCategory(value: string): value is CollectionCategory {

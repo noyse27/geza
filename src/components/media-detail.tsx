@@ -191,11 +191,30 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
           <div className="detail-credits">
             <div>
               <span className="eyebrow">REGIE</span>
-              <p>{m.directors.join(', ') || 'Noch keine Angabe'}</p>
+              <div className="tags">
+                {m.directors.map((director) => (
+                  <Link
+                    key={director}
+                    className="fact-button"
+                    replace={modal}
+                    href={collectionHref('director', director)}
+                  >
+                    {director}
+                  </Link>
+                ))}
+                {!m.directors.length && <p>Noch keine Angabe</p>}
+              </div>
             </div>
             <div>
               <span className="eyebrow">BESETZUNG</span>
-              <p>{m.actors.slice(0, 10).join(', ') || 'Noch keine Angabe'}</p>
+              <div className="tags">
+                {m.actors.slice(0, 10).map((actor) => (
+                  <Link key={actor} className="fact-button" replace={modal} href={collectionHref('actor', actor)}>
+                    {actor}
+                  </Link>
+                ))}
+                {!m.actors.length && <p>Noch keine Angabe</p>}
+              </div>
             </div>
           </div>
           <div className="external-links">

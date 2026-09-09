@@ -12,8 +12,8 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
   let seriesId: string | undefined;
   try {
     const rows = await query<{ id: string }>(
-      `INSERT INTO media(kind,title,year,genres,countries,certification)
-      SELECT 'movie','Collection test ' || lpad(n::text,3,'0'),2025,ARRAY[$1,$1],ARRAY['Deutschland','Frankreich'],'FSK 12'
+      `INSERT INTO media(kind,title,year,genres,countries,certification,directors,actors)
+      SELECT 'movie','Collection test ' || lpad(n::text,3,'0'),2025,ARRAY[$1,$1],ARRAY['Deutschland','Frankreich'],'FSK 12',ARRAY['Director ' || $1],ARRAY['Actor ' || $1]
       FROM generate_series(1,53) n RETURNING id`,
       [genre],
     );
@@ -26,6 +26,10 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
         )
       )[0].id,
     );
+    const uncertifiedId = (
+      await query(`INSERT INTO media(kind,title) VALUES('movie','Uncertified ' || $1) RETURNING id`, [suffix])
+    )[0].id;
+    ids.push(uncertifiedId);
     await query(
       "INSERT INTO watches(media_id,source,source_id,watched_at) VALUES($1,'test',$2,now()),($1,'test',$3,now())",
       [ids[0], suffix + 'a', suffix + 'b'],
@@ -33,6 +37,10 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
     await query("INSERT INTO ratings(media_id,rating,source,rated_at) VALUES($1,8,'test',now())", [ids[0]]);
     const groups = await collectionGroups('genre');
     assert.equal(groups.find((group) => group.value === genre)?.count, 53);
+    assert.equal(
+      (await collectionGroups('director')).find((group) => group.value === `Director ${genre}`)?.count,
+      53,
+    );
     const first = await collectionItems('genre', genre, new URLSearchParams());
     const second = await collectionItems('genre', genre, new URLSearchParams({ page: '1' }));
     assert.equal(first.items.length, 50);
@@ -53,6 +61,8 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
       ['country', 'Deutschland'],
       ['country', 'Frankreich'],
       ['certification', 'FSK 12'],
+      ['director', `Director ${genre}`],
+      ['actor', `Actor ${genre}`],
       ['year', '2025'],
       ['rating', '8'],
     ] as const) {
@@ -66,6 +76,15 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
       (await collectionItems('certification', 'FSK 16', new URLSearchParams({ q: 'Collection test' }))).items
         .length,
       0,
+    );
+    assert.ok(
+      (await collectionItems('certification', 'none', new URLSearchParams({ q: 'Uncertified' }))).items.some(
+        (item) => item.id === uncertifiedId,
+      ),
+    );
+    assert.equal(
+      (await collectionGroups('certification')).find((group) => group.value === 'none')?.label,
+      'Keine Altersangabe',
     );
     assert.equal((await collectionItems('year', 'NaN', new URLSearchParams())).items.length, 0);
     assert.equal(

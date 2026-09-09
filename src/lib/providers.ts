@@ -3,6 +3,7 @@ import { query } from './db';
 import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
+import { normalizeCertification } from './certification';
 type Raw = Record<string, any>;
 const fields = [
   'title',
@@ -29,7 +30,9 @@ export function fromPlex(m: Raw): Raw {
     genres: tags(m.Genre),
     directors: tags(m.Director),
     actors: tags(m.Role).slice(0, 10),
-    certification: m.contentRating?.startsWith('de/') ? m.contentRating.slice(3) : undefined,
+    certification: normalizeCertification(
+      m.contentRating?.startsWith('de/') ? m.contentRating.slice(3) : undefined,
+    ),
     runtime: m.duration ? Math.round(m.duration / 60000) : undefined,
   };
 }
@@ -115,7 +118,7 @@ async function tmdb(m: Raw): Promise<Raw | null> {
     genres: tags(d.genres),
     directors: d.credits?.crew?.filter((x: Raw) => x.job === 'Director').map((x: Raw) => x.name),
     actors: d.credits?.cast?.slice(0, 10).map((x: Raw) => x.name),
-    certification: de ? `FSK ${de}` : undefined,
+    certification: normalizeCertification(de),
     runtime: d.runtime || d.episode_run_time?.[0],
     poster: d.poster_path
       ? `https://image.tmdb.org/t/p/w342${d.poster_path}`
@@ -162,7 +165,9 @@ async function tvdb(m: Raw): Promise<Raw | null> {
       .map((x: Raw) => x.personName),
     directors: d.characters?.filter((x: Raw) => x.peopleType === 'Director').map((x: Raw) => x.personName),
     runtime: d.runtime || d.averageRuntime,
-    certification: d.contentRatings?.find((x: Raw) => x.country === 'deu' || x.country === 'de')?.name,
+    certification: normalizeCertification(
+      d.contentRatings?.find((x: Raw) => x.country === 'deu' || x.country === 'de')?.name,
+    ),
     poster: d.image,
   };
 }

@@ -10,10 +10,18 @@ export async function collectionGroups(category: CollectionCategory) {
      JOIN film_series_members fsm ON fsm.series_id=fs.id JOIN media m ON m.id=fsm.media_id
      WHERE m.kind='movie' GROUP BY fs.id ORDER BY fs.title,fs.id`,
     );
+  if (category === 'certification')
+    return query<{ value: string; label: string; count: number }>(
+      `SELECT COALESCE(value,'none') AS value,COALESCE(value,'Keine Altersangabe') AS label,
+        count(DISTINCT id)::int AS count FROM (
+        SELECT m.id,m.certification AS value FROM media m WHERE m.kind='movie'
+      ) groups GROUP BY value ORDER BY value IS NULL,value`,
+    );
   const expressions = {
     genre: 'unnest(m.genres)',
     country: 'unnest(m.countries)',
-    certification: 'm.certification',
+    director: 'unnest(m.directors)',
+    actor: 'unnest(m.actors)',
     year: 'm.year::text',
     rating: 'r.rating::text',
   };
@@ -27,12 +35,15 @@ export async function collectionGroups(category: CollectionCategory) {
 }
 
 export async function collectionItems(category: CollectionCategory, value: string, params: URLSearchParams) {
-  const values: unknown[] = [value];
+  const isUncertified = category === 'certification' && value === 'none';
+  const values: unknown[] = isUncertified ? [] : [value];
   const filters = ["m.kind='movie'"];
   const predicates = {
     genre: 'm.genres @> ARRAY[$1]::text[]',
     country: 'm.countries @> ARRAY[$1]::text[]',
-    certification: 'm.certification=$1',
+    director: 'm.directors @> ARRAY[$1]::text[]',
+    actor: 'm.actors @> ARRAY[$1]::text[]',
+    certification: isUncertified ? 'm.certification IS NULL' : 'm.certification=$1',
     year: 'm.year=$1::integer',
     rating: 'r.rating=$1::integer',
     series: 'fsm.series_id=$1::bigint',
