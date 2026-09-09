@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: { default: 'Geza — Film & Serie', template: '%s · Geza' },
   description: 'Filme, Serien und persönliche Perspektiven.',
   robots: process.env.PUBLIC_URL ? undefined : { index: false, follow: false },
+  icons: { icon: '/icon.svg' },
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const admin = await isAdmin();
@@ -47,7 +48,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main>{children}</main>
         <footer>
           <Link className="footer-brand" href="/">
-            geza.
+            <Film size={18} />
+            <span>
+              geza<span className="brand-dot">.</span>
+            </span>
           </Link>
           <span>Für die Filme, die bleiben.</span>
           <span className="footer-copyright">
