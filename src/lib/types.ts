@@ -8,6 +8,8 @@ export type Media = {
   parent_title?: string;
   parent_year?: number;
   show_title?: string;
+  series_id?: string;
+  series_title?: string;
   season: number | null;
   episode: number | null;
   ids: Record<string, string | number>;

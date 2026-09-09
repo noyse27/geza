@@ -1,7 +1,7 @@
 import { configuredFriendReviews } from '@/lib/friend-reviews';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getMedia, publicColumns } from '@/lib/catalog';
+import { getMedia, publicColumns, listFilmSeries } from '@/lib/catalog';
 import { query } from '@/lib/db';
 import { isAdmin } from '@/lib/auth';
 import { Poster, kindLabel, MediaRow, Stars } from '@/components/media';
@@ -26,6 +26,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     m = await getMedia(id);
   if (!m) notFound();
   const admin = await isAdmin();
+  const seriesOptions = admin ? await listFilmSeries() : [];
   if (['movie', 'show', 'episode'].includes(m.kind))
     await query(
       `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),updated_at=now() WHERE jobs.status IN ('done','failed') AND jobs.updated_at<now()-interval '7 days'`,
@@ -87,6 +88,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <div className="detail-top">
         <div className="detail-poster">
           <Poster item={m} large />
+          {m.series_title && (
+            <Link className="series-badge" href={`/series/${m.series_id}`}>
+              {m.series_title}
+            </Link>
+          )}
         </div>
         <div className="detail-intro">
           <span className="eyebrow accent">
@@ -186,7 +192,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               </a>
             )}
           </div>
-          {admin && <MediaEditor item={JSON.parse(JSON.stringify(m))} />}
+          {admin && (
+            <MediaEditor item={JSON.parse(JSON.stringify(m))} seriesOptions={JSON.parse(JSON.stringify(seriesOptions))} />
+          )}
         </div>
       </div>
       <div className={`detail-lower ${admin ? 'with-private' : ''}`}>

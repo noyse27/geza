@@ -67,11 +67,26 @@ export async function getMedia(id: string) {
   return (
     (
       await query<Media>(
-        `SELECT ${publicColumns},m.locked_fields FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.id=$1`,
+        `SELECT ${publicColumns},m.locked_fields,fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1`,
         [id],
       )
     )[0] || null
   );
+}
+export async function listFilmSeries() {
+  return query<{ id: string; title: string }>('SELECT id,title FROM film_series ORDER BY title');
+}
+export async function getFilmSeries(id: string) {
+  if (!/^\d+$/.test(id)) return null;
+  const [series] = await query<{ id: string; title: string }>('SELECT id,title FROM film_series WHERE id=$1', [
+    id,
+  ]);
+  if (!series) return null;
+  const items = await query<Media>(
+    `SELECT ${cardColumns} FROM film_series_members fsm JOIN media m ON m.id=fsm.media_id LEFT JOIN media p ON p.id=m.parent_id WHERE fsm.series_id=$1 ORDER BY fsm.position`,
+    [id],
+  );
+  return { series, items };
 }
 export async function history(params: URLSearchParams, admin = false, limit = 50) {
   const values: unknown[] = [];
