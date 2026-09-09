@@ -18,8 +18,8 @@ export async function renderReviewBody(body: string) {
       end = start + m[0].length;
     if (start > last) parts.push(body.slice(last, start));
     parts.push(
-      <Link key={start} href={`/title/${m[1]}`}>
-        {title}
+      <Link key={start} className="review-title-link" href={`/title/${m[1]}`}>
+        {title} ↗
       </Link>,
     );
     last = end;
