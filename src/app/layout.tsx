@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const admin = await isAdmin();
+  const year = new Date().getFullYear();
   return (
     <html lang="de">
       <body>
@@ -49,6 +50,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             geza.
           </Link>
           <span>Für die Filme, die bleiben.</span>
+          <span className="footer-copyright">
+            &copy; 2026{year > 2026 ? ` - ${year}` : ''} Binged with love &bull; Curated with care &bull; Served
+            with style by <a href="https://polze.net/geza.html">PolzeSoft</a>
+          </span>
           <Link href="/credits">Daten & Quellen</Link>
           <span className="footer-note">{admin ? 'Privater Bereich verfügbar' : 'Film & Serie'}</span>
         </footer>

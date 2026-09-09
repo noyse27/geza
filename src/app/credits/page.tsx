@@ -26,6 +26,10 @@ export default function Page() {
       </p>
       <h2>Schrift</h2>
       <p>Syne wird lokal ausgeliefert. Für die Schrift werden keine Verbindungen zu Google aufgebaut.</p>
+      <h2>Kontakt</h2>
+      <p>
+        Email: <a href="mailto:geza@polze.net">geza@polze.net</a>
+      </p>
     </div>
   );
 }
