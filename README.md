@@ -6,7 +6,7 @@ Film- und Serienportal mit öffentlichen Bewertungen und Reviews sowie einem pri
 
 ## Sichtbarkeit
 
-**Öffentlich:** Katalog, Suche, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
+**Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
 **Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
 
@@ -33,6 +33,16 @@ zum Anlegen des Admins. Danach ist diese Einrichtung gesperrt und `/login` ist d
 - Provider-Zugänge: nach Anmeldung unter **Admin**
 
 Die lokale App ist nur an `127.0.0.1` gebunden. Der Datenbankport ist im normalen Betrieb geschlossen; `compose.dev.yaml` stellt bei Bedarf PostgreSQL auf `127.0.0.1:5439` bereit.
+
+## Sammlungen und Filmreihen
+
+Unter **Sammlungen** führen Kacheln für **Filmreihen, Genres, FSK, Länder, Erscheinungsjahre und GEZA-Bewertungen** zu Unterkacheln mit Filmanzahlen. Ein Klick öffnet die entsprechende Filmliste. Jahr, Altersfreigabe, Länder, Genres, GEZA-Bewertung und Filmreihe sind auch auf der Detailseite direkt anklickbar.
+
+Die Listen zeigen **50 Filme pro Seite**. Mit „Weitere 50“ und „Vorherige 50“ sind alle Treffer erreichbar; Suche und Sortierung gelten für die gesamte ausgewählte Sammlung. Jeder Film erscheint einmal, unabhängig von seinen Anschauereignissen. Filmreihen verwenden standardmäßig ihre gespeicherte Reihenfolge, die Admins weiterhin bearbeiten können.
+
+Ein Film aus einer Sammlung öffnet seine vollständigen Details **im Modal**, einschließlich Reviews und der nach Login verfügbaren Bearbeitung. Beim Schließen bleiben Suche, Sortierung und Scrollposition erhalten. „Vorheriger“ und „Nächster“ wechseln innerhalb der aktuellen Ergebnisseite. Ein Kategorienklick im Modal führt zur neuen Sammlung; Browser-Zurück führt zur vorherigen Liste. „Detailseite öffnen“ sowie ein direkt aufgerufener oder neu geladener Filmlink öffnen die normale Detailseite.
+
+Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbieter. Migration **011** ergänzt passende Indizes; vollständige Details werden erst beim Öffnen geladen. Änderungen im Modal aktualisieren anschließend die Liste und deren Anzahl. Technische Hinweise und Testmessungen stehen in [Sammlungen](docs/sammlungen.md).
 
 ## Trakt-Import
 
@@ -115,7 +125,7 @@ Migrationen laufen vor App und Worker. Das benannte Datenbankvolume überlebt Co
 
 ## Prüfungen
 
-Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run build`. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank.
+Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run build`. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
 
 Die GitHub-CI folgt `adolar-songster` und `bloeki`: Typprüfung, Tests, Build, Trivy, Gitleaks, CodeQL und Image-Scan. Dependabot prüft npm, Docker und GitHub Actions montags in Europe/Berlin mit gruppierten Minor-/Patch-Updates. Entwicklungscompiler und Paketmanager werden nicht im Laufzeitimage ausgeliefert.
 
@@ -137,7 +147,16 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
-### v1.0.2 (current)
+### v1.1.0 (current)
+
+- Neuer Bereich Sammlungen mit Filmreihen, Genres, FSK, Ländern, Erscheinungsjahren und GEZA-Bewertungen
+- Klickbare Detailangaben führen direkt zu passenden Filmlisten; Suche, Sortierung und Paging mit 50 Filmen pro Seite
+- Vollständige Filmdetails als Modal innerhalb von Sammlungen, mit erhaltener Scrollposition, Vorheriger/Nächster und aktualisierten Listen nach Änderungen
+- Filmreihen mit Zuordnung und bearbeitbarer Reihenfolge; bestehende Reihen werden in Sammlungen übernommen
+- Filmicon als Favicon und im Footer
+- Datenbankmigration 011 für schnelle Sammlungsabfragen und neue Regressionstests in der CI
+
+### v1.0.2
 - Titel-Links in Reviews grün hervorgehoben (Akzentfarbe mit Pfeil), analog zu den anderen Geza-Links
 
 ### v1.0.1

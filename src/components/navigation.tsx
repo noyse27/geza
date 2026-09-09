@@ -9,6 +9,7 @@ export function Navigation({ admin }: { admin: boolean }) {
     ? [
         ['/home', 'Home'],
         ['/history', 'History'],
+        ['/collections', 'Sammlungen'],
         ['/data', 'Data'],
         ['/stats', 'Statistik'],
         ['/admin', 'Admin'],
@@ -17,11 +18,18 @@ export function Navigation({ admin }: { admin: boolean }) {
         ['/', 'Entdecken'],
         ['/search', 'Suche'],
         ['/history', 'History'],
+        ['/collections', 'Sammlungen'],
       ];
   return (
     <nav aria-label="Hauptnavigation">
       {links.map(([url, label]) => (
-        <Link key={url} href={url} className={path === url ? 'active' : ''}>
+        <Link
+          key={url}
+          href={url}
+          className={
+            path === url || (url === '/collections' && path.startsWith('/collections/')) ? 'active' : ''
+          }
+        >
           {label}
         </Link>
       ))}
