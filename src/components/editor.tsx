@@ -12,6 +12,7 @@ async function post(body: unknown) {
     body: JSON.stringify(body),
   });
   if (!r.ok) throw Error((await r.json()).error || 'Speichern fehlgeschlagen');
+  window.dispatchEvent(new Event('geza:catalog-changed'));
 }
 export function MediaEditor({
   item,

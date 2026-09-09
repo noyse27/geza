@@ -37,15 +37,22 @@ export function Stars({ rating }: { rating: number }) {
 }
 export function MediaRow({
   item,
+  href,
   watched = false,
   index,
 }: {
   item: Media;
+  href?: string;
   watched?: boolean;
   index?: number;
 }) {
   return (
-    <Link href={`/title/${item.id}`} className="media-row" prefetch={false}>
+    <Link
+      href={href || `/title/${item.id}`}
+      scroll={href ? false : undefined}
+      className="media-row"
+      prefetch={false}
+    >
       {index !== undefined && <span className="row-index">{String(index + 1).padStart(2, '0')}</span>}
       <Poster item={item} />
       <div className="row-info">
@@ -67,6 +74,7 @@ export function MediaRow({
           {item.genres.slice(0, 2).join(' · ') ||
             (item.original_title && item.original_title !== item.title ? item.original_title : '')}
           {item.runtime ? ` · ${item.runtime} Min.` : ''}
+          {item.certification ? ` · ${item.certification}` : ''}
         </span>
       </div>
       <div className="row-meta">

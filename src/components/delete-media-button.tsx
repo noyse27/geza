@@ -1,11 +1,14 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCollectionHref } from './collection-context';
 import { Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 
 export function DeleteMediaButton({ item }: { item: Media }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const collectionHref = useCollectionHref();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,7 +54,14 @@ export function DeleteMediaButton({ item }: { item: Media }) {
                   } catch {
                     /* Storage-Zugriff darf das Löschen nicht blockieren. */
                   }
-                  router.replace(item.parent_id ? `/title/${item.parent_id}` : '/search');
+                  window.dispatchEvent(new Event('geza:catalog-changed'));
+                  router.replace(
+                    pathname.startsWith('/collections/title/')
+                      ? collectionHref
+                      : item.parent_id
+                        ? `/title/${item.parent_id}`
+                        : '/search',
+                  );
                   router.refresh();
                 } catch (e) {
                   setError((e as Error).message);

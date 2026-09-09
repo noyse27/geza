@@ -1,6 +1,6 @@
 {
   "name": "geza",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "lint": "tsc --noEmit",
     "test:unit": "tsx --test tests/unit.test.ts",
     "test:integration": "tsx --test tests/integration.test.ts",
+    "test:collections": "tsx --test tests/collections.test.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "import:trakt": "tsx scripts/import.ts",
     "worker": "tsx scripts/worker.ts",

@@ -21,7 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const admin = await isAdmin();
   const year = new Date().getFullYear();
   return (
-    <html lang="de">
+    <html lang="de" data-scroll-behavior="smooth">
       <body>
         <header className="site-header">
           <Link className="brand" href={admin ? '/home' : '/'} aria-label="Geza Startseite">

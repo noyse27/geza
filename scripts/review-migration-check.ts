@@ -10,10 +10,13 @@ try {
     const name = `geza_review_migration_${Date.now()}_${existing ? 'upgrade' : 'fresh'}`;
     const url = new URL(process.env.DATABASE_URL!);
     url.pathname = '/' + name;
-    let target: pg.Pool | undefined;
+    let target: pg.Client | undefined;
     try {
       await source.query(`CREATE DATABASE ${name}`);
-      target = new pg.Pool({ connectionString: url.toString() });
+      // Await the connection's actual end before dropping its database. Pool.end()
+      // can finish while an idle socket is still closing, racing DROP ... FORCE.
+      target = new pg.Client({ connectionString: url.toString() });
+      await target.connect();
       await target.query(
         'CREATE TABLE migrations(name text PRIMARY KEY, applied_at timestamptz DEFAULT now())',
       );
