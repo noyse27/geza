@@ -2,6 +2,8 @@
 
 `/collections` bietet Filmreihen, Genres, FSK, Länder, Erscheinungsjahre und GEZA-Bewertungen. Die Angaben auf der Detailseite führen direkt zur passenden Sammlung. Es werden Filme aus dem vorhandenen Katalog angezeigt; Serien, Staffeln und Episoden sind nicht Teil dieser Sammlungen.
 
+Die Altersfreigabe wird beim Speichern (Anbieterabgleich und manuelle Bearbeitung) einheitlich auf `FSK <Wert>` normalisiert. Filme ganz ohne Altersangabe erscheinen in der eigenen Kachel „Keine Altersangabe“ statt in der Sammlung zu fehlen.
+
 - Jede Unterkachel zeigt die Anzahl unterschiedlicher Filme. Mehrere Anschauereignisse und doppelte Genreangaben erzeugen keine doppelten Filmzeilen.
 - Die Ergebnisliste enthält 50 Filme pro Seite. „Weitere 50“ und „Vorherige 50“ blättern durch alle Ergebnisse. Suche und Sortierung gelten für die gesamte ausgewählte Sammlung; eine neue Suche beginnt auf Seite 1.
 - Die gespeicherte Reihenfolge aus `film_series_members` bleibt der Standard für Filmreihen. Die vorhandene Reihenfolgebearbeitung ist für Admins verlinkt.

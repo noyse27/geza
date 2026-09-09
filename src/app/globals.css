@@ -1088,6 +1088,9 @@ nav .active:after {
   font-size: 9px;
   color: var(--muted);
 }
+.detail-credits .tags {
+  margin: 7px 0 0;
+}
 .detail-credits p {
   font-size: 13px;
   line-height: 1.8;
