@@ -147,7 +147,10 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
-### v1.1.0 (current)
+### v1.1.1 (current)
+- Migrationen laufen nicht mehr in den 8s-Statement-Timeout der App; verhinderte auf größeren Produktivbeständen den Abschluss von Migration 013
+
+### v1.1.0
 
 - Neuer Bereich Sammlungen mit Filmreihen, Genres, FSK, Ländern, Erscheinungsjahren und GEZA-Bewertungen
 - Klickbare Detailangaben führen direkt zu passenden Filmlisten; Suche, Sortierung und Paging mit 50 Filmen pro Seite
