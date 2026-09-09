@@ -137,7 +137,11 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
-### v1.0 (current)
+### v1.0.1 (current)
+- Footer zeigt Copyright-Hinweis mit Link auf PolzeSoft; Kontaktblock mit Mailadresse unter „Daten & Quellen"
+- Interne Titel-Links in Reviews zeigen statt der nackten URL den Filmtitel als Link
+
+### v1.0
 - Öffentlicher Katalog mit Suche, Detailseiten, Zehnerbewertungen und Reviews; privates Anschautagebuch nach Login
 - Trakt-Import per ZIP-Upload im Admin oder CLI für History, Bewertungen, Kommentare und Sammlung
 - Plex-Webhook-Sync für Anschauereignisse sowie persönliche Reviews via community.plex.tv, mit Schutz vor doppelten Reviews
