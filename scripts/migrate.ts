@@ -7,6 +7,7 @@ for (const file of (await readdir('migrations')).filter((f) => f.endsWith('.sql'
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SET LOCAL statement_timeout=0');
     await client.query('SELECT pg_advisory_xact_lock(729382)');
     if (!(await client.query('SELECT 1 FROM migrations WHERE name=$1', [file])).rowCount) {
       await client.query(await readFile(`migrations/${file}`, 'utf8'));
