@@ -7,14 +7,8 @@ import { isAdmin } from '@/lib/auth';
 import { Poster, kindLabel, MediaRow, Stars } from '@/components/media';
 import { Star } from 'lucide-react';
 import { Back } from '@/components/navigation';
-import {
-  MediaEditor,
-  ReviewBody,
-  ReviewEditor,
-  RatingEditor,
-  WatchEditor,
-  WatchCreator,
-} from '@/components/editor';
+import { MediaEditor, ReviewEditor, RatingEditor, WatchEditor, WatchCreator } from '@/components/editor';
+import { ReviewBody } from '@/components/review-body';
 import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, Save, X, Globe, LockKeyhole, Trash2 } from 'lucide-react';
+import { Pencil, Save, X, Globe, Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
@@ -112,7 +112,7 @@ export function MediaEditor({ item }: { item: Media }) {
     </>
   );
 }
-type Review = {
+export type Review = {
   id: string;
   body: string;
   spoiler: boolean;
@@ -434,36 +434,5 @@ export function WatchCreator({ mediaId }: { mediaId: string }) {
       </button>
       {error && <p className="error">{error}</p>}
     </form>
-  );
-}
-export function ReviewBody({ review, admin = false }: { review: Review; admin?: boolean }) {
-  return (
-    <article className="review">
-      <div className="review-meta">
-        <span>Persönliche Perspektive</span>
-        {admin && (
-          <span>
-            {review.is_public ? (
-              <>
-                <Globe size={13} /> Öffentlich
-              </>
-            ) : (
-              <>
-                <LockKeyhole size={13} /> Privat
-              </>
-            )}
-          </span>
-        )}
-        {review.parent_source_id && <span>Antwort auf einen Kommentar</span>}
-      </div>
-      {review.spoiler ? (
-        <details>
-          <summary>Spoiler anzeigen</summary>
-          <p className="review-text">{review.body}</p>
-        </details>
-      ) : (
-        <p className="review-text">{review.body}</p>
-      )}
-    </article>
   );
 }

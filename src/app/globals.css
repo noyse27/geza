@@ -1472,6 +1472,13 @@ footer > a:nth-of-type(2) {
 .footer-note {
   color: #626d57;
 }
+.footer-copyright {
+  color: #626d57;
+}
+.footer-copyright a {
+  color: inherit;
+  text-decoration: underline;
+}
 @media (min-width: 1500px) {
   .hero {
     padding-top: 78px;
@@ -1853,6 +1860,9 @@ footer > a:nth-of-type(2) {
     font-size: 9px;
   }
   .footer-note {
+    display: none;
+  }
+  .footer-copyright {
     display: none;
   }
   footer > span:nth-child(2) {
