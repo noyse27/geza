@@ -137,7 +137,10 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
-### v1.0.1 (current)
+### v1.0.2 (current)
+- Titel-Links in Reviews grün hervorgehoben (Akzentfarbe mit Pfeil), analog zu den anderen Geza-Links
+
+### v1.0.1
 - Footer zeigt Copyright-Hinweis mit Link auf PolzeSoft; Kontaktblock mit Mailadresse unter „Daten & Quellen"
 - Interne Titel-Links in Reviews zeigen statt der nackten URL den Filmtitel als Link
 
