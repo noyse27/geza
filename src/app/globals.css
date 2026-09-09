@@ -1173,6 +1173,9 @@ nav .active:after {
   line-height: 1.9;
   color: #cdd2c5;
 }
+.review-title-link {
+  color: var(--accent);
+}
 .review summary {
   color: var(--accent);
   cursor: pointer;
