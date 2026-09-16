@@ -2,6 +2,8 @@
 
 ## Ergänzung vom 16. September 2026: Scrobbles und Now Playing
 
+Plex-Cover-Fallback: Typprüfung und alle 17 Unit-Tests sind lokal erfolgreich. Für die Live-Abnahme einen Film ohne zugeordnetes Katalog-Cover starten: Now Playing soll dessen Plex-Poster anzeigen; bei Episoden wird das Serienposter bevorzugt. Die Bildroute `/api/admin/now-playing/cover` muss ohne Anmeldung HTTP 401 liefern. Fremde URLs, Pfadnavigation und Query-Strings werden abgewiesen. Weder das Cover noch neue Medienzuordnungen werden dabei im Katalog gespeichert.
+
 Lokal unter Node 22 geprüft: Typprüfung (`npm run lint`), alle 13 Unit-Tests und Produktionsbuild erfolgreich. Der neue Unit-Test prüft Plex-Wiedergabestatus, ungültige Laufzeiten, Fortschrittsgrenzen und den Ausschluss privater Plex-Felder aus den Anzeigedaten. Auf diesem Rechner stehen weder Docker noch eine Testdatenbank oder eine konfigurierte Plex-Verbindung zur Verfügung; Datenbankintegration und Browser-/Live-Plex-Abnahme wurden für diese Änderung noch nicht durchgeführt.
 
 Für die Abnahme in der Laufumgebung:

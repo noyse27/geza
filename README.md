@@ -62,7 +62,7 @@ Exporte, Zugangsdaten, Backups und lokale Protokolle sind von Git und Docker-Bui
 
 ## Metadaten und Plex
 
-Die private Home-Seite zeigt mit „Now Playing“ aktive Film- und Episodenwiedergaben des verbundenen Plex-Servers. Der Block lädt separat und fragt alle 15 Sekunden `/status/sessions` ab, solange der Browser-Tab sichtbar ist. Er zeigt Titel, Staffel/Episode, Fortschritt, Restlaufzeit und während der Wiedergabe die geschätzte Endzeit in Berlin. Pausierte und puffernde Wiedergaben sind gekennzeichnet; mehrere Sitzungen erscheinen als einzelne Karten. Angezeigt werden alle aktiven Sitzungen des verbundenen Servers, ausschließlich nach Admin-Anmeldung. Ohne Wiedergabe, ohne Plex-Konfiguration oder bei Verbindungsfehlern bleibt der Block ausgeblendet. Eindeutige Katalogtreffer erhalten Detail-Link und vorhandenes Katalog-Cover; Plex-Cover werden nicht übernommen. Es sind weder neue Webhooks noch eine Migration erforderlich.
+Die private Home-Seite zeigt mit „Now Playing“ aktive Film- und Episodenwiedergaben des verbundenen Plex-Servers. Der Block lädt separat und fragt alle 15 Sekunden `/status/sessions` ab, solange der Browser-Tab sichtbar ist. Er zeigt Titel, Staffel/Episode, Fortschritt, Restlaufzeit und während der Wiedergabe die geschätzte Endzeit in Berlin. Pausierte und puffernde Wiedergaben sind gekennzeichnet; mehrere Sitzungen erscheinen als einzelne Karten. Angezeigt werden alle aktiven Sitzungen des verbundenen Servers, ausschließlich nach Admin-Anmeldung. Ohne Wiedergabe, ohne Plex-Konfiguration oder bei Verbindungsfehlern bleibt der Block ausgeblendet. Eindeutige Katalogtreffer erhalten Detail-Link und vorhandenes Katalog-Cover; Fehlt ein Katalog-Cover, verwendet ausschließlich dieser private Block das Plex-Cover als Fallback (bei Episoden bevorzugt das Serienposter). Das Bild wird über eine admin-geschützte Route ohne Weitergabe des Plex-Tokens geladen und nicht im Katalog gespeichert. Es sind weder neue Webhooks noch eine Migration erforderlich.
 
 Auf Episoden- und Staffelseiten können angemeldete Admins über **Zuordnung korrigieren** eine vorhandene Serie suchen und Staffel sowie Episodennummer ändern. Cover, Jahr, Datensatz-ID und ein Link zur Serienansicht helfen bei gleichnamigen Treffern. Anschauereignisse, Bewertungen und Reviews bleiben am bisherigen Datensatz erhalten; erneute Trakt-Importe überschreiben die korrigierte Zuordnung nicht. Die Funktion führt keine doppelten Episoden zusammen.
 
@@ -150,6 +150,8 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 ## Changelog
 
 ### Unveröffentlicht
+
+- Now Playing verwendet bei fehlendem Katalog-Cover das Plex-Poster über eine geschützte Bildroute. Diese Ausnahme betrifft nur den privaten Wiedergabeblock; Plex-Cover werden weiterhin nicht importiert.
 
 - Now Playing ergänzt fehlende externe IDs aus den Plex-Bibliotheksmetadaten, damit vorhandene Katalog-Cover auch bei unvollständigen Sitzungsdaten gefunden werden. Ein fehlgeschlagener zusätzlicher Abruf blendet die Wiedergabe nicht aus; mehrdeutige Treffer bleiben unzugeordnet.
 

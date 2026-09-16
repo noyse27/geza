@@ -14,6 +14,35 @@ import { friendUrl, parseFilmdienst, parseWortvogel } from '../src/lib/friend-re
 import { plexImdbRating } from '../src/lib/provider-ratings';
 import { playbackItem } from '../src/lib/now-playing';
 import { nowPlayingCatalog } from '../src/lib/now-playing-catalog';
+import { plexCoverFallback, validPlexCoverPath } from '../src/lib/plex-cover';
+
+test('Plex cover fallback supports film and series thumbnails without exposing server or token', () => {
+  const thumb = '/library/metadata/123/thumb/456';
+  assert.equal(
+    plexCoverFallback({ type: 'movie', thumb }),
+    '/api/admin/now-playing/cover?path=' + encodeURIComponent(thumb),
+  );
+  assert.equal(
+    plexCoverFallback({ type: 'episode', grandparentThumb: thumb, thumb: '/library/metadata/9/thumb' }),
+    '/api/admin/now-playing/cover?path=' + encodeURIComponent(thumb),
+  );
+  assert.equal(
+    plexCoverFallback({ type: 'episode', thumb }),
+    '/api/admin/now-playing/cover?path=' + encodeURIComponent(thumb),
+  );
+  assert.equal(plexCoverFallback({ type: 'movie' }), undefined);
+  for (const value of [
+    'https://other.test/image',
+    '//other.test/image',
+    '/library/metadata/../thumb',
+    '/library/metadata/1/thumb?X-Plex-Token=secret',
+    '/library/metadata/1/art',
+    null,
+  ]) {
+    assert.equal(validPlexCoverPath(value), false);
+    assert.equal(plexCoverFallback({ type: 'movie', thumb: value }), undefined);
+  }
+});
 
 test('now playing resolves missing session IDs through library metadata', async () => {
   const raw = { type: 'movie', ratingKey: '123', guid: 'plex://movie/abc' };
