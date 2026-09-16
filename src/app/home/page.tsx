@@ -5,6 +5,7 @@ import { history } from '@/lib/catalog';
 import { query } from '@/lib/db';
 import { Search } from '@/components/search';
 import { MediaRow } from '@/components/media';
+import { NowPlaying } from '@/components/now-playing';
 export const metadata = { title: 'Dein Tagebuch', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -17,6 +18,7 @@ export default async function Page() {
   const c = counts[0];
   return (
     <div className="page">
+      <NowPlaying />
       <section className="hero private-hero">
         <div className="hero-top">
           <span className="eyebrow accent">DEIN PERSÖNLICHES FILMTAGEBUCH</span>

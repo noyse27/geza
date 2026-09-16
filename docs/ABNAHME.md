@@ -1,5 +1,19 @@
 # Erste lokale Abnahme
 
+## Ergänzung vom 16. September 2026: Scrobbles und Now Playing
+
+Lokal unter Node 22 geprüft: Typprüfung (`npm run lint`), alle 13 Unit-Tests und Produktionsbuild erfolgreich. Der neue Unit-Test prüft Plex-Wiedergabestatus, ungültige Laufzeiten, Fortschrittsgrenzen und den Ausschluss privater Plex-Felder aus den Anzeigedaten. Auf diesem Rechner stehen weder Docker noch eine Testdatenbank oder eine konfigurierte Plex-Verbindung zur Verfügung; Datenbankintegration und Browser-/Live-Plex-Abnahme wurden für diese Änderung noch nicht durchgeführt.
+
+Für die Abnahme in der Laufumgebung:
+
+1. Zwei offene Scrobbles nacheinander zuordnen. Nach dem ersten Speichern über „Weitere Scrobbles zuordnen“ im Dialog bleiben; erledigte Einträge verschwinden und der Zähler sinkt. Nach dem Schließen enthält die History beide Einträge.
+2. Gleichnamige Serien suchen und die angezeigte Episodenzahl mit den vorhandenen Katalogepisoden vergleichen. Mehrfache Anschauereignisse dürfen die Zahl nicht erhöhen.
+3. Mit konfigurierter Plex-Verbindung einen Film und eine Episode starten und als Admin `/home` öffnen. Titel, Staffel/Episode, Fortschritt, Restlaufzeit und geschätzte Endzeit prüfen. Eindeutige Katalogtreffer erhalten Cover und Detail-Link.
+4. Wiedergabe pausieren, fortsetzen und beenden; Änderungen erscheinen beim nächsten Abruf. Pausen zeigen keine Endzeit. Mehrere aktive Sitzungen des Servers erscheinen separat.
+5. Ohne Wiedergabe oder bei unerreichbarem Plex bleibt der Block ausgeblendet und die Home-Seite bedienbar. Ohne Anmeldung liefert `/api/admin/now-playing` HTTP 401.
+
+Für diese Änderung ist keine Datenbankmigration erforderlich. Die folgenden Angaben dokumentieren die ursprüngliche Abnahme vom 6. September.
+
 Stand: 6. September 2026. Geza läuft als Docker-Paket auf `http://localhost:3080`.
 
 ## Daten

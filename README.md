@@ -62,6 +62,8 @@ Exporte, Zugangsdaten, Backups und lokale Protokolle sind von Git und Docker-Bui
 
 ## Metadaten und Plex
 
+Die private Home-Seite zeigt mit „Now Playing“ aktive Film- und Episodenwiedergaben des verbundenen Plex-Servers. Der Block lädt separat und fragt alle 15 Sekunden `/status/sessions` ab, solange der Browser-Tab sichtbar ist. Er zeigt Titel, Staffel/Episode, Fortschritt, Restlaufzeit und während der Wiedergabe die geschätzte Endzeit in Berlin. Pausierte und puffernde Wiedergaben sind gekennzeichnet; mehrere Sitzungen erscheinen als einzelne Karten. Angezeigt werden alle aktiven Sitzungen des verbundenen Servers, ausschließlich nach Admin-Anmeldung. Ohne Wiedergabe, ohne Plex-Konfiguration oder bei Verbindungsfehlern bleibt der Block ausgeblendet. Eindeutige Katalogtreffer erhalten Detail-Link und vorhandenes Katalog-Cover; Plex-Cover werden nicht übernommen. Es sind weder neue Webhooks noch eine Migration erforderlich.
+
 Auf Episoden- und Staffelseiten können angemeldete Admins über **Zuordnung korrigieren** eine vorhandene Serie suchen und Staffel sowie Episodennummer ändern. Cover, Jahr, Datensatz-ID und ein Link zur Serienansicht helfen bei gleichnamigen Treffern. Anschauereignisse, Bewertungen und Reviews bleiben am bisherigen Datensatz erhalten; erneute Trakt-Importe überschreiben die korrigierte Zuordnung nicht. Die Funktion führt keine doppelten Episoden zusammen.
 
 Regressionstest mit einer automatisch angelegten und anschließend entfernten Testdatenbank: `node --import tsx scripts/assignment-check.ts` (benötigt `DATABASE_URL` und Berechtigung zum Anlegen einer Datenbank).
@@ -146,6 +148,12 @@ Filmdienst und wortvogel.de werden für aufgerufene Filme im Hintergrund gesucht
 Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
 
 ## Changelog
+
+### Unveröffentlicht
+
+- Offene Scrobbles können nach dem Speichern im selben Dialog weiter zugeordnet werden; die History wird erst beim Schließen aktualisiert.
+- Serientreffer bei der Scrobble-Zuordnung zeigen die Anzahl ihrer bereits zugeordneten Katalogepisoden.
+- Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; automatische Aktualisierung alle 15 Sekunden.
 
 ### v1.1.1 (current)
 - Migrationen laufen nicht mehr in den 8s-Statement-Timeout der App; verhinderte auf größeren Produktivbeständen den Abschluss von Migration 013

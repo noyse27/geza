@@ -21,6 +21,7 @@ export async function plexRequest(path: string) {
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
   const r = await loggedFetch('Plex', url.toString(), {
+    cache: 'no-store',
     headers: { 'X-Plex-Token': token, Accept: 'application/json' },
     signal: AbortSignal.timeout(12000),
     redirect: 'error',

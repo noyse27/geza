@@ -2,7 +2,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, X, Check, Search } from 'lucide-react';
 
-type Item = { id: string; title: string; kind: string; year?: number; season?: number; episode?: number };
+type Item = {
+  id: string;
+  title: string;
+  kind: string;
+  year?: number;
+  season?: number;
+  episode?: number;
+  episode_count?: number;
+};
 type Pending = {
   id: string;
   title: string;
@@ -50,6 +58,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
     [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const eventId = useRef('');
+  const changed = useRef(false);
   async function read(url: string, signal?: AbortSignal) {
     const response = await fetch(url, { signal });
     const data = await response.json();
@@ -78,6 +87,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
     eventId.current = crypto.randomUUID();
   }
   function show() {
+    changed.current = false;
     reset();
     setMode('new');
     setOpen(true);
@@ -152,6 +162,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
       });
       const result = await response.json();
       if (!response.ok) throw Error(result.error || 'Speichern fehlgeschlagen.');
+      changed.current = true;
       try {
         sessionStorage.setItem('history:invalidated', String(Date.now()));
       } catch {
@@ -193,7 +204,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
         }}
         onClose={() => {
           setOpen(false);
-          if (success) window.location.assign('/history');
+          if (changed.current) window.location.reload();
         }}
       >
         <div className="scrobble-heading">
@@ -210,7 +221,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
         <div className="segmented">
           <button
             className={mode === 'new' ? 'active' : ''}
-            disabled={busy || success}
+            disabled={busy}
             onClick={() => {
               reset();
               setMode('new');
@@ -220,7 +231,7 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
           </button>
           <button
             className={mode === 'inbox' ? 'active' : ''}
-            disabled={busy || success}
+            disabled={busy}
             onClick={() => {
               reset();
               setMode('inbox');
@@ -238,6 +249,11 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
           <div className="scrobble-success" role="status">
             <Check size={32} />
             <h3>In deiner History gespeichert.</h3>
+            {mode === 'inbox' && (
+              <button className="button primary" onClick={() => reset()}>
+                {count ? `Weitere Scrobbles zuordnen (${count})` : 'Zur Übersicht'}
+              </button>
+            )}
             <button className="button primary" onClick={close}>
               History anzeigen
             </button>
@@ -315,7 +331,10 @@ export function ScrobbleDialog({ initialCount }: { initialCount: number }) {
                     )
                     .map((item) => (
                       <button type="button" key={item.id} onClick={() => setSelected(item)}>
-                        <strong>{item.title}</strong>
+                        <strong>
+                          {item.title}
+                          {item.kind === 'show' ? ` (${item.episode_count ?? 0} zugeordnete Episoden)` : ''}
+                        </strong>
                         <span>
                           {item.year || 'Jahr unbekannt'} · {item.kind === 'show' ? 'Serie' : 'Film'} · #
                           {item.id}

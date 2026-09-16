@@ -27,7 +27,9 @@ export async function GET(req: Request) {
   const term = (p.get('q') || '').trim().slice(0, 160);
   if (term.length < 2) return Response.json({ items: [] }, { headers });
   const items = await query(
-    `SELECT id,title,year,kind FROM media WHERE kind IN ('movie','show')
+    `SELECT id,title,year,kind,
+    CASE WHEN kind='show' THEN (SELECT count(*)::int FROM media e WHERE e.parent_id=media.id AND e.kind='episode') END AS episode_count
+    FROM media WHERE kind IN ('movie','show')
     AND (title ILIKE $1 OR original_title ILIKE $1) ORDER BY (lower(title)=lower($2)) DESC,title,year,id LIMIT 30`,
     ['%' + term.replace(/[\\%_]/g, '\\$&') + '%', term],
   );

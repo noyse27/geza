@@ -10,6 +10,8 @@ Das Datum ist erforderlich, die Uhrzeit optional. Die Eingabe wird als Europe/Be
 
 ## Offene Scrobbles
 
+Nach dem Speichern führt „Weitere Scrobbles zuordnen“ zur verbleibenden Liste im selben Dialog. Die History wird beim Schließen aktualisiert, auch wenn zwischenzeitlich der Tab gewechselt wurde. Serientreffer zeigen in Klammern die Zahl ihrer zugeordneten Episoden im Katalog (nicht die Zahl der Anschauereignisse).
+
 Empfangener Titel, Serie, Staffel/Episode, Fehler und Anfrageverlauf helfen beim Zuordnen. Der Admin sucht den passenden Katalogtitel, prüft Datum und Uhrzeit und bestätigt „Zuordnen und Scrobble speichern“. Wenn verfügbar, wird der ursprüngliche `lastViewedAt`-Zeitpunkt vorausgefüllt; sonst das Empfangsdatum ohne genaue Uhrzeit.
 
 Speicherung und Abschluss des Jobs erfolgen in derselben Datenbanktransaktion mit einer Sperre auf dem Auftrag. Der Scrobble behält seine Plex-Ereignis-ID, sodass erneutes Absenden keinen zweiten Eintrag erzeugt. Die Entscheidung wird im Ereignisprotokoll aufgezeichnet. Eine konkurrierende abweichende Zuordnung wird abgelehnt.
