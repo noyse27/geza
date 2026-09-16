@@ -13,6 +13,93 @@ import { plexIds } from '../src/lib/plex';
 import { friendUrl, parseFilmdienst, parseWortvogel } from '../src/lib/friend-reviews';
 import { plexImdbRating } from '../src/lib/provider-ratings';
 import { playbackItem } from '../src/lib/now-playing';
+import { nowPlayingCatalog } from '../src/lib/now-playing-catalog';
+
+test('now playing resolves missing session IDs through library metadata', async () => {
+  const raw = { type: 'movie', ratingKey: '123', guid: 'plex://movie/abc' };
+  const match = { id: '7', poster: '/api/posters/7' };
+  const calls: string[] = [];
+  const result = await nowPlayingCatalog(raw, {
+    find: async (kind, ids) => {
+      assert.equal(kind, 'movie');
+      return ids.imdb === 'tt0120791' ? [match] : [];
+    },
+    request: async (path) => {
+      calls.push(path);
+      return { MediaContainer: { Metadata: [{ ...raw, Guid: [{ id: 'imdb://tt0120791' }] }] } };
+    },
+  });
+  assert.deepEqual(result, match);
+  assert.deepEqual(calls, ['/library/metadata/123?includeGuids=1']);
+});
+
+test('now playing preserves direct matches, rejects ambiguous matches and unsafe library keys', async () => {
+  const match = { id: '7', poster: '/api/posters/7' };
+  const request = async () => {
+    throw Error('Unexpected metadata request');
+  };
+  assert.deepEqual(
+    await nowPlayingCatalog({ type: 'movie', ratingKey: '123' }, { find: async () => [match], request }),
+    match,
+  );
+  assert.equal(
+    await nowPlayingCatalog(
+      { type: 'movie', ratingKey: '123' },
+      { find: async () => [match, { ...match, id: '8' }], request },
+    ),
+    null,
+  );
+  let requested = false;
+  assert.equal(
+    await nowPlayingCatalog(
+      { type: 'movie', ratingKey: '../sessions' },
+      {
+        find: async () => [],
+        request: async () => {
+          requested = true;
+          return null;
+        },
+      },
+    ),
+    null,
+  );
+  assert.equal(requested, false);
+});
+
+test('now playing tolerates failed metadata lookup and rejects unrelated metadata', async () => {
+  let lookups = 0;
+  const find = async () => {
+    lookups++;
+    return [];
+  };
+  assert.equal(
+    await nowPlayingCatalog(
+      { type: 'movie', ratingKey: '123' },
+      {
+        find,
+        request: async () => {
+          throw Error('offline');
+        },
+      },
+    ),
+    null,
+  );
+  assert.equal(
+    await nowPlayingCatalog(
+      { type: 'movie', ratingKey: '123' },
+      {
+        find,
+        request: async () => ({
+          MediaContainer: {
+            Metadata: [{ type: 'episode', ratingKey: '123', Guid: [{ id: 'imdb://other' }] }],
+          },
+        }),
+      },
+    ),
+    null,
+  );
+  assert.equal(lookups, 2);
+});
 
 test('now playing handles playback states, invalid timing and excludes private Plex fields', () => {
   const raw = {

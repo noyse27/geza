@@ -151,6 +151,8 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ### Unveröffentlicht
 
+- Now Playing ergänzt fehlende externe IDs aus den Plex-Bibliotheksmetadaten, damit vorhandene Katalog-Cover auch bei unvollständigen Sitzungsdaten gefunden werden. Ein fehlgeschlagener zusätzlicher Abruf blendet die Wiedergabe nicht aus; mehrdeutige Treffer bleiben unzugeordnet.
+
 - Offene Scrobbles können nach dem Speichern im selben Dialog weiter zugeordnet werden; die History wird erst beim Schließen aktualisiert.
 - Serientreffer bei der Scrobble-Zuordnung zeigen die Anzahl ihrer bereits zugeordneten Katalogepisoden.
 - Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; automatische Aktualisierung alle 15 Sekunden.
