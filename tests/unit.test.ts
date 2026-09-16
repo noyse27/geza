@@ -12,6 +12,37 @@ import {
 import { plexIds } from '../src/lib/plex';
 import { friendUrl, parseFilmdienst, parseWortvogel } from '../src/lib/friend-reviews';
 import { plexImdbRating } from '../src/lib/provider-ratings';
+import { playbackItem } from '../src/lib/now-playing';
+
+test('now playing handles playback states, invalid timing and excludes private Plex fields', () => {
+  const raw = {
+    type: 'episode',
+    title: 'Pilot',
+    grandparentTitle: 'Serie',
+    parentIndex: 0,
+    index: 1,
+    sessionKey: '42',
+    duration: 60000,
+    viewOffset: 90000,
+    Player: { state: 'paused', address: 'private' },
+    User: { title: 'private' },
+    token: 'secret',
+  };
+  assert.deepEqual(playbackItem(raw), {
+    id: '42',
+    title: 'Serie',
+    subtitle: 'Staffel 0 · Episode 1 · Pilot',
+    state: 'paused',
+    duration: 60000,
+    position: 60000,
+  });
+  assert.equal(playbackItem({ ...raw, type: 'track' }), null);
+  assert.equal(playbackItem({ ...raw, Player: { state: 'stopped' } }), null);
+  assert.equal(playbackItem({ ...raw, duration: 'bad', viewOffset: -1 })?.duration, 0);
+  assert.equal(playbackItem({ ...raw, duration: 'bad', viewOffset: -1 })?.position, 0);
+  assert.equal(playbackItem({ ...raw, Player: { state: 'playing' } })?.state, 'playing');
+  assert.equal(playbackItem({ ...raw, Player: { state: 'buffering' } })?.state, 'buffering');
+});
 
 test('external review links cannot use scripts or impersonate the fixed providers', () => {
   assert.throws(() => friendUrl('wortvogel', 'https://wortvogel.de.evil.test/review'));
@@ -51,7 +82,11 @@ test('wortvogel.de search results match by title and production year, ignoring s
   const article = (title: string, url: string, year: number) =>
     `<article><h2 class="post-list-title"> <a href="${url}">Kino Kritik: ${title}</a> </h2>` +
     `<p><b> USA ${year}. Regie </b> : Someone.</p></article>`;
-  const html = article('Supergirl (spoilerfrei)', 'https://wortvogel.de/2026/06/kino-kritik-supergirl/', 2026);
+  const html = article(
+    'Supergirl (spoilerfrei)',
+    'https://wortvogel.de/2026/06/kino-kritik-supergirl/',
+    2026,
+  );
   assert.deepEqual(parseWortvogel(html, ['Supergirl'], 2026), {
     url: 'https://wortvogel.de/2026/06/kino-kritik-supergirl/',
     rating: null,
