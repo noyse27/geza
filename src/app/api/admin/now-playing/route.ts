@@ -2,6 +2,7 @@ import { isAdmin } from '@/lib/auth';
 import { plexRequest } from '@/lib/plex';
 import { nowPlayingCatalog } from '@/lib/now-playing-catalog';
 import { playbackItem } from '@/lib/now-playing';
+import { plexCoverFallback } from '@/lib/plex-cover';
 
 export const dynamic = 'force-dynamic';
 export async function GET() {
@@ -18,6 +19,7 @@ export async function GET() {
         item.mediaId = match.id;
         item.poster = match.poster || undefined;
       }
+      item.poster ||= plexCoverFallback(raw);
       items.push(item);
     }
     return Response.json({ items }, { headers });
