@@ -14,6 +14,8 @@ Für die Abnahme in der Laufumgebung:
 
 Für diese Änderung ist keine Datenbankmigration erforderlich. Die folgenden Angaben dokumentieren die ursprüngliche Abnahme vom 6. September.
 
+Nachtrag zur Cover-Zuordnung: Die Typprüfung und alle 16 Unit-Tests sind lokal erfolgreich. Zusätzliche Tests prüfen Sitzungen ohne externe IDs, Auflösung über Plex-Bibliotheksmetadaten, mehrdeutige Treffer, ungültige Bibliotheksschlüssel und fehlgeschlagene Metadatenabrufe. Live zusätzlich einen bereits importierten Film mit vorhandenem Cover starten, dessen Sitzungsdaten nur eine Plex-GUID enthalten: Der Block soll nach Auflösung der IMDb-/TMDB-ID das Katalog-Cover und den Detail-Link zeigen.
+
 Stand: 6. September 2026. Geza läuft als Docker-Paket auf `http://localhost:3080`.
 
 ## Daten

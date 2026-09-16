@@ -1,6 +1,6 @@
 import { isAdmin } from '@/lib/auth';
-import { plexIds, plexRequest } from '@/lib/plex';
-import { query } from '@/lib/db';
+import { plexRequest } from '@/lib/plex';
+import { nowPlayingCatalog } from '@/lib/now-playing-catalog';
 import { playbackItem } from '@/lib/now-playing';
 
 export const dynamic = 'force-dynamic';
@@ -13,15 +13,10 @@ export async function GET() {
     for (const raw of data?.MediaContainer?.Metadata || []) {
       const item = playbackItem(raw);
       if (!item) continue;
-      const matches = await query<{ id: string; poster: string | null }>(
-        `SELECT m.id,COALESCE(m.poster,p.poster) AS poster FROM media m
-         LEFT JOIN media p ON p.id=m.parent_id WHERE m.kind=$1 AND
-         EXISTS(SELECT 1 FROM jsonb_each_text($2::jsonb) x WHERE m.ids->>x.key=x.value) LIMIT 2`,
-        [raw.type, JSON.stringify(plexIds(raw))],
-      );
-      if (matches.length === 1) {
-        item.mediaId = matches[0].id;
-        item.poster = matches[0].poster || undefined;
+      const match = await nowPlayingCatalog(raw);
+      if (match) {
+        item.mediaId = match.id;
+        item.poster = match.poster || undefined;
       }
       items.push(item);
     }
