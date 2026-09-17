@@ -78,7 +78,7 @@ export function FriendReviews({
                             : ''}{' '}
                       {provider === 'filmdienst' ? (
                         <a
-                          href={`https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(`${title} ${year || ''}`)}#results`}
+                          href={`https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(title)}#results`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >

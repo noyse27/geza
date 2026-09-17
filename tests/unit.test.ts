@@ -297,3 +297,30 @@ test('bundled review modules constrain automatic discovery to supported media', 
     'https://wortvogel.de/2026/06/kino-kritik-supergirl/',
   );
 });
+
+test('Filmdienst selects by decoded title and production year in result cards', async () => {
+  const { filmdienstCandidates } = await import('../src/lib/review-modules/filmdienst');
+  const card = (id: number, title: string, year: string) => `<article>
+    <a href="/film/details/${id}/film"><img title="Unrelated image title" /></a>
+    <h3><a title="${title}" href="/film/details/${id}/film">${title}</a></h3>
+    <div class="credit-line"><ul><li>D&#228;nemark ${year}</li><li>R: Director</li></ul></div>
+    <div class="teaser-text">A story set in 2025.</div>
+  </article>`;
+  const title = 'Therapie f\u00fcr Wikinger';
+  const html = card(1, 'Therapie f&#252;r Wikinger', '2025');
+  assert.deepEqual(filmdienstCandidates(html, [title], 2025), ['/film/details/1/film']);
+  assert.deepEqual(filmdienstCandidates(html, [title], 2024), []);
+  assert.deepEqual(filmdienstCandidates(html, [title], 2024, 'tt123'), ['/film/details/1/film']);
+  assert.deepEqual(filmdienstCandidates(html, ['Other'], 2025), []);
+  const remakes = [1980, 1990, 2000, 2010, 2025].map((year, i) => card(i, 'Lola', String(year))).join('');
+  assert.deepEqual(filmdienstCandidates(remakes, ['Lola'], 2025), ['/film/details/4/film']);
+  assert.deepEqual(filmdienstCandidates(card(2, 'Therapie f&uuml;r Wikinger', ''), [title], 2025), [
+    '/film/details/2/film',
+  ]);
+  assert.deepEqual(filmdienstCandidates(card(3, 'Therapie f&#xFC;r Wikinger', '2025'), [title], 2025), [
+    '/film/details/3/film',
+  ]);
+  assert.deepEqual(filmdienstCandidates(html + html, [title], 2025), ['/film/details/1/film']);
+  const ambiguous = [1, 2, 3, 4].map((id) => card(id, 'Lola', '2025')).join('');
+  assert.deepEqual(filmdienstCandidates(ambiguous, ['Lola'], 2025, 'tt123'), []);
+});
