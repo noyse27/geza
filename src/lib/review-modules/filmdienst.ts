@@ -41,6 +41,55 @@ export function parseFilmdienst(html: string, titles: string[], year: number, im
   return null;
 }
 
+// Filmdienst encodes umlauts in search-result attributes as numeric entities.
+function decodeTitle(value: string) {
+  const named: Record<string, string> = {
+    amp: '&',
+    quot: '"',
+    apos: "'",
+    lt: '<',
+    gt: '>',
+    nbsp: ' ',
+    auml: '\u00e4',
+    ouml: '\u00f6',
+    uuml: '\u00fc',
+    Auml: '\u00c4',
+    Ouml: '\u00d6',
+    Uuml: '\u00dc',
+    szlig: '\u00df',
+  };
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, code: string) => {
+    if (!code.startsWith('#')) return named[code] ?? entity;
+    const point = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : Number(code.slice(1));
+    return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+  });
+}
+
+export function filmdienstCandidates(html: string, titles: string[], year: number, imdb?: string) {
+  const candidates = new Map<string, number | null>();
+  for (const article of html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)) {
+    const metadata = article[1].match(/<ul\b[^>]*>([\s\S]*?)<\/ul>/i)?.[1] ?? '';
+    const production = metadata.match(/<li\b[^>]*>([\s\S]*?)<\/li>/i)?.[1] ?? '';
+    const resultYear = production.replace(/<[^>]*>/g, ' ').match(/\b(?:18|19|20|21)\d{2}\b/)?.[0];
+    for (const link of article[1].matchAll(/<a\b([^>]*)>/gi)) {
+      const path = link[1].match(/\bhref=["'](\/film\/details\/\d+\/[^"'#?]+)["']/i)?.[1];
+      const title = link[1].match(/\btitle=(["'])(.*?)\1/i)?.[2];
+      if (!path || !title) continue;
+      const name = decodeTitle(title).replace(/\s*\(\d{4}\)\s*$/, '');
+      if (titles.some((t) => normalize(t) === normalize(name)))
+        candidates.set(path, resultYear ? Number(resultYear) : null);
+    }
+  }
+  const entries = [...candidates];
+  const exact = entries.filter(([, candidateYear]) => candidateYear === year);
+  // Unknown years are checked on the detail page. A differing year requires IMDb proof.
+  const eligible = exact.length
+    ? exact
+    : entries.filter(([, candidateYear]) => candidateYear === null || imdb);
+  // Never silently choose three arbitrary results from an ambiguous set.
+  return eligible.length <= 3 ? eligible.map(([path]) => path) : [];
+}
+
 let lastRequest = 0;
 async function fetchPage(url: string, redirects = 0): Promise<string> {
   const u = new URL(url);
@@ -80,37 +129,19 @@ async function discover(m: ReviewMedia) {
   // Conservative: suspend discovery if the publisher introduces any disallowed paths.
   if (/^[\t ]*Disallow:[\t ]*[^\s]/im.test(robots)) throw Error('Abrufregeln geändert');
   const titles = [m.title, m.original_title].filter(Boolean);
-  let html = await fetchPage(
-    `https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(`${m.title} ${m.year}`)}`,
+  const html = await fetchPage(
+    `https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(m.title)}`,
   );
-  const candidates = (page: string) => [
-    ...new Set(
-      [...page.matchAll(/<a\s+[^>]*href="(\/film\/details\/\d+\/[^"#?]+)"[^>]*title="([^"]+)"/g)]
-        .filter((match) =>
-          titles.some((title) => normalize(title) === normalize(match[2].replace(/\s*\(\d{4}\)\s*$/, ''))),
-        )
-        .map((match) => match[1]),
-    ),
-  ];
-  let paths = candidates(html);
-  if (!paths.length) {
-    html = await fetchPage(`https://www.filmdienst.de/suche/alle?searchText=${encodeURIComponent(m.title)}`);
-    paths = candidates(html);
-  }
-  if (paths.length > 3)
-    paths = m.ids.imdb
-      ? paths
-          .sort(
-            (a, b) =>
-              Math.abs(Number(a.match(/-(\d{4})$/)?.[1] || 0) - Number(m.year)) -
-              Math.abs(Number(b.match(/-(\d{4})$/)?.[1] || 0) - Number(m.year)),
-          )
-          .slice(0, 3)
-      : [];
+  const paths = filmdienstCandidates(html, titles, Number(m.year), m.ids.imdb as string | undefined);
   const matches: { url: string; rating: number | null }[] = [];
   for (const path of paths) {
     const url = `https://www.filmdienst.de${path}`;
-    const result = parseFilmdienst(await fetchPage(url), titles, Number(m.year), m.ids.imdb as string | undefined);
+    const result = parseFilmdienst(
+      await fetchPage(url),
+      titles,
+      Number(m.year),
+      m.ids.imdb as string | undefined,
+    );
     if (result) matches.push({ url, ...result });
   }
   return matches.length === 1 ? matches[0] : null;
