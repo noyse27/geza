@@ -5,7 +5,7 @@ export function ReviewBoxAdmin({
   boxes,
   modules,
 }: {
-  boxes: { provider: string; name: string; scale: number }[];
+  boxes: { provider: string; name: string; scale: number; automatic_enabled?: boolean }[];
   modules: { id: string; name: string }[];
 }) {
   const router = useRouter();
@@ -101,8 +101,27 @@ export function ReviewBoxAdmin({
             <article className="panel" key={box.provider}>
               <h3>{box.name}</h3>
               <p className="muted">
-                {isModule ? 'Automatische Reviews' : 'Manuelle Reviews'} · {box.scale} Punkte
+                {isModule
+                  ? box.automatic_enabled === false
+                    ? 'Automatische Abfrage pausiert'
+                    : 'Automatische Reviews'
+                  : 'Manuelle Reviews'}{' '}
+                · {box.scale} Punkte
               </p>
+              {isModule && (
+                <button
+                  className="button"
+                  disabled={busy}
+                  onClick={() =>
+                    save('review-box-toggle', {
+                      provider: box.provider,
+                      enabled: box.automatic_enabled === false,
+                    })
+                  }
+                >
+                  {box.automatic_enabled === false ? 'Abfrage aktivieren' : 'Abfrage pausieren'}
+                </button>
+              )}
               {editing === box.provider ? (
                 <form
                   className="review-form"
@@ -127,12 +146,7 @@ export function ReviewBoxAdmin({
                   <button className="button primary" disabled={busy}>
                     Speichern
                   </button>
-                  <button
-                    type="button"
-                    className="text-link"
-                    disabled={busy}
-                    onClick={() => setEditing('')}
-                  >
+                  <button type="button" className="text-link" disabled={busy} onClick={() => setEditing('')}>
                     Abbrechen
                   </button>
                 </form>

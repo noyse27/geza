@@ -33,7 +33,7 @@ export async function discoverFriendReview() {
   const providers = reviewModules.filter((module) => module.discover).map((module) => module.id);
   const [row] = await query(
     `UPDATE friend_reviews SET next_check_at=now()+interval '1 day'
-     WHERE (media_id,provider)=(SELECT media_id,provider FROM friend_reviews WHERE provider=ANY($1::text[]) AND provider IN (SELECT provider FROM review_boxes) AND NOT manual AND status<>'found' AND next_check_at<=now() ORDER BY next_check_at FOR UPDATE SKIP LOCKED LIMIT 1)
+     WHERE (media_id,provider)=(SELECT media_id,provider FROM friend_reviews WHERE provider=ANY($1::text[]) AND provider IN (SELECT provider FROM review_boxes WHERE automatic_enabled) AND NOT manual AND status<>'found' AND next_check_at<=now() ORDER BY next_check_at FOR UPDATE SKIP LOCKED LIMIT 1)
      RETURNING media_id,provider,next_check_at::text`,
     [providers],
   );

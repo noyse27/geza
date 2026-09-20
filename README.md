@@ -25,8 +25,8 @@ sh setup.sh
 ```
 
 Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten und bauen das Image. Vorhandene Einstellungen
-bleiben erhalten. Ohne vorhandenes Admin-Konto zeigt `/login` beim ersten Start automatisch eine Maske
-zum Anlegen des Admins. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
+bleiben erhalten. Ohne vorhandenes Admin-Konto zeigt Geza beim ersten Start automatisch die Auswahl
+„Neu einrichten“ oder „Geza wiederherstellen“. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
 
 - Anwendung: <http://localhost:3080>
 - Erster Admin und Anmeldung: <http://localhost:3080/login>
@@ -104,6 +104,55 @@ Bei gesetzter `PUBLIC_URL` werden `/sitemap.xml` und auf jeweils 10.000 URLs auf
 
 ## Sicherung und Updates
 
+### Vollständiger Serverumzug
+
+1. Alte und neue Installation auf dieselbe Geza-Version aktualisieren. Unter **Admin → Sicherung und Umzug**
+   den Wiederherstellungsschlüssel erzeugen und **separat** sichern, anschließend die `.geza`-Datei herunterladen.
+2. Geza auf dem Zielserver mit **leerer Datenbank**, neu erzeugter `.env` und passender `PUBLIC_URL` installieren.
+   Beim ersten Aufruf **Geza wiederherstellen** wählen, Exportdatei hochladen und Schlüssel prüfen.
+3. Admin-Konto, API-Zugänge und automatische Reviewmodule unabhängig auswählen. Die Vorschau zeigt Datum
+   und Datensatzanzahlen. Bei falschem oder fehlendem Schlüssel erneut versuchen oder ausdrücklich
+   **Ohne Konten und Zugangsdaten fortfahren** wählen.
+4. Import starten. Danach mit dem bisherigen Admin-Passwort anmelden oder im selben Browser einen neuen
+   Admin anlegen. Bis zum Abschluss bleibt die Installation einschließlich APIs und Worker gesperrt.
+5. Unter **Admin** die Verbindungen prüfen und die **neue Webhook-Adresse in Plex eintragen**. Pausierte
+   Reviewmodule lassen sich dort wieder aktivieren. Bei Bedarf Metadatenabfragen und Plex-Review-Abgleich neu starten.
+
+Enthalten sind alle Medienfelder und Zuordnungen, History samt Originalzeiten, Bewertungen, eigene Reviews
+einschließlich Entwürfen, externe Reviews, Anbieterbewertungen, gespeicherte Cover, Filmreihen mit Reihenfolge,
+Reviewanbieter, Importberichte und Aufgaben einschließlich ungeklärter Scrobbles. Der Export ist ein konsistenter
+Datenbankschnappschuss. Neue Ereignisse nach diesem Zeitpunkt gehören nicht zum Export: Für den abschließenden
+Umzug die Einspeisung am alten Server pausieren und erst danach exportieren.
+
+Konten (mit Passwort-Hashes) und verwendete Provider-Zugänge, auch aus Umgebungsvariablen, werden mit AES-256-GCM
+und einem zufälligen 256-Bit-Wiederherstellungsschlüssel geschützt. Auf dem Zielserver werden Zugangsdaten mit
+dem **neuen** Installationsschlüssel gespeichert. Mediendaten sind absichtlich ohne Schlüssel lesbar, damit der
+Import ohne Zugangsdaten möglich bleibt; dies umfasst auch private History und Entwürfe. Die Prüfsumme erkennt
+Beschädigungen, belegt aber nicht die Vertrauenswürdigkeit einer fremden Datei.
+
+Sitzungen, Loginversuche, technische Ereignisprotokolle, Datenbank-/Sitzungsgeheimnisse und das alte
+Webhook-Geheimnis werden nicht übertragen. Offene Hintergrundjobs werden erhalten, aber pausiert; Reviewmodule
+starten nur entsprechend der gewählten Option. Eine Wiederherstellung in vorhandene Datenbestände ist ausgeschlossen.
+Fehler während der Übernahme rollen sämtliche importierten Tabellen zurück. Dateiformat und Datenbankschema müssen
+unterstützt sein; der bisherige JSON-Medienauszug ist **kein** vollständiges Umzugsbackup.
+
+Der Browserimport unterstützt maximal **256 MiB komprimiert / 512 MiB entpackt**. Der Server benötigt ausreichend
+Arbeitsspeicher für die Verarbeitung; gegebenenfalls das Uploadlimit und Timeout des Reverse-Proxys anpassen.
+Für größere Installationen bleibt die nachfolgende PostgreSQL-Sicherung verfügbar. Exportdateien und Schlüssel
+werden nicht auf dem Geza-Server als Dateien abgelegt. Die Einrichtungssitzung bleibt sieben Tage im ursprünglichen
+Browser verfügbar; die Admin-Einrichtung direkt nach dem Import abschließen.
+
+Falls diese Browsersitzung verloren geht, lässt sich ausschließlich eine bereits importierte, noch nicht
+abgeschlossene Wiederherstellung am Zielserver beenden:
+`docker compose exec -it app node --import tsx scripts/finish-restore.ts`.
+Das Skript fragt Benutzername und Passwort interaktiv ab (Passwort unsichtbar) und ersetzt niemals einen vorhandenen Admin.
+
+Automatische Umzugstests: `npm run test:unit` und `npm run test:transfer`. Letzteres benötigt `DATABASE_URL`
+und das Recht, eine temporäre Testdatenbank anzulegen; vorhandene Anwendungsdaten werden nicht verändert.
+Nach `npm run build` prüft `npm run test:transfer:http` zusätzlich echte HTTP-Aufrufe und große Uploads.
+
+### PostgreSQL-Sicherung
+
 Sicherung: `./scripts/backup.ps1` auf Windows oder `sh scripts/backup.sh` auf Linux. **Zusätzlich `.env` sicher aufbewahren**, weil ihr Schlüssel für die Provider-Zugangsdaten benötigt wird. Datenbanksicherungen enthalten auch gespeicherte Poster. Im Adminbereich gibt es zusätzlich einen JSON-Export.
 
 Wiederherstellung in eine **leere** Zieldatenbank:
@@ -150,6 +199,8 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 ## Changelog
 
 ### Unveröffentlicht
+
+- Vollständiger verschlüsselter Konten-/Zugangsdatenexport mit allen Nutzdaten und Erststart-Assistent für Serverumzüge; optionale Konten-, API- und Reviewmodulübernahme, atomare Wiederherstellung und neue Plex-Webhook-Adresse.
 
 - Now Playing verwendet bei fehlendem Katalog-Cover das Plex-Poster über eine geschützte Bildroute. Diese Ausnahme betrifft nur den privaten Wiedergabeblock; Plex-Cover werden weiterhin nicht importiert.
 

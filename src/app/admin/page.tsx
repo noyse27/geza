@@ -4,10 +4,13 @@ import { requireAdmin } from '@/lib/auth';
 import { getSetting, settingKeys } from '@/lib/settings';
 import { query } from '@/lib/db';
 import { AdminControls } from '@/components/admin';
+import { TransferExport } from '@/components/transfer';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
-  const boxes = await query('SELECT provider,name,scale FROM review_boxes ORDER BY provider');
+  const boxes = await query(
+    'SELECT provider,name,scale,automatic_enabled FROM review_boxes ORDER BY provider',
+  );
   const settings = Object.fromEntries(
     await Promise.all(settingKeys.map(async (k) => [k, await getSetting(k)])),
   );
@@ -33,6 +36,7 @@ export default async function Page() {
         />
       </div>
       <AdminControls configured={configured} values={settings} publicUrl={process.env.PUBLIC_URL || ''} />
+      <TransferExport />
       <p>
         <a className="button" href="/admin/logs">
           Ereignisprotokoll: Webhooks und Fehler ansehen
@@ -40,7 +44,7 @@ export default async function Page() {
       </p>
       <p>
         <a className="button" href="/api/export">
-          Alle persönlichen Daten als JSON exportieren
+          Medienauszug als JSON exportieren (kein Umzugsbackup)
         </a>
       </p>
       <div className="stats-columns">

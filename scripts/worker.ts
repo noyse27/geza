@@ -3,6 +3,7 @@ import { query, pool } from '../src/lib/db';
 import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex, processPlexReviewSync } from '../src/lib/plex';
+import { installationReady } from '../src/lib/setup';
 let running = true;
 process.on('SIGTERM', () => {
   running = false;
@@ -15,7 +16,7 @@ let lastCleanup = 0;
 const friendsLoop = (async () => {
   while (running) {
     try {
-      await discoverFriendReview();
+      if (await installationReady()) await discoverFriendReview();
     } catch (error) {
       await logEvent('error', 'friends', 'Freundesreviews konnten nicht abgefragt werden', { error });
     }
@@ -24,6 +25,10 @@ const friendsLoop = (async () => {
 })();
 while (running) {
   try {
+    if (!(await installationReady())) {
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
     if (Date.now() - lastCleanup > 3600000) {
       await query("DELETE FROM event_logs WHERE created_at < now() - interval '14 days'");
       lastCleanup = Date.now();

@@ -38,6 +38,11 @@ export async function POST(req: Request) {
           { error: 'Bitte eine vorhandene Serie und gültige Staffel/Episode auswählen.' },
           { status: 400 },
         );
+    } else if (body.action === 'review-box-toggle') {
+      const provider = z.string().min(1).max(100).parse(body.data?.provider);
+      const enabled = z.boolean().parse(body.data?.enabled);
+      if (!reviewModule(provider)?.discover) throw Error('Unbekanntes automatisches Modul');
+      await query('UPDATE review_boxes SET automatic_enabled=$2 WHERE provider=$1', [provider, enabled]);
     } else if (body.action === 'review-box-delete') {
       const provider = z.string().min(1).max(100).parse(body.data?.provider);
       await query('DELETE FROM review_boxes WHERE provider=$1', [provider]);
@@ -46,11 +51,10 @@ export async function POST(req: Request) {
       if (reviewModule(provider)) throw Error('Name und Skala sind durch das Plugin vorgegeben');
       const name = z.string().trim().min(1).max(100).parse(body.data?.name);
       const scale = z.number().int().min(1).max(100).parse(body.data?.scale);
-      const updated = await query('UPDATE review_boxes SET name=$2,scale=$3 WHERE provider=$1 RETURNING provider', [
-        provider,
-        name,
-        scale,
-      ]);
+      const updated = await query(
+        'UPDATE review_boxes SET name=$2,scale=$3 WHERE provider=$1 RETURNING provider',
+        [provider, name, scale],
+      );
       if (!updated.length) throw Error('Unbekannter Anbieter');
     } else if (body.action === 'review-box-add') {
       const provider = z.string().min(1).max(100).parse(body.data?.provider);
@@ -116,10 +120,7 @@ export async function POST(req: Request) {
       const data = z
         .object({
           seriesId: z.string().regex(/^\d+$/),
-          order: z
-            .array(z.string().regex(/^\d+$/))
-            .min(1)
-            .max(500),
+          order: z.array(z.string().regex(/^\d+$/)).min(1).max(500),
         })
         .parse(body.data);
       await query(
