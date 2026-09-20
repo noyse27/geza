@@ -118,6 +118,18 @@ Bei gesetzter `PUBLIC_URL` werden `/sitemap.xml` und auf jeweils 10.000 URLs auf
 5. Unter **Admin** die Verbindungen prüfen und die **neue Webhook-Adresse in Plex eintragen**. Pausierte
    Reviewmodule lassen sich dort wieder aktivieren. Bei Bedarf Metadatenabfragen und Plex-Review-Abgleich neu starten.
 
+Als CLI-Alternative zum Browser-Upload, etwa wenn ein vorgeschalteter Reverse-Proxy (z. B. Plesk) große
+Uploads abbricht oder puffert: die `.geza`-Datei nach `data/` legen und direkt gegen die Datenbank einspielen.
+Zeigt jeden Schritt (Datei lesen, entschlüsseln, Tabellen prüfen, Einspielen) sofort in der Konsole:
+
+```sh
+docker compose exec -T worker node --import tsx scripts/restore.ts /imports/DEINE-DATEI.geza --key DEIN-WIEDERHERSTELLUNGSSCHLUESSEL
+```
+
+Ohne Schlüssel stattdessen `--without-key` setzen; danach fehlt das Admin-Konto und wird wie gewohnt mit
+`scripts/finish-restore.ts` angelegt. `--no-api-keys` beziehungsweise `--no-modules` lassen sich einzeln
+weglassen. Nur für eine leere Zielinstallation, wie beim Browser-Import.
+
 Enthalten sind alle Medienfelder und Zuordnungen, History samt Originalzeiten, Bewertungen, eigene Reviews
 einschließlich Entwürfen, externe Reviews, Anbieterbewertungen, gespeicherte Cover, Filmreihen mit Reihenfolge,
 Reviewanbieter, Importberichte und Aufgaben einschließlich ungeklärter Scrobbles. Der Export ist ein konsistenter
@@ -200,6 +212,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ### Unveröffentlicht
 
+- CLI-Alternative `scripts/restore.ts` zum Browser-Import bei der Wiederherstellung, mit Fortschrittsausgaben in der Konsole; nützlich wenn ein vorgeschalteter Reverse-Proxy große Uploads abbricht.
 - Vollständiger verschlüsselter Konten-/Zugangsdatenexport mit allen Nutzdaten und Erststart-Assistent für Serverumzüge; optionale Konten-, API- und Reviewmodulübernahme, atomare Wiederherstellung und neue Plex-Webhook-Adresse.
 
 - Now Playing verwendet bei fehlendem Katalog-Cover das Plex-Poster über eine geschützte Bildroute. Diese Ausnahme betrifft nur den privaten Wiedergabeblock; Plex-Cover werden weiterhin nicht importiert.
