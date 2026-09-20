@@ -92,6 +92,13 @@ Auf dem Zielserver in `.env` setzen:
 PUBLIC_URL=https://geza.schwarzesherz.info:777
 ```
 
+**Pflicht bei jedem Zugriff über einen Domainnamen** (eigener Reverse-Proxy, Plesk, Caddy, etc.), nicht nur
+für Sitemap/Hosting: Login, Setup-Assistent und alle anderen verändernden Anfragen vergleichen den
+`Origin`-Header des Browsers mit `PUBLIC_URL` und lehnen bei Abweichung mit „Ungültige Anfrage“ ab. Ohne
+Domain funktioniert nur der lokale Zugriff über `localhost`/`127.0.0.1`. Der Wert muss exakt Schema, Host
+und – falls verwendet – Port enthalten, wie ihn der Browser tatsächlich aufruft (z. B. `https://geza.example.com`
+ohne Port bei Standard-HTTPS). Nach einer Änderung `docker compose up -d`, damit sie wirksam wird.
+
 Ein vorhandener HTTPS-Reverse-Proxy kann auf `127.0.0.1:3080` weiterleiten. Ohne vorhandenen Proxy gibt es eine optionale Caddy-Konfiguration:
 
 ```sh
