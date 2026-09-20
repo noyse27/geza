@@ -49,6 +49,7 @@ services:
       retries: 3
   worker:
     image: geza:local
+    build: .
     restart: unless-stopped
     command: [node, --import, tsx, scripts/worker.ts]
     env_file: .env
