@@ -69,8 +69,14 @@ jobs:
       - name: Review migration regression tests
         run: node --import tsx scripts/review-migration-check.ts
 
+      - name: Complete installation transfer regression tests
+        run: npm run test:transfer
+
       - name: Build
         run: npm run build
+
+      - name: Transfer HTTP regression tests
+        run: npm run test:transfer:http
 
   dependency-and-secret-scan:
     runs-on: ubuntu-latest

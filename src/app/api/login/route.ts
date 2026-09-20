@@ -2,6 +2,8 @@ import { query } from '@/lib/db';
 import { createSession, validOrigin } from '@/lib/auth';
 import { hashPassword, verifyPassword, safeNext } from '@/lib/security';
 import { z } from 'zod';
+import { cookies } from 'next/headers';
+import { createInitialAdmin } from '@/lib/setup';
 const dummy = hashPassword('not-a-real-password');
 export async function POST(req: Request) {
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
@@ -20,12 +22,15 @@ export async function POST(req: Request) {
     if (!data.success) return Response.json({ error: 'Bitte Eingaben prüfen.' }, { status: 400 });
     if (data.data.password !== data.data.passwordConfirm)
       return Response.json({ error: 'Die Passwörter stimmen nicht überein.' }, { status: 400 });
-    const created = await query(
-      'INSERT INTO admin_account(id,username,password_hash) VALUES(1,$1,$2) ON CONFLICT(id) DO NOTHING RETURNING id',
-      [data.data.username, hashPassword(data.data.password)],
-    );
-    if (!created.length)
-      return Response.json({ error: 'Der Admin wurde bereits angelegt.' }, { status: 409 });
+    try {
+      await createInitialAdmin(
+        data.data.username,
+        data.data.password,
+        (await cookies()).get('geza_setup')?.value || '',
+      );
+    } catch (error) {
+      return Response.json({ error: (error as Error).message }, { status: 409 });
+    }
     await createSession();
     return Response.json({ next: '/admin' });
   }

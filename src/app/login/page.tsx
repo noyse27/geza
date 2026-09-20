@@ -1,4 +1,5 @@
 import { LoginForm } from '@/components/login';
+import { SetupWizard } from '@/components/transfer';
 import { query } from '@/lib/db';
 export const metadata = { title: 'Anmelden', robots: { index: false, follow: false } };
 export default async function Page() {
@@ -8,20 +9,20 @@ export default async function Page() {
       <div className="login-intro">
         <span className="eyebrow accent">{setupRequired ? 'ERSTER START' : 'DEIN PRIVATER VORFÜHRRAUM'}</span>
         <h1>
-          {setupRequired ? 'Admin' : 'Willkommen'}
+          {setupRequired ? 'Geza' : 'Willkommen'}
           <br />
-          {setupRequired ? 'anlegen' : 'zurück'}
+          {setupRequired ? 'einrichten' : 'zurück'}
           <span className="accent">.</span>
         </h1>
         <p>
           {setupRequired
-            ? 'Ein Konto für den privaten Bereich.'
+            ? 'Neu beginnen oder deine Installation wiederherstellen.'
             : 'Deine History, Bewertungen und Filmabende.'}
           <br />
           {setupRequired ? 'Danach ist die Einrichtung geschlossen.' : 'Nur für dich.'}
         </p>
       </div>
-      <LoginForm setupRequired={setupRequired} />
+      {setupRequired ? <SetupWizard /> : <LoginForm />}
     </div>
   );
 }

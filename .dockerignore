@@ -8,3 +8,5 @@ node_modules
 backups
 *.log
 test-results
+*.geza
+geza-wiederherstellungsschluessel*.txt
