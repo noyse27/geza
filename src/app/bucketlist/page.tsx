@@ -12,7 +12,7 @@ export default async function Page() {
         <h1>
           Bucketliste<span className="accent">.</span>
         </h1>
-        <p>Was dein Plex-Server kennt, aber du noch nicht gesehen hast.</p>
+        <p>Als Nächstes auf der Liste.</p>
       </div>
       <section>
         <h2>Filme</h2>
