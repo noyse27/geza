@@ -7,6 +7,7 @@ type Props = {
   configured: Record<string, boolean>;
   values: Record<string, string>;
   publicUrl: string;
+  plexSections: { key: string; title: string; type: string }[];
 };
 type ImportReport = {
   dryRun?: boolean;
@@ -29,13 +30,18 @@ const fields = [
   ['PLEX_WEBHOOK_SECRET', 'Webhook-Geheimnis'],
 ] as const;
 const sensitive = new Set(['TMDB_TOKEN', 'TVDB_API_KEY', 'TVDB_PIN', 'PLEX_TOKEN', 'PLEX_WEBHOOK_SECRET']);
-export function AdminControls({ configured, values, publicUrl, demo = false }: Props) {
+export function AdminControls({ configured, values, publicUrl, plexSections, demo = false }: Props) {
   const [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
     [importing, setImporting] = useState(false),
     [importReport, setImportReport] = useState<ImportReport | null>(null),
     [shown, setShown] = useState<Record<string, boolean>>({}),
     [formValues, setFormValues] = useState<Record<string, string>>(values),
+    [watchedOnly, setWatchedOnly] = useState(values.PLEX_SCAN_WATCHED_ONLY === '1'),
+    [scanEnabled, setScanEnabled] = useState(values.PLEX_SCAN_ENABLED === '1'),
+    [scanSections, setScanSections] = useState<string[]>(
+      (values.PLEX_SCAN_SECTIONS || '').split(',').filter(Boolean),
+    ),
     [origin, setOrigin] = useState('');
   const router = useRouter();
   useEffect(() => setOrigin(window.location.origin), []);
@@ -74,6 +80,12 @@ export function AdminControls({ configured, values, publicUrl, demo = false }: P
     } finally {
       setBusy(false);
     }
+  }
+  async function saveScanSettings(next: { watchedOnly: boolean; enabled: boolean; sections: string[] }) {
+    setWatchedOnly(next.watchedOnly);
+    setScanEnabled(next.enabled);
+    setScanSections(next.sections);
+    await action({ action: 'plex-scan-settings', data: next });
   }
   async function uploadTrakt(form: HTMLFormElement) {
     setImporting(true);
@@ -277,6 +289,65 @@ export function AdminControls({ configured, values, publicUrl, demo = false }: P
           </button>
           <button className="button" disabled={busy} onClick={() => action({ action: 'retry' })}>
             Fehlgeschlagene Aufgaben wiederholen
+          </button>
+        </div>
+      </div>
+      <div className="panel">
+        <h2>Plex-Bibliotheks-Scan</h2>
+        <p className="muted">
+          Durchsucht deine Plex-Bibliothek und ordnet ungesehene Filme/Serien der Bucketliste statt dem
+          Katalog zu. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
+        </p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={watchedOnly}
+            disabled={busy}
+            onChange={(e) =>
+              void saveScanSettings({ watchedOnly: e.target.checked, enabled: scanEnabled, sections: scanSections })
+            }
+          />
+          Nur gesehene Filme/Serien in den Katalog übernehmen (Titel mit Bewertung oder Review bleiben immer
+          erhalten)
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={scanEnabled}
+            disabled={busy}
+            onChange={(e) =>
+              void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
+            }
+          />
+          Nächtlichen Scan automatisch ausführen (täglich 03:00 Uhr)
+        </label>
+        {plexSections.length > 0 && (
+          <fieldset>
+            <legend>Zu durchsuchende Bibliotheken (leer = alle)</legend>
+            {plexSections.map((s) => (
+              <label key={s.key} className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={scanSections.includes(s.key)}
+                  disabled={busy}
+                  onChange={(e) =>
+                    void saveScanSettings({
+                      watchedOnly,
+                      enabled: scanEnabled,
+                      sections: e.target.checked
+                        ? [...scanSections, s.key]
+                        : scanSections.filter((k) => k !== s.key),
+                    })
+                  }
+                />
+                {s.title} ({s.type === 'movie' ? 'Filme' : 'Serien'})
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <div className="button-row">
+          <button className="button primary" disabled={busy} onClick={() => action({ action: 'plex-scan' })}>
+            Jetzt scannen
           </button>
         </div>
       </div>

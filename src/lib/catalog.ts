@@ -11,7 +11,7 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
   };
   const q = (params.get('q') || '').trim().slice(0, 160),
     type = params.get('type') || 'all';
-  const filters: string[] = [];
+  const filters: string[] = ['NOT m.bucketlist'];
   let candidates = '';
   let rank = 'm.title ASC,m.id ASC';
   if (type === 'movie') filters.push("m.kind='movie'");
@@ -61,6 +61,17 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
     hasMore: rows.length > limit,
     elapsed: Math.round((performance.now() - start) * 10) / 10,
   };
+}
+export async function getBucketlist() {
+  const [movies, shows] = await Promise.all([
+    query<Media>(
+      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='movie' ORDER BY m.title,m.id`,
+    ),
+    query<Media>(
+      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='show' ORDER BY m.title,m.id`,
+    ),
+  ]);
+  return { movies, shows };
 }
 export async function getMedia(id: string) {
   if (!/^\d+$/.test(id)) return null;

@@ -10,6 +10,9 @@ export const settingKeys = [
   'PLEX_ACCOUNT_ID',
   'PLEX_SERVER_ID',
   'PLEX_WEBHOOK_SECRET',
+  'PLEX_SCAN_WATCHED_ONLY',
+  'PLEX_SCAN_ENABLED',
+  'PLEX_SCAN_SECTIONS',
 ] as const;
 export async function getSetting(key: string) {
   if (isDemo()) return key === 'PLEX_URL' ? 'https://plex.example.invalid' : `demo-fantasie-${key.toLowerCase()}`;
