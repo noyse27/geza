@@ -1,6 +1,6 @@
 import { getBucketlist } from '@/lib/catalog';
 import { requireAdmin } from '@/lib/auth';
-import { MediaCard } from '@/components/media';
+import { BucketlistTabs } from '@/components/bucketlist';
 export const metadata = { title: 'Bucketliste', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -14,30 +14,7 @@ export default async function Page() {
         </h1>
         <p>Als Nächstes auf der Liste.</p>
       </div>
-      <section>
-        <h2>Filme</h2>
-        {movies.length ? (
-          <div className="poster-grid">
-            {movies.map((m) => (
-              <MediaCard item={m} key={m.id} />
-            ))}
-          </div>
-        ) : (
-          <p className="muted">Keine ungesehenen Filme gefunden.</p>
-        )}
-      </section>
-      <section>
-        <h2>Serien</h2>
-        {shows.length ? (
-          <div className="poster-grid">
-            {shows.map((m) => (
-              <MediaCard item={m} key={m.id} />
-            ))}
-          </div>
-        ) : (
-          <p className="muted">Keine ungesehenen Serien gefunden.</p>
-        )}
-      </section>
+      <BucketlistTabs movies={JSON.parse(JSON.stringify(movies))} shows={JSON.parse(JSON.stringify(shows))} />
     </div>
   );
 }
