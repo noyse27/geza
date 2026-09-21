@@ -1,0 +1,263 @@
+[
+  {
+    "title": "One Mile: Chapter One",
+    "original_title": "One Mile: Chapter One",
+    "year": 2026,
+    "countries": [
+      "Vereinigte Staaten",
+      "Kanada"
+    ],
+    "genres": [
+      "Action",
+      "Abenteuer"
+    ],
+    "directors": [
+      "Adam Davidson"
+    ],
+    "actors": [
+      "Ryan Phillippe",
+      "Amélie Hoeferle",
+      "Sara Canning"
+    ],
+    "certification": "FSK 16",
+    "runtime": 86,
+    "kind": "movie",
+    "cover": "covers/1.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/3OaWRY4OAuZJuQxRKDtU1pI8SbF.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/1327688"
+  },
+  {
+    "title": "One Mile: Chapter Two",
+    "original_title": "One Mile: Chapter Two",
+    "year": 2026,
+    "countries": [
+      "Vereinigte Staaten",
+      "Kanada"
+    ],
+    "genres": [
+      "Action",
+      "Drama"
+    ],
+    "directors": [
+      "Adam Davidson"
+    ],
+    "actors": [
+      "Ryan Phillippe",
+      "Amélie Hoeferle",
+      "Sara Canning"
+    ],
+    "certification": "FSK 16",
+    "runtime": 80,
+    "kind": "movie",
+    "cover": "covers/2.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/w5Q2WCTr15O8md1OXE6Hky5Apmd.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/1327690"
+  },
+  {
+    "title": "Monster House",
+    "original_title": "Monster House",
+    "year": 2006,
+    "countries": [
+      "US"
+    ],
+    "genres": [
+      "Animation",
+      "Komödie",
+      "Familie",
+      "Fantasy",
+      "Horror"
+    ],
+    "directors": [
+      "Gil Kenan"
+    ],
+    "actors": [
+      "Mitchel Musso",
+      "Sam Lerner",
+      "Spencer Locke",
+      "Steve Buscemi",
+      "Maggie Gyllenhaal",
+      "Kevin James",
+      "Nick Cannon",
+      "Jon Heder",
+      "Jason Lee",
+      "Catherine O'Hara"
+    ],
+    "certification": "FSK 6",
+    "runtime": 91,
+    "kind": "movie",
+    "cover": "covers/3.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/i2JQR4oN39RUPq1ywODjSMw15Ua.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/9297"
+  },
+  {
+    "title": "Das Schwarze Quadrat",
+    "original_title": "Das Schwarze Quadrat",
+    "year": 2021,
+    "countries": [
+      "Deutschland",
+      "Germany"
+    ],
+    "genres": [
+      "Komödie",
+      "Krimi"
+    ],
+    "directors": [
+      "Peter Meister"
+    ],
+    "actors": [
+      "Sandra Hüller",
+      "Bernhard Schütz",
+      "Jacob Matschenz"
+    ],
+    "certification": "FSK 12",
+    "runtime": 105,
+    "kind": "movie",
+    "cover": "covers/4.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/muDv79a0CUzi2V5z1Ng86DfRkX1.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/840576"
+  },
+  {
+    "title": "Visions",
+    "original_title": "Visions",
+    "year": 2023,
+    "countries": [
+      "France"
+    ],
+    "genres": [
+      "Mystery",
+      "Thriller"
+    ],
+    "directors": [
+      "Yann Gozlan"
+    ],
+    "actors": [
+      "Diane Kruger",
+      "Mathieu Kassovitz",
+      "Marta Nieto"
+    ],
+    "certification": "FSK 16",
+    "runtime": 124,
+    "kind": "movie",
+    "cover": "covers/5.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/aTnltikAezwvM70FKyy2lK8hYgZ.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/818721"
+  },
+  {
+    "title": "Der Spion und sein Bruder",
+    "original_title": "Grimsby",
+    "year": 2016,
+    "countries": [
+      "GB",
+      "US"
+    ],
+    "genres": [
+      "Action",
+      "Komödie"
+    ],
+    "directors": [
+      "Louis Leterrier"
+    ],
+    "actors": [
+      "Sacha Baron Cohen",
+      "Mark Strong",
+      "Isla Fisher",
+      "Penélope Cruz",
+      "Rebel Wilson",
+      "Gabourey Sidibe",
+      "Annabelle Wallis",
+      "Nick Sampson",
+      "David Harewood",
+      "Scott Adkins"
+    ],
+    "certification": "FSK 12",
+    "runtime": 83,
+    "kind": "movie",
+    "cover": "covers/6.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/ibiPpAtxzgRpbcJUJlKQ1fhJue1.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/267193"
+  },
+  {
+    "title": "Scanners II",
+    "original_title": "Scanners II: The New Order",
+    "year": 1991,
+    "countries": [
+      "Kanada"
+    ],
+    "genres": [
+      "Horror",
+      "Science-Fiction"
+    ],
+    "directors": [
+      "Christian Duguay"
+    ],
+    "actors": [
+      "David Hewlett",
+      "Deborah Raffin",
+      "Yvan Ponton"
+    ],
+    "certification": "FSK 18",
+    "runtime": 104,
+    "kind": "movie",
+    "cover": "covers/7.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/dYiTprXJqLGgVf12dkYUMNws0Vv.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/24331"
+  },
+  {
+    "title": "Mercy",
+    "original_title": "Mercy",
+    "year": 2026,
+    "countries": [
+      "Vereinigte Staaten"
+    ],
+    "genres": [
+      "Science-Fiction",
+      "Action"
+    ],
+    "directors": [
+      "Timur Bekmambetov"
+    ],
+    "actors": [
+      "Chris Pratt",
+      "Rebecca Ferguson",
+      "Kali Reis"
+    ],
+    "certification": "FSK 12",
+    "runtime": 101,
+    "kind": "movie",
+    "cover": "covers/8.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/qe0L3XcwR58ufXFigHUFxwYuGuV.jpg",
+    "sourceUrl": "https://www.themoviedb.org/movie/1236153"
+  },
+  {
+    "title": "Cobra Kai",
+    "original_title": "Cobra Kai",
+    "year": 2018,
+    "countries": [
+      "US"
+    ],
+    "genres": [
+      "Action & Adventure",
+      "Drama",
+      "Komödie"
+    ],
+    "directors": [],
+    "actors": [
+      "William Zabka",
+      "Ralph Macchio",
+      "Courtney Henggeler",
+      "Xolo Maridueña",
+      "Tanner Buchanan",
+      "Mary Mouser",
+      "Peyton List",
+      "Jacob Bertrand",
+      "Gianni DeCenzo",
+      "Dallas Dupree Young"
+    ],
+    "certification": "FSK 16",
+    "runtime": null,
+    "kind": "show",
+    "cover": "covers/9.jpg",
+    "coverSource": "https://image.tmdb.org/t/p/w342/6GDW4EsgsXlYrL1ASb5eCHQK4er.jpg",
+    "sourceUrl": "https://www.themoviedb.org/tv/77169"
+  }
+]

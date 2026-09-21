@@ -1,53 +1,62 @@
-import { readdir, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dataTables, encodeArchive, sealCredentials, type Archive } from '../src/lib/transfer-format';
 import { hashPassword } from '../src/lib/security';
 const date = '2026-09-20T18:00:00.000Z';
 const tables = Object.fromEntries(dataTables.map((t) => [t, []])) as unknown as Archive['tables'];
-const titles = [
-  'Das Licht am Hafen',
-  'Das Licht am Hafen – Heimkehr',
-  'Ein Sommer auf dem Mars',
-  'Die letzte Straßenbahn',
-  'Wolken über Morgen',
-  'Zimmer 204',
-  'Sternenpost',
-  'Die leise Stadt',
-];
+// Public catalog fields only. Personal history, reviews, IDs and credentials from the
+// source installation are deliberately absent from this small, checked-in fixture.
+const catalog = JSON.parse(await readFile('assets/demo/catalog.json', 'utf8')) as Array<{
+  title: string;
+  original_title: string;
+  year: number;
+  countries: string[];
+  genres: string[];
+  directors: string[];
+  actors: string[];
+  certification: string | null;
+  runtime: number | null;
+  cover: string;
+}>;
+const covers = await Promise.all(catalog.map((item) => readFile(`assets/demo/${item.cover}`)));
 for (let n = 1; n <= 12; n++) {
+  const item = catalog[Math.min(n, 9) - 1];
+  const cover = covers[Math.min(n, 9) - 1];
   tables.media.push({
     id: String(n),
     kind: n <= 8 ? 'movie' : n === 9 ? 'show' : n === 10 ? 'season' : 'episode',
     trakt_id: null,
-    title:
-      titles[n - 1] ||
-      (n === 9
-        ? 'Nachtarchiv'
-        : n === 10
-          ? 'Staffel 1'
-          : n === 11
-            ? 'Das verschwundene Band'
-            : 'Eine Stimme im Regen'),
-    original_title: '',
-    year: 2025,
+    title: n <= 9 ? item.title : n === 10 ? 'Staffel 1' : `Episode ${n - 10}`,
+    original_title: n <= 9 ? item.original_title : '',
+    year: item.year,
     parent_id: n >= 10 ? '9' : null,
     season: n >= 10 ? 1 : null,
     episode: n >= 11 ? n - 10 : null,
     ids: {},
     summary:
-      'Frei erfundener Demotitel: Eine unerwartete Begegnung verändert den Alltag und führt zu einer besonderen Reise.',
-    countries: ['Deutschland'],
-    genres: [n % 2 ? 'Drama' : 'Science Fiction'],
-    directors: ['Mira Beispiel'],
-    actors: ['Alex Muster', 'Kim Beispiel'],
-    certification: '12',
-    runtime: n >= 9 ? 45 : 100 + n,
-    poster: null,
+      'Demobeispiel mit echten Katalogdaten und Cover. Bewertungen, Reviews und Anschauereignisse sind ausschließlich erfundene Testdaten.',
+    countries: item.countries,
+    genres: item.genres,
+    directors: item.directors,
+    actors: item.actors,
+    certification: item.certification,
+    runtime: n <= 9 ? item.runtime : null,
+    poster: `/api/posters/${n}`,
     locked_fields: [],
     search_text: '',
     search_vector: null,
     enriched_at: date,
     updated_at: date,
     field_sources: {},
+  });
+  // bytea uses PostgreSQL's JSON-compatible hex representation, as in normal backups.
+  // Every entry gets a stored poster, including season/episodes using the series artwork.
+  tables.posters.push({
+    media_id: String(n),
+    content_type: 'image/jpeg',
+    data: `\\x${cover.toString('hex')}`,
+    etag: createHash('sha256').update(cover).digest('hex'),
+    updated_at: date,
   });
   if (n === 9 || n === 10) continue;
   tables.watches.push({
@@ -79,7 +88,7 @@ for (let n = 1; n <= 12; n++) {
       updated_at: date,
     });
 }
-tables.film_series.push({ id: '1', title: 'Das Licht am Hafen', created_at: date });
+tables.film_series.push({ id: '1', title: 'One Mile', created_at: date });
 tables.film_series_members.push(
   { series_id: '1', media_id: '1', position: 1 },
   { series_id: '1', media_id: '2', position: 2 },
@@ -101,8 +110,9 @@ for (let n = 1; n <= 3; n++)
       receivedAt: date,
       metadata: {
         type: n === 3 ? 'episode' : 'movie',
-        title: n === 3 ? 'Das verschwundene Band' : titles[n - 1],
-        year: 2025,
+        title: n === 3 ? 'Episode 1' : catalog[n - 1].title,
+        year: n === 3 ? catalog[8].year : catalog[n - 1].year,
+        ...(n === 3 ? { grandparentTitle: catalog[8].title, parentIndex: 1, index: 1 } : {}),
       },
     },
     status: 'failed',
@@ -132,4 +142,6 @@ await writeFile(
     ),
   }),
 );
-console.log('demo.geza erzeugt: ausschließlich erfundene Daten. Öffentlicher Demoschlüssel: 64 Nullen.');
+console.log(
+  'demo.geza erzeugt: echte Katalogdaten mit lokalen Covern, erfundene Nutzerdaten. Öffentlicher Demoschlüssel: 64 Nullen.',
+);
