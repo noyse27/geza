@@ -5,6 +5,7 @@ import { query, pool } from '../src/lib/db';
 import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex, processPlexReviewSync } from '../src/lib/plex';
+import { processPlexScan } from '../src/lib/plex-scan';
 import { installationReady } from '../src/lib/setup';
 let running = true;
 process.on('SIGTERM', () => {
@@ -15,6 +16,7 @@ process.on('SIGINT', () => {
 });
 console.log('Geza worker ready');
 let lastCleanup = 0;
+let plexScanSeeded = false;
 const friendsLoop = (async () => {
   while (running) {
     try {
@@ -39,6 +41,15 @@ while (running) {
     if (Date.now() - lastCleanup > 3600000) {
       await query("DELETE FROM event_logs WHERE created_at < now() - interval '14 days'");
       lastCleanup = Date.now();
+    }
+    if (!plexScanSeeded) {
+      // Seeded here instead of a migration so fresh installs keep an empty jobs table (required by demo setup).
+      await query(
+        `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{}',
+          ((date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day' + interval '3 hours') AT TIME ZONE 'Europe/Berlin'))
+         ON CONFLICT(dedupe_key) DO NOTHING`,
+      );
+      plexScanSeeded = true;
     }
     await query(
       "UPDATE jobs SET status='pending',available_at=now() WHERE status='running' AND updated_at<now()-interval '10 minutes'",
@@ -66,6 +77,7 @@ while (running) {
           if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
           else if (job.kind === 'plex') await processPlex(job.payload);
           else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
+          else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
           else throw Error('Unbekannter Aufgabentyp');
           await query("UPDATE jobs SET status='done',updated_at=now(),error=NULL WHERE id=$1", [job.id]);
           await logEvent('info', job.kind, 'Verarbeitung erfolgreich abgeschlossen');

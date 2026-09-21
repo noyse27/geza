@@ -4,6 +4,7 @@ import { reviewModules } from '@/lib/review-modules';
 import { requireAdmin } from '@/lib/auth';
 import { getSetting, settingKeys } from '@/lib/settings';
 import { query } from '@/lib/db';
+import { plexRequest } from '@/lib/plex';
 import { AdminControls } from '@/components/admin';
 import { TransferExport } from '@/components/transfer';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
@@ -16,6 +17,17 @@ export default async function Page() {
     await Promise.all(settingKeys.map(async (k) => [k, await getSetting(k)])),
   );
   const configured = Object.fromEntries(settingKeys.map((k) => [k, !!settings[k]]));
+  let plexSections: { key: string; title: string; type: string }[] = [];
+  if (!isDemo() && settings.PLEX_URL && settings.PLEX_TOKEN) {
+    try {
+      const data = await plexRequest('/library/sections');
+      plexSections = (data?.MediaContainer?.Directory || [])
+        .filter((s: { type: string }) => ['movie', 'show'].includes(s.type))
+        .map((s: { key: string; title: string; type: string }) => ({ key: s.key, title: s.title, type: s.type }));
+    } catch {
+      plexSections = [];
+    }
+  }
   const [jobs, imports, errors] = await Promise.all([
     query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
@@ -41,6 +53,7 @@ export default async function Page() {
         configured={configured}
         values={settings}
         publicUrl={process.env.PUBLIC_URL || ''}
+        plexSections={plexSections}
       />
       {isDemo() ? (
         <section className="panel">
@@ -75,7 +88,9 @@ export default async function Page() {
                     ? 'Metadaten'
                     : j.kind === 'plex-review-sync'
                       ? 'Plex-Reviews'
-                      : 'Plex'}{' '}
+                      : j.kind === 'plex-scan'
+                        ? 'Bibliotheks-Scan'
+                        : 'Plex'}{' '}
                   · {j.status}
                 </span>
                 <strong>{j.count.toLocaleString('de-DE')}</strong>

@@ -11,6 +11,7 @@ export function Navigation({ admin }: { admin: boolean }) {
         ['/history', 'History'],
         ['/collections', 'Sammlungen'],
         ['/data', 'Data'],
+        ['/bucketlist', 'Bucketliste'],
         ['/stats', 'Statistik'],
         ['/admin', 'Admin'],
       ]

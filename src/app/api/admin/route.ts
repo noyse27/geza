@@ -232,7 +232,19 @@ export async function POST(req: Request) {
       );
     } else if (body.action === 'plex-review-batch') {
       await query(
-        `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'plex-review-sync','plex-review-sync:'||id,jsonb_build_object('mediaId',id) FROM media WHERE ids ? 'plex' ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),error=NULL`,
+        `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'plex-review-sync','plex-review-sync:'||id,jsonb_build_object('mediaId',id) FROM media WHERE ids ? 'plex' AND NOT bucketlist ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',attempts=0,available_at=now(),error=NULL`,
+      );
+    } else if (body.action === 'plex-scan-settings') {
+      const data = z
+        .object({ watchedOnly: z.boolean(), enabled: z.boolean(), sections: z.array(z.string().max(50)).max(200) })
+        .parse(body.data);
+      await setSetting('PLEX_SCAN_WATCHED_ONLY', data.watchedOnly ? '1' : '0');
+      await setSetting('PLEX_SCAN_ENABLED', data.enabled ? '1' : '0');
+      await setSetting('PLEX_SCAN_SECTIONS', data.sections.join(','));
+    } else if (body.action === 'plex-scan') {
+      await query(
+        `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{"manual":true}'::jsonb,now())
+         ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL,payload='{"manual":true}'::jsonb`,
       );
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
