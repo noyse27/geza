@@ -1,3 +1,4 @@
+import { isDemo } from './demo-mode';
 import { randomBytes } from 'node:crypto';
 import { pool } from './db';
 import { decrypt, digest, encrypt } from './security';
@@ -111,6 +112,7 @@ export type RestoreOptions = {
   key: string;
 };
 export async function restoreInstallation(archive: Archive, options: RestoreOptions, owner: string) {
+  if (isDemo()) throw Error('Wiederherstellung im Demomodus deaktiviert.');
   if (!owner) throw Error('Einrichtungssitzung fehlt. Bitte die Seite neu laden.');
   let credentials: Credentials | undefined;
   if (options.accounts || options.apiKeys) credentials = openCredentials(archive, options.key);

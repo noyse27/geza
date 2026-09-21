@@ -1,3 +1,4 @@
+import { isDemo } from './demo-mode';
 import { loggedFetch, logEvent } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
@@ -15,6 +16,7 @@ export function plexIds(m: PlexMetadata) {
   return ids;
 }
 export async function plexRequest(path: string) {
+  if (isDemo()) throw Error('Externe Anfragen sind im Demomodus deaktiviert.');
   const base = await getSetting('PLEX_URL'),
     token = await getSetting('PLEX_TOKEN');
   if (!base || !token) return null;

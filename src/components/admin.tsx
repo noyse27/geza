@@ -3,11 +3,13 @@ import { Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 type Props = {
+  demo?: boolean;
   configured: Record<string, boolean>;
   values: Record<string, string>;
   publicUrl: string;
 };
 type ImportReport = {
+  dryRun?: boolean;
   files: number;
   media: number;
   watches: number;
@@ -27,7 +29,7 @@ const fields = [
   ['PLEX_WEBHOOK_SECRET', 'Webhook-Geheimnis'],
 ] as const;
 const sensitive = new Set(['TMDB_TOKEN', 'TVDB_API_KEY', 'TVDB_PIN', 'PLEX_TOKEN', 'PLEX_WEBHOOK_SECRET']);
-export function AdminControls({ configured, values, publicUrl }: Props) {
+export function AdminControls({ configured, values, publicUrl, demo = false }: Props) {
   const [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
     [importing, setImporting] = useState(false),
@@ -82,7 +84,11 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
       const data = await r.json();
       if (!r.ok) throw Error(data.error);
       setImportReport(data.report);
-      setMessage('Trakt-Import abgeschlossen.');
+      setMessage(
+        data.report?.dryRun
+          ? 'Demo-Vorschau: Diese Datensätze würden verarbeitet. Nichts wurde gespeichert; vorhandene Dubletten wurden nicht abgeglichen.'
+          : 'Trakt-Import abgeschlossen.',
+      );
       form.reset();
       router.refresh();
     } catch (e) {
@@ -101,10 +107,10 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
           void action({ action: 'settings', data: Object.fromEntries(f) });
         }}
       >
-        <h2>Verbindungen</h2>
+        <h2>Verbindungen{demo ? ' · Demo, schreibgeschützt' : ''}</h2>
         <p className="muted">
-          Zugangsdaten werden verschlüsselt gespeichert. Geheime Werte bleiben maskiert, bis du sie per
-          Auge einblendest.
+          Zugangsdaten werden verschlüsselt gespeichert. Geheime Werte bleiben maskiert, bis du sie per Auge
+          einblendest.
         </p>
         <div className="form-grid">
           {fields.map(([key, label]) => (
@@ -115,6 +121,7 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
               </span>
               <span className="secret-input">
                 <input
+                  readOnly={demo}
                   name={key}
                   type={sensitive.has(key) && !shown[key] ? 'password' : 'text'}
                   autoComplete="off"
@@ -155,8 +162,8 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
       <div className="panel">
         <h2>Plex-Webhook</h2>
         <p className="muted">
-          Diese Adresse trägst du in Plex als Webhook ein. Das Secret am Ende gehört nur dir und kann
-          bei Bedarf neu erzeugt werden.
+          Diese Adresse trägst du in Plex als Webhook ein. Das Secret am Ende gehört nur dir und kann bei
+          Bedarf neu erzeugt werden.
         </p>
         <div className="webhook-box">
           <code>{webhookUrl || 'Erst ein Webhook-Geheimnis speichern oder generieren.'}</code>
@@ -219,11 +226,17 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
           void uploadTrakt(e.currentTarget);
         }}
       >
-        <h2>Trakt-Export importieren</h2>
+        <h2>{demo ? 'Trakt-Import ausprobieren' : 'Trakt-Export importieren'}</h2>
         <p className="muted">
-          Lade die ZIP aus deinem Trakt-Export hoch. Geza entpackt sie, erkennt die passenden JSON-Dateien
-          und importiert Watch-History, Bewertungen, Reviews und Sammlung.
+          Lade die ZIP aus deinem Trakt-Export hoch. Geza entpackt sie, erkennt die passenden JSON-Dateien und
+          importiert Watch-History, Bewertungen, Reviews und Sammlung.
         </p>
+        {demo && (
+          <p>
+            Nur Vorschau (max. 10 MiB ZIP / 20 MiB JSON): Es werden keine importierten Daten gespeichert. Kein
+            Dublettenabgleich.
+          </p>
+        )}
         <div className="upload-box">
           <input name="file" type="file" accept=".zip,application/zip" required />
           <button className="button primary" disabled={importing || busy}>
@@ -270,8 +283,8 @@ export function AdminControls({ configured, values, publicUrl }: Props) {
       <div className="panel">
         <h2>Plex-Reviews nachziehen</h2>
         <p className="muted">
-          Ruft für alle Titel mit Plex-Verweis die persönliche Plex-Review erneut ab und speichert sie.
-          Läuft im Hintergrund über die Warteschlange, ein erneuter Klick stößt einen frischen Abgleich an.
+          Ruft für alle Titel mit Plex-Verweis die persönliche Plex-Review erneut ab und speichert sie. Läuft
+          im Hintergrund über die Warteschlange, ein erneuter Klick stößt einen frischen Abgleich an.
         </p>
         <div className="button-row">
           <button

@@ -1,8 +1,9 @@
+import { isDemo } from '@/lib/demo-mode';
 import type { MetadataRoute } from 'next';
 export const dynamic = 'force-dynamic';
 export default function robots(): MetadataRoute.Robots {
   const base = process.env.PUBLIC_URL;
-  return base
+  return !isDemo() && base
     ? {
         rules: {
           userAgent: '*',

@@ -10,6 +10,35 @@ Film- und Serienportal mit öffentlichen Bewertungen und Reviews sowie einem pri
 
 **Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
 
+## Demomodus
+
+Seit **v1.2.0** lässt sich Geza als öffentliche Demo für die eigene Website installieren:
+
+```powershell
+# Windows
+./setup.ps1 -Mode demo
+```
+
+```sh
+# Linux / macOS
+sh setup.sh demo
+```
+
+| | Produktion | Demo |
+| --- | --- | --- |
+| Installation | `./setup.ps1` / `sh setup.sh` | `./setup.ps1 -Mode demo` / `sh setup.sh demo` |
+| Lokale Adresse | `http://localhost:3080` | `http://localhost:3081` |
+| Konfiguration | `.env` | `.env.demo` |
+| Adminzugang | Bei der Einrichtung selbst festlegen | **admin / admin** |
+| Ausgangsdaten | Leer oder eigene Wiederherstellung | Automatisch aus [demo.geza](demo.geza) |
+| Trakt-Upload | Import | Vorschau ohne Datenbankänderung |
+| Provider und Geza-Wiederherstellung | Verfügbar | Gesperrt; Verbindungen zeigen Fantasieschlüssel |
+| Zurücksetzen | Kein automatischer Reset | Standardmäßig alle 60 Minuten |
+
+Die Demo verwendet eine eigene Datenbank und zwölf erfundene Medieneinträge, Bewertungen, Reviews sowie drei offene Scrobbles zur Nachpflege. Reviews, Bewertungen und Bearbeitung können ausprobiert werden. Alle Besucher teilen denselben Datenbestand; beim Reset verschwinden Änderungen und Anmeldungen. Bitte keine persönlichen Daten eingeben.
+
+Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` in `.env.demo` setzen; iframe-Einbettung lässt sich mit `DEMO_FRAME_ANCESTORS` auf die eigene Domain beschränken. Details zu Hosting, Reset, Uploadlimits und Tests stehen in [Installation und Website-Einbindung](docs/demo.md).
+
 ## Lokal starten
 
 Voraussetzung: Docker mit Compose. Kein separates Node.js oder PostgreSQL erforderlich.
@@ -217,7 +246,15 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
-### Unveröffentlicht
+### v1.2.0
+
+- Separat installierbarer Demomodus mit `admin / admin`, automatischer Einspielung von `demo.geza`, erfundenen Beispieldaten und offenen Scrobbles.
+- Konfigurierbarer automatischer Reset einschließlich Sitzungen; Schutz vor dem Überschreiben vorhandener Daten und versehentlichem Start einer Demo-Datenbank als Produktion.
+- Trakt-Vorschau ohne Datenbankänderung mit Uploadlimits; Geza-Wiederherstellung, Providerzugriffe und Änderungen an Zugangsdaten in der Demo gesperrt.
+- Gezielte iframe-Freigabe für die eigene Website, sichtbarer Demohinweis und Ausschluss der Demo von Suchmaschinen.
+- Docker-/HTTP-Integrationstests für Importvorschau, Bearbeitung, Scrobble-Nachpflege und den tatsächlichen Worker-Reset; Schutz vorhandener Daten zusätzlich in der CI geprüft.
+- Worker-Image wird bei einer frischen Compose-Installation mitgebaut; `PUBLIC_URL` als Voraussetzung für Zugriffe über einen Domainnamen dokumentiert.
+- Filmdienst-Titelsuche und Abgleich des Produktionsjahrs korrigiert.
 
 - CLI-Alternative `scripts/restore.ts` zum Browser-Import bei der Wiederherstellung, mit Fortschrittsausgaben in der Konsole; nützlich wenn ein vorgeschalteter Reverse-Proxy große Uploads abbricht.
 - Vollständiger verschlüsselter Konten-/Zugangsdatenexport mit allen Nutzdaten und Erststart-Assistent für Serverumzüge; optionale Konten-, API- und Reviewmodulübernahme, atomare Wiederherstellung und neue Plex-Webhook-Adresse.

@@ -1,6 +1,6 @@
 {
   "name": "geza",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 3080",
     "lint": "tsc --noEmit",
-    "test:unit": "tsx --test tests/unit.test.ts tests/transfer.test.ts",
+    "test:unit": "tsx --test tests/unit.test.ts tests/transfer.test.ts tests/demo.test.ts",
     "test:transfer": "tsx scripts/transfer-check.ts",
     "test:transfer:http": "tsx scripts/transfer-http-check.ts",
     "test:integration": "tsx --test tests/integration.test.ts",
@@ -20,7 +20,9 @@
     "import:trakt": "tsx scripts/import.ts",
     "worker": "tsx scripts/worker.ts",
     "benchmark": "tsx scripts/benchmark.ts",
-    "reviews:dedupe": "tsx scripts/dedupe-reviews.ts"
+    "reviews:dedupe": "tsx scripts/dedupe-reviews.ts",
+    "test:demo:http": "tsx scripts/demo-http-check.ts",
+    "test:demo:safety": "tsx scripts/demo-safety-check.ts"
   },
   "dependencies": {
     "@fontsource/syne": "^5.3.0",

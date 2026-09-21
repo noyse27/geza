@@ -1,8 +1,10 @@
+import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
 import { exportInstallation } from '@/lib/transfer';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 export async function POST(req: Request) {
+  if (isDemo()) return demoBlocked();
   if (!validOrigin(req) || !(await isAdmin()))
     return Response.json({ error: 'Anmeldung erforderlich.' }, { status: 403 });
   try {

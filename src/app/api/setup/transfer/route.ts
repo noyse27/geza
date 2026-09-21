@@ -1,3 +1,4 @@
+import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'no-store' };
 export async function GET() {
+  if (isDemo()) return demoBlocked();
   if (await installationReady())
     return Response.json({ error: 'Einrichtung abgeschlossen.' }, { status: 409, headers });
   const jar = await cookies();
@@ -42,6 +44,7 @@ const optionsSchema = z
   })
   .strict();
 export async function POST(req: Request) {
+  if (isDemo()) return demoBlocked();
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage.' }, { status: 403, headers });
   if (await installationReady())
     return Response.json({ error: 'Einrichtung abgeschlossen.' }, { status: 409, headers });

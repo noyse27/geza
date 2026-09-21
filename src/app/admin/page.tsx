@@ -1,3 +1,4 @@
+import { isDemo } from '@/lib/demo-mode';
 import { ReviewBoxAdmin } from '@/components/review-box-admin';
 import { reviewModules } from '@/lib/review-modules';
 import { requireAdmin } from '@/lib/auth';
@@ -35,8 +36,24 @@ export default async function Page() {
           modules={reviewModules.map(({ id, name }) => ({ id, name }))}
         />
       </div>
-      <AdminControls configured={configured} values={settings} publicUrl={process.env.PUBLIC_URL || ''} />
-      <TransferExport />
+      <AdminControls
+        demo={isDemo()}
+        configured={configured}
+        values={settings}
+        publicUrl={process.env.PUBLIC_URL || ''}
+      />
+      {isDemo() ? (
+        <section className="panel">
+          <h2>Sicherung und Umzug</h2>
+          <p>
+            Geza-Import und vollständiger Export sind in der Demo deaktiviert. Verbindungen zeigen
+            ausschließlich Fantasieschlüssel; Änderungen und externe Abfragen sind gesperrt.
+          </p>
+          <a href="/api/demo/download">demo.geza herunterladen</a>
+        </section>
+      ) : (
+        <TransferExport />
+      )}
       <p>
         <a className="button" href="/admin/logs">
           Ereignisprotokoll: Webhooks und Fehler ansehen

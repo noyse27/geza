@@ -18,6 +18,7 @@ COPY --from=build --chown=node:node /app/scripts ./scripts
 COPY --from=build --chown=node:node /app/src/lib ./src/lib
 COPY --from=build --chown=node:node /app/migrations ./migrations
 COPY --from=build --chown=node:node /app/package.json /app/tsconfig.json ./
+COPY --from=build --chown=node:node /app/demo.geza ./demo.geza
 USER node
 EXPOSE 3080
 CMD ["node", "server.js"]

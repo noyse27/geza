@@ -1,13 +1,15 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-if (existsSync('.env')) {
+const demo = process.argv.includes('--demo');
+const envFile = demo ? '.env.demo' : '.env';
+if (existsSync(envFile)) {
   console.log('.env exists, keeping configuration.');
   process.exit(0);
 }
 const password = randomBytes(20).toString('hex');
 writeFileSync(
-  '.env',
-  `POSTGRES_PASSWORD=${password}\nDATABASE_URL=postgres://geza:${password}@localhost:5439/geza\nSESSION_SECRET=${randomBytes(32).toString('hex')}\nPUBLIC_URL=\nGEZA_PORT=3080\nPLEX_WEBHOOK_SECRET=${randomBytes(24).toString('hex')}\n`,
+  envFile,
+  `POSTGRES_PASSWORD=${password}\nDATABASE_URL=postgres://geza:${password}@localhost:5439/geza\nSESSION_SECRET=${randomBytes(32).toString('hex')}\nPUBLIC_URL=\nGEZA_PORT=${demo ? 3081 : 3080}\nGEZA_ENV_FILE=${envFile}\nGEZA_MODE=${demo ? 'demo' : 'production'}\nDEMO_RESET_MINUTES=60\nPLEX_WEBHOOK_SECRET=${randomBytes(24).toString('hex')}\n`,
   { mode: 0o600 },
 );
 console.log('Created .env with random credentials.');

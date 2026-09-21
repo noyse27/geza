@@ -1,3 +1,5 @@
+import { isDemo } from '../src/lib/demo-mode';
+import { maintainDemo } from '../src/lib/demo';
 import { logContext, logEvent, redact } from '../src/lib/logging';
 import { query, pool } from '../src/lib/db';
 import { enrichMedia } from '../src/lib/providers';
@@ -16,7 +18,7 @@ let lastCleanup = 0;
 const friendsLoop = (async () => {
   while (running) {
     try {
-      if (await installationReady()) await discoverFriendReview();
+      if (!isDemo() && (await installationReady())) await discoverFriendReview();
     } catch (error) {
       await logEvent('error', 'friends', 'Freundesreviews konnten nicht abgefragt werden', { error });
     }
@@ -25,6 +27,11 @@ const friendsLoop = (async () => {
 })();
 while (running) {
   try {
+    if (isDemo()) {
+      await maintainDemo();
+      await new Promise((r) => setTimeout(r, 5000));
+      continue;
+    }
     if (!(await installationReady())) {
       await new Promise((r) => setTimeout(r, 2000));
       continue;
