@@ -1,8 +1,10 @@
+import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { logContext, logEvent } from '@/lib/logging';
 import { getSetting } from '@/lib/settings';
 import { constantEqual, digest } from '@/lib/security';
 import { pool } from '@/lib/db';
 export async function POST(req: Request, { params }: { params: Promise<{ secret: string }> }) {
+  if (isDemo()) return demoBlocked();
   const requestId = crypto.randomUUID();
   return logContext.run({ requestId, method: req.method, path: '/api/plex/[secret]' }, async () => {
     const respond = async (

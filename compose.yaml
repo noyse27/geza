@@ -18,7 +18,7 @@ services:
     build: .
     image: geza:local
     command: [node, --import, tsx, scripts/migrate.ts]
-    env_file: .env
+    env_file: ${GEZA_ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgres://geza:${POSTGRES_PASSWORD}@db:5432/geza
     depends_on:
@@ -27,7 +27,7 @@ services:
     image: geza:local
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file: ${GEZA_ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgres://geza:${POSTGRES_PASSWORD}@db:5432/geza
       HOSTNAME: 0.0.0.0
@@ -52,7 +52,7 @@ services:
     build: .
     restart: unless-stopped
     command: [node, --import, tsx, scripts/worker.ts]
-    env_file: .env
+    env_file: ${GEZA_ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgres://geza:${POSTGRES_PASSWORD}@db:5432/geza
     volumes:

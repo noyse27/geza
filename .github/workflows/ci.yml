@@ -72,6 +72,9 @@ jobs:
       - name: Complete installation transfer regression tests
         run: npm run test:transfer
 
+      - name: Demo installation safety regression tests
+        run: npm run test:demo:safety
+
       - name: Build
         run: npm run build
 

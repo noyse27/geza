@@ -1,3 +1,4 @@
+import { isDemo } from '@/lib/demo-mode';
 import { isAdmin } from '@/lib/auth';
 import { plexRequest } from '@/lib/plex';
 import { nowPlayingCatalog } from '@/lib/now-playing-catalog';
@@ -6,6 +7,7 @@ import { plexCoverFallback } from '@/lib/plex-cover';
 
 export const dynamic = 'force-dynamic';
 export async function GET() {
+  if (isDemo()) return Response.json({ items: [] });
   const headers = { 'Cache-Control': 'private, no-store' };
   if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401, headers });
   try {

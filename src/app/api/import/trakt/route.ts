@@ -1,3 +1,4 @@
+import { isDemo } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
 import { importTrakt } from '@/lib/importer';
 import AdmZip from 'adm-zip';
@@ -8,7 +9,8 @@ import { tmpdir } from 'node:os';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const exportFile = /^(watched-history-|watched-movies-|watched-shows-|ratings-|comments-|collection-).*\.json$/;
+const exportFile =
+  /^(watched-history-|watched-movies-|watched-shows-|ratings-|comments-|collection-).*\.json$/;
 const maxZipBytes = 200 * 1024 * 1024;
 const maxJsonBytes = 500 * 1024 * 1024;
 
@@ -27,6 +29,23 @@ export async function POST(req: Request) {
   const contentType = req.headers.get('content-type') || '';
   if (!contentType.includes('multipart/form-data'))
     return Response.json({ error: 'Bitte eine Trakt-ZIP hochladen.' }, { status: 400 });
+  if (isDemo()) {
+    const reader = req.body?.getReader();
+    if (!reader) return Response.json({ error: 'Datei fehlt.' }, { status: 400 });
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > 10 * 1024 * 1024) {
+        await reader.cancel();
+        return Response.json({ error: 'Demo-Uploadlimit: 10 MiB.' }, { status: 413 });
+      }
+      chunks.push(value);
+    }
+    req = new Request(req.url, { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) });
+  }
   const form = await req.formData(),
     file = form.get('file');
   if (!(file instanceof File)) return Response.json({ error: 'Keine ZIP-Datei gefunden.' }, { status: 400 });
@@ -46,7 +65,7 @@ export async function POST(req: Request) {
       const target = safePath(root, entry.entryName);
       if (!target) continue;
       total += entry.header.size;
-      if (total > maxJsonBytes)
+      if (total > (isDemo() ? 20 * 1024 * 1024 : maxJsonBytes))
         return Response.json({ error: 'Die entpackten JSON-Dateien sind zu groß.' }, { status: 413 });
       const data = entry.getData();
       if (data.length !== entry.header.size)

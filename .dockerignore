@@ -10,3 +10,5 @@ backups
 test-results
 *.geza
 geza-wiederherstellungsschluessel*.txt
+
+!demo.geza

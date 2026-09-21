@@ -1,3 +1,4 @@
+import { isDemo } from './demo-mode';
 import { query } from './db';
 import { reviewModule, reviewModules } from './review-modules';
 import type { ReviewMedia } from './review-modules/types';
@@ -30,6 +31,7 @@ export async function configuredFriendReviews(id: string, media: ReviewMedia) {
   );
 }
 export async function discoverFriendReview() {
+  if (isDemo()) return;
   const providers = reviewModules.filter((module) => module.discover).map((module) => module.id);
   const [row] = await query(
     `UPDATE friend_reviews SET next_check_at=now()+interval '1 day'

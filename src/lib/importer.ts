@@ -1,3 +1,4 @@
+import { isDemo } from './demo-mode';
 import { readdir, readFile } from 'node:fs/promises';
 import { pool } from './db';
 import { watchedTime } from './security';
@@ -60,6 +61,17 @@ export async function importTrakt(directory: string) {
         });
     }
   }
+  if (isDemo())
+    return {
+      files: files.length,
+      media: media.size,
+      watches: history.length,
+      unknownDates: history.filter((r) => !r.watched_at).length,
+      ratings: ratings.length,
+      reviews: reviews.length,
+      providerCollisions: [],
+      dryRun: true,
+    };
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

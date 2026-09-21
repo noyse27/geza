@@ -1,3 +1,4 @@
+import { isDemo, demoResetMinutes } from '@/lib/demo-mode';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Film, LockKeyhole } from 'lucide-react';
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: { default: 'Geza — Film & Serie', template: '%s · Geza' },
   description: 'Filme, Serien und persönliche Perspektiven.',
-  robots: process.env.PUBLIC_URL ? undefined : { index: false, follow: false },
+  robots: !isDemo() && process.env.PUBLIC_URL ? undefined : { index: false, follow: false },
   icons: { icon: '/icon.svg' },
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
+        {isDemo() && (
+          <aside className="demo-banner">
+            Öffentliche Demo · <Link href="/login">Admin ausprobieren: admin / admin</Link> · Gemeinsame
+            Testdaten, Reset alle {demoResetMinutes()} Minuten (auch deine Änderungen und Anmeldung). Bitte
+            keine persönlichen Daten eingeben.
+          </aside>
+        )}
         <main>{children}</main>
         <footer>
           <Link className="footer-brand" href="/">
@@ -55,8 +63,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </Link>
           <span>Für die Filme, die bleiben.</span>
           <span className="footer-copyright">
-            &copy; 2026{year > 2026 ? ` - ${year}` : ''} Binged with love &bull; Curated with care &bull; Served
-            with style by <a href="https://polze.net/geza.html">PolzeSoft</a>
+            &copy; 2026{year > 2026 ? ` - ${year}` : ''} Binged with love &bull; Curated with care &bull;
+            Served with style by <a href="https://polze.net/geza.html">PolzeSoft</a>
           </span>
           <Link href="/credits">Daten & Quellen</Link>
           <span className="footer-note">{admin ? 'Privater Bereich verfügbar' : 'Film & Serie'}</span>

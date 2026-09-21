@@ -1,9 +1,11 @@
+import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { isAdmin } from '@/lib/auth';
 import { getSetting } from '@/lib/settings';
 import { validPlexCoverPath } from '@/lib/plex-cover';
 
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
+  if (isDemo()) return demoBlocked();
   const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
   if (!(await isAdmin())) return new Response(null, { status: 401, headers });
   const path = new URL(req.url).searchParams.get('path');

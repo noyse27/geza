@@ -1,3 +1,4 @@
+import { isDemo } from './demo-mode';
 import { loggedFetch, logEvent, logContext } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
@@ -172,6 +173,7 @@ async function tvdb(m: Raw): Promise<Raw | null> {
   };
 }
 export async function enrichMedia(id: string) {
+  if (isDemo()) return;
   const m = (await query('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!m) return;
   return logContext.run(

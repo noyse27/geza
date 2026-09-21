@@ -1,5 +1,9 @@
+import { isDemo } from '../src/lib/demo-mode';
+import { maintainDemo } from '../src/lib/demo';
 import { readdir, readFile } from 'node:fs/promises';
 import { pool } from '../src/lib/db';
+if (!isDemo() && (await pool.query("SELECT to_regclass('public.demo_state') AS name")).rows[0].name)
+  throw Error('Demo-Datenbank darf nicht als Produktion gestartet werden. Separate Installation verwenden.');
 await pool.query(
   'CREATE TABLE IF NOT EXISTS migrations(name text PRIMARY KEY, applied_at timestamptz DEFAULT now())',
 );
@@ -22,4 +26,5 @@ for (const file of (await readdir('migrations')).filter((f) => f.endsWith('.sql'
     client.release();
   }
 }
+await maintainDemo();
 await pool.end();

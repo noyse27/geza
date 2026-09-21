@@ -2205,3 +2205,6 @@ footer > a:nth-of-type(2) {
     gap: 12px;
   }
 }
+
+.demo-banner { padding: 14px 24px; background: #322b12; color: #fff4c2; text-align: center; font-size: 14px; }
+.demo-banner a { text-decoration: underline; }

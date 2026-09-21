@@ -1,3 +1,4 @@
+import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { setSetting, settingKeys } from '@/lib/settings';
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
   try {
     const body = await req.json();
+    if (isDemo() && !['delete-media','assignment','review-box-delete','review-box-edit','review-box-add','friend-review','media','series-reorder','review','watch','watch-delete','watch-create','rating'].includes(body.action)) return demoBlocked();
     if (body.action === 'delete-media') {
       const result = await deleteMedia(body.data);
       return Response.json(result, {
