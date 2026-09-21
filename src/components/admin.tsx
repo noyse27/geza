@@ -45,6 +45,7 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
     [origin, setOrigin] = useState('');
   const router = useRouter();
   useEffect(() => setOrigin(window.location.origin), []);
+  const plexConfigured = configured.PLEX_URL && configured.PLEX_TOKEN;
   const webhookSecret = formValues.PLEX_WEBHOOK_SECRET || values.PLEX_WEBHOOK_SECRET || '';
   const webhookBase = publicUrl || origin;
   const webhookUrl = webhookSecret && webhookBase ? `${webhookBase}/api/plex/${webhookSecret}` : '';
@@ -171,66 +172,76 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
           </button>
         </div>
       </form>
-      <div className="panel">
-        <h2>Plex-Webhook</h2>
-        <p className="muted">
-          Diese Adresse trägst du in Plex als Webhook ein. Das Secret am Ende gehört nur dir und kann bei
-          Bedarf neu erzeugt werden.
-        </p>
-        <div className="webhook-box">
-          <code>{webhookUrl || 'Erst ein Webhook-Geheimnis speichern oder generieren.'}</code>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={!webhookUrl}
-            title="Webhook-Adresse kopieren"
-            aria-label="Webhook-Adresse kopieren"
-            onClick={() => {
-              if (webhookUrl) void navigator.clipboard.writeText(webhookUrl);
-            }}
-          >
-            <Copy size={16} />
-          </button>
+      {plexConfigured ? (
+        <div className="panel">
+          <h2>Plex-Webhook</h2>
+          <p className="muted">
+            Diese Adresse trägst du in Plex als Webhook ein. Das Secret am Ende gehört nur dir und kann bei
+            Bedarf neu erzeugt werden.
+          </p>
+          <div className="webhook-box">
+            <code>{webhookUrl || 'Erst ein Webhook-Geheimnis speichern oder generieren.'}</code>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={!webhookUrl}
+              title="Webhook-Adresse kopieren"
+              aria-label="Webhook-Adresse kopieren"
+              onClick={() => {
+                if (webhookUrl) void navigator.clipboard.writeText(webhookUrl);
+              }}
+            >
+              <Copy size={16} />
+            </button>
+          </div>
+          <div className="form-grid webhook-help">
+            <label>
+              Account-ID aus dem Plex-Webhook
+              <span className="secret-input">
+                <input readOnly value={formValues.PLEX_ACCOUNT_ID || ''} />
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Account-ID kopieren"
+                  aria-label="Account-ID kopieren"
+                  disabled={!formValues.PLEX_ACCOUNT_ID}
+                  onClick={() => void navigator.clipboard.writeText(formValues.PLEX_ACCOUNT_ID || '')}
+                >
+                  <Copy size={16} />
+                </button>
+              </span>
+            </label>
+            <label>
+              Server-UUID
+              <span className="secret-input">
+                <input readOnly value={formValues.PLEX_SERVER_ID || ''} />
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Server-UUID kopieren"
+                  aria-label="Server-UUID kopieren"
+                  disabled={!formValues.PLEX_SERVER_ID}
+                  onClick={() => void navigator.clipboard.writeText(formValues.PLEX_SERVER_ID || '')}
+                >
+                  <Copy size={16} />
+                </button>
+              </span>
+            </label>
+            <label>
+              Plex Identity-URL
+              <input readOnly value={plexIdentityUrl || ''} />
+            </label>
+          </div>
         </div>
-        <div className="form-grid webhook-help">
-          <label>
-            Account-ID aus dem Plex-Webhook
-            <span className="secret-input">
-              <input readOnly value={formValues.PLEX_ACCOUNT_ID || ''} />
-              <button
-                className="icon-button"
-                type="button"
-                title="Account-ID kopieren"
-                aria-label="Account-ID kopieren"
-                disabled={!formValues.PLEX_ACCOUNT_ID}
-                onClick={() => void navigator.clipboard.writeText(formValues.PLEX_ACCOUNT_ID || '')}
-              >
-                <Copy size={16} />
-              </button>
-            </span>
-          </label>
-          <label>
-            Server-UUID
-            <span className="secret-input">
-              <input readOnly value={formValues.PLEX_SERVER_ID || ''} />
-              <button
-                className="icon-button"
-                type="button"
-                title="Server-UUID kopieren"
-                aria-label="Server-UUID kopieren"
-                disabled={!formValues.PLEX_SERVER_ID}
-                onClick={() => void navigator.clipboard.writeText(formValues.PLEX_SERVER_ID || '')}
-              >
-                <Copy size={16} />
-              </button>
-            </span>
-          </label>
-          <label>
-            Plex Identity-URL
-            <input readOnly value={plexIdentityUrl || ''} />
-          </label>
+      ) : (
+        <div className="panel">
+          <h2>Plex-Funktionen</h2>
+          <p className="muted">
+            Speichere zuerst Plex-Server-URL und -Token oben unter „Verbindungen“, um Webhook,
+            Bibliotheks-Scan und Review-Abgleich zu nutzen.
+          </p>
         </div>
-      </div>
+      )}
       <form
         className="panel"
         onSubmit={(e) => {
@@ -292,81 +303,90 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
           </button>
         </div>
       </div>
-      <div className="panel">
-        <h2>Plex-Bibliotheks-Scan</h2>
-        <p className="muted">
-          Durchsucht deine Plex-Bibliothek und ordnet ungesehene Filme/Serien der Bucketliste statt dem
-          Katalog zu. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
-        </p>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={watchedOnly}
-            disabled={busy}
-            onChange={(e) =>
-              void saveScanSettings({ watchedOnly: e.target.checked, enabled: scanEnabled, sections: scanSections })
-            }
-          />
-          Nur gesehene Filme/Serien in den Katalog übernehmen (Titel mit Bewertung oder Review bleiben immer
-          erhalten)
-        </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={scanEnabled}
-            disabled={busy}
-            onChange={(e) =>
-              void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
-            }
-          />
-          Nächtlichen Scan automatisch ausführen (täglich 03:00 Uhr)
-        </label>
-        {plexSections.length > 0 && (
-          <fieldset>
-            <legend>Zu durchsuchende Bibliotheken (leer = alle)</legend>
-            {plexSections.map((s) => (
-              <label key={s.key} className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={scanSections.includes(s.key)}
-                  disabled={busy}
-                  onChange={(e) =>
-                    void saveScanSettings({
-                      watchedOnly,
-                      enabled: scanEnabled,
-                      sections: e.target.checked
-                        ? [...scanSections, s.key]
-                        : scanSections.filter((k) => k !== s.key),
-                    })
-                  }
-                />
-                {s.title} ({s.type === 'movie' ? 'Filme' : 'Serien'})
-              </label>
-            ))}
-          </fieldset>
-        )}
-        <div className="button-row">
-          <button className="button primary" disabled={busy} onClick={() => action({ action: 'plex-scan' })}>
-            Jetzt scannen
-          </button>
+      {plexConfigured && (
+        <div className="panel">
+          <h2>Plex-Bibliotheks-Scan</h2>
+          <p className="muted">
+            Durchsucht deine Plex-Bibliothek und ordnet ungesehene Filme/Serien der Bucketliste statt dem
+            Katalog zu. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
+          </p>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={watchedOnly}
+              disabled={busy}
+              onChange={(e) =>
+                void saveScanSettings({
+                  watchedOnly: e.target.checked,
+                  enabled: scanEnabled,
+                  sections: scanSections,
+                })
+              }
+            />
+            Nur gesehene Filme/Serien in den Katalog übernehmen (Titel mit Bewertung oder Review bleiben immer
+            erhalten). Ohne diese Option bleibt die Bucketliste leer, weil ungesehene Titel dann ganz normal im
+            Katalog erscheinen.
+          </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={scanEnabled}
+              disabled={busy}
+              onChange={(e) =>
+                void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
+              }
+            />
+            Nächtlichen Scan automatisch ausführen (täglich 03:00 Uhr)
+          </label>
+          {plexSections.length > 0 && (
+            <fieldset>
+              <legend>Zu durchsuchende Bibliotheken (leer = alle)</legend>
+              {plexSections.map((s) => (
+                <label key={s.key} className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={scanSections.includes(s.key)}
+                    disabled={busy}
+                    onChange={(e) =>
+                      void saveScanSettings({
+                        watchedOnly,
+                        enabled: scanEnabled,
+                        sections: e.target.checked
+                          ? [...scanSections, s.key]
+                          : scanSections.filter((k) => k !== s.key),
+                      })
+                    }
+                  />
+                  {s.title} ({s.type === 'movie' ? 'Filme' : 'Serien'})
+                </label>
+              ))}
+            </fieldset>
+          )}
+          <div className="button-row">
+            <button className="button primary" disabled={busy} onClick={() => action({ action: 'plex-scan' })}>
+              Jetzt scannen
+            </button>
+          </div>
         </div>
-      </div>
-      <div className="panel">
-        <h2>Plex-Reviews nachziehen</h2>
-        <p className="muted">
-          Ruft für alle Titel mit Plex-Verweis die persönliche Plex-Review erneut ab und speichert sie. Läuft
-          im Hintergrund über die Warteschlange, ein erneuter Klick stößt einen frischen Abgleich an.
-        </p>
-        <div className="button-row">
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={() => action({ action: 'plex-review-batch' })}
-          >
-            Plex-Reviews für alle Titel abgleichen
-          </button>
+      )}
+      {plexConfigured && (
+        <div className="panel">
+          <h2>Plex-Reviews nachziehen</h2>
+          <p className="muted">
+            Ruft für alle Titel mit Plex-Verweis die persönliche Plex-Review erneut ab und speichert sie.
+            Läuft im Hintergrund über die Warteschlange, ein erneuter Klick stößt einen frischen Abgleich an.
+          </p>
+          <div className="button-row">
+            <button
+              className="button primary"
+              disabled={busy}
+              onClick={() => action({ action: 'plex-review-batch' })}
+            >
+              Plex-Reviews für alle Titel abgleichen
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       {message && (
         <p className="notice" role="status">
           {message}
