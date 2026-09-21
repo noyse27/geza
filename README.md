@@ -35,7 +35,7 @@ sh setup.sh demo
 | Provider und Geza-Wiederherstellung | Verfügbar | Gesperrt; Verbindungen zeigen Fantasieschlüssel |
 | Zurücksetzen | Kein automatischer Reset | Standardmäßig alle 60 Minuten |
 
-Die Demo verwendet eine eigene Datenbank und zwölf erfundene Medieneinträge, Bewertungen, Reviews sowie drei offene Scrobbles zur Nachpflege. Reviews, Bewertungen und Bearbeitung können ausprobiert werden. Alle Besucher teilen denselben Datenbestand; beim Reset verschwinden Änderungen und Anmeldungen. Bitte keine persönlichen Daten eingeben.
+Die Demo verwendet eine eigene Datenbank und zwölf Medieneinträge mit lokalen Film- und Seriencovern sowie erfundene Bewertungen, Reviews und drei offene Scrobbles zur Nachpflege. Reviews, Bewertungen und Bearbeitung können ausprobiert werden. Alle Besucher teilen denselben Datenbestand; beim Reset verschwinden Änderungen und Anmeldungen. Bitte keine persönlichen Daten eingeben.
 
 Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` in `.env.demo` setzen; iframe-Einbettung lässt sich mit `DEMO_FRAME_ANCESTORS` auf die eigene Domain beschränken. Details zu Hosting, Reset, Uploadlimits und Tests stehen in [Installation und Website-Einbindung](docs/demo.md).
 

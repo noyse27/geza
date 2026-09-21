@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import AdmZip from 'adm-zip';
 import { dataTables } from '../src/lib/transfer-format';
+import { createHash } from 'node:crypto';
 
 // Only run against the disposable geza-demo-test Compose project.
 if (process.env.GEZA_DEMO_TEST !== '1')
@@ -60,6 +61,21 @@ try {
     assert.equal(response.headers.get('x-frame-options'), null);
   }
   console.log('PASS automatic seed, admin login, pages and iframe policy');
+  const posters = (await db.query('SELECT media_id,data,etag FROM posters ORDER BY media_id')).rows;
+  assert.equal(posters.length, 12);
+  for (const poster of posters) {
+    const response = await request(`/api/posters/${poster.media_id}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/jpeg');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(bytes, poster.data);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), poster.etag);
+    const cached = await fetch(`${base}/api/posters/${poster.media_id}`, {
+      headers: { 'If-None-Match': response.headers.get('etag')! },
+    });
+    assert.equal(cached.status, 304);
+  }
+  console.log('PASS all local cover images and conditional caching');
   const before = await snapshot();
   for (const action of [
     'settings',
