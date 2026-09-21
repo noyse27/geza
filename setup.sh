@@ -12,5 +12,5 @@ if [ "$mode" = demo ]; then
   echo "Demo: http://localhost:3081 — admin / admin"
 else
   docker compose up --build -d
+  echo 'Geza: http://localhost:3080 — first admin: http://localhost:3080/login'
 fi
-echo 'Geza: http://localhost:3080 — first admin: http://localhost:3080/login'
