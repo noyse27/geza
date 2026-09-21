@@ -8,6 +8,7 @@ import { verifyPassword } from '../src/lib/security';
 import { importTrakt } from '../src/lib/importer';
 import { pool } from '../src/lib/db';
 import { isDemo, demoResetMinutes } from '../src/lib/demo-mode';
+import { createHash } from 'node:crypto';
 
 test('bundled demo has usable credentials, related media, reviews and unresolved scrobbles', async () => {
   const archive = decodeArchive(await readFile('demo.geza'));
@@ -15,6 +16,20 @@ test('bundled demo has usable credentials, related media, reviews and unresolved
   assert.equal(credentials.accounts[0].username, 'admin');
   assert.ok(verifyPassword('admin', credentials.accounts[0].password_hash));
   assert.equal(archive.tables.media.length, 12);
+  assert.equal(archive.tables.posters.length, 12);
+  for (const media of archive.tables.media) {
+    assert.equal(media.poster, `/api/posters/${media.id}`);
+    const poster = archive.tables.posters.find((p) => p.media_id === media.id);
+    assert.ok(poster);
+    assert.equal(poster.content_type, 'image/jpeg');
+    assert.match(String(poster.data), /^\\x[0-9a-f]+$/);
+    const bytes = Buffer.from(String(poster.data).slice(2), 'hex');
+    assert.equal(bytes.subarray(0, 2).toString('hex'), 'ffd8');
+    assert.ok(bytes.length > 10000);
+    assert.equal(poster.etag, createHash('sha256').update(bytes).digest('hex'));
+    assert.deepEqual(media.ids, {});
+    assert.equal(media.trakt_id, null);
+  }
   const ids = new Set(archive.tables.media.map((m) => m.id));
   for (const table of ['watches', 'ratings', 'reviews'] as const)
     for (const row of archive.tables[table]) assert.ok(ids.has(row.media_id));
