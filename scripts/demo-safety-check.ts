@@ -4,6 +4,7 @@ import pg from 'pg';
 
 // Creates and drops its own database; never resets the supplied source database.
 const source = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+source.on('error', (err) => console.error('source pool error', err));
 const name = `geza_demo_safety_${Date.now()}`;
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = '/' + name;
@@ -18,6 +19,7 @@ function migrate(mode: string) {
 try {
   await source.query(`CREATE DATABASE ${name}`);
   db = new pg.Pool({ connectionString: url.toString() });
+  db.on('error', (err) => console.error('db pool error', err));
   let result = migrate('production');
   assert.equal(result.status, 0, result.stderr);
   await db.query("INSERT INTO media(kind,title) VALUES('movie','Protected production entry')");

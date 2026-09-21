@@ -5,6 +5,7 @@ import { dataTables, newTransferKey, decodeArchive, openCredentials } from '../s
 
 // Only the newly created temporary database is modified. No application data is used.
 const source = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+source.on('error', (err) => console.error('source pool error', err));
 const name = `geza_transfer_${Date.now()}`;
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = '/' + name;
