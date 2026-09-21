@@ -323,9 +323,8 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
                 })
               }
             />
-            Nur gesehene Filme/Serien in den Katalog übernehmen (Titel mit Bewertung oder Review bleiben immer
-            erhalten). Ohne diese Option bleibt die Bucketliste leer, weil ungesehene Titel dann ganz normal im
-            Katalog erscheinen.
+            Ungesehene Medien zur Bucketliste hinzufügen (Titel mit Bewertung oder Review bleiben immer im
+            Katalog).
           </label>
           <label className="checkbox">
             <input
