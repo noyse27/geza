@@ -246,6 +246,11 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ## Changelog
 
+### v1.2.1
+
+- Setup ergänzt fehlende oder leere Pflichtwerte in vorhandenen `.env`-/`.env.demo`-Dateien und erhält vorhandene Einstellungen. Dadurch funktioniert die Demo-Installation auch nach dem vorherigen Eintragen von `PUBLIC_URL`.
+- Setup-Meldungen nennen die tatsächlich verwendete Datei; widersprüchliche Modusangaben werden vor Änderungen abgewiesen. Die Demo zeigt keine zusätzliche Produktionsadresse mehr an.
+
 ### v1.2.0
 
 - Separat installierbarer Demomodus mit `admin / admin`, automatischer Einspielung von `demo.geza`, erfundenen Beispieldaten und offenen Scrobbles.

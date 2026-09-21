@@ -5,6 +5,8 @@ Demo und Produktion immer separat installieren. Die Demo verweigert den Start au
 Windows: `./setup.ps1 -Mode demo`. Linux/macOS: `sh setup.sh demo`.
 Ohne Argument wird Produktion installiert. Die Demo verwendet `.env.demo`, das Compose-Projekt `geza-demo`, ein eigenes Datenbankvolume und Port **3081**. Zugang: **admin / admin**.
 
+Seit v1.2.1 ergänzt das Setup auch eine bereits vorhandene, unvollständige `.env.demo`, beispielsweise wenn dort zuerst nur `PUBLIC_URL` eingetragen wurde. Bestehende Werte bleiben erhalten. Bei „POSTGRES_PASSWORD is missing a value“ aus v1.2.0 den Code aktualisieren und `sh setup.sh demo` erneut ausführen. Falls die Datenbank früher bereits erfolgreich eingerichtet war und ihr Passwort verloren ging, muss deren ursprüngliches Passwort wiederhergestellt werden; ein neu erzeugtes Passwort ändert keine vorhandene PostgreSQL-Datenbank. Die Konfigurationsdatei oder das Datenbankvolume dafür nicht löschen.
+
 In `.env.demo` die öffentliche Demo-Adresse als `PUBLIC_URL` setzen, beispielsweise `https://demo.example.com`. Anschließend:
 
 ```sh
