@@ -8,6 +8,7 @@ import { dataTables, newTransferKey, decodeArchive } from '../src/lib/transfer-f
 
 // Requires a production build. Uses a dedicated temporary DB and localhost-only server.
 const source = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+source.on('error', (err) => console.error('source pool error', err));
 const name = `geza_transfer_http_${Date.now()}`;
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = '/' + name;
@@ -18,6 +19,7 @@ let output = '';
 try {
   await source.query(`CREATE DATABASE ${name}`);
   target = new pg.Pool({ connectionString: url.toString() });
+  target.on('error', (err) => console.error('target pool error', err));
   await target.query('CREATE TABLE migrations(name text PRIMARY KEY)');
   for (const file of (await readdir('migrations')).filter((f) => f.endsWith('.sql')).sort()) {
     await target.query(await readFile('migrations/' + file, 'utf8'));
