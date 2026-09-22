@@ -147,6 +147,39 @@ export async function searchTmdb(kind: 'movie' | 'show', term: string, year?: nu
     poster: r.poster_path ? `https://image.tmdb.org/t/p/w185${r.poster_path}` : null,
   }));
 }
+export async function fetchTmdbDetails(kind: 'movie' | 'show', tmdbId: number) {
+  const token = await getSetting('TMDB_TOKEN');
+  if (!token) throw Error('TMDB ist nicht konfiguriert.');
+  const headers = { Authorization: `Bearer ${token}` };
+  const path = `${kind === 'movie' ? 'movie' : 'tv'}/${tmdbId}`;
+  const d = await json(
+    `https://api.themoviedb.org/3/${path}?language=de-DE&append_to_response=credits,release_dates,content_ratings`,
+    headers,
+  );
+  let overview = d.overview;
+  if (!overview) overview = (await json(`https://api.themoviedb.org/3/${path}?language=en-US`, headers)).overview;
+  const de =
+    d.release_dates?.results
+      ?.find((x: Raw) => x.iso_3166_1 === 'DE')
+      ?.release_dates?.find((x: Raw) => x.certification)?.certification ||
+    d.content_ratings?.results?.find((x: Raw) => x.iso_3166_1 === 'DE')?.rating;
+  return {
+    title: d.title || d.name,
+    original_title: d.original_title || d.original_name || '',
+    year: Number((d.release_date || d.first_air_date || '').slice(0, 4)) || null,
+    summary: overview || '',
+    countries: d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country || [],
+    genres: tags(d.genres),
+    directors: d.credits?.crew?.filter((x: Raw) => x.job === 'Director').map((x: Raw) => x.name) || [],
+    actors: d.credits?.cast?.slice(0, 10).map((x: Raw) => x.name) || [],
+    certification: normalizeCertification(de) ?? null,
+    runtime: d.runtime || d.episode_run_time?.[0] || null,
+    poster: d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null,
+    voteAverage: d.vote_average,
+    voteCount: Number(d.vote_count) || 0,
+    url: `https://www.themoviedb.org/${path}`,
+  };
+}
 let tvdbSession: { key: string; token: string; expires: number } | null = null;
 async function tvdb(m: Raw): Promise<Raw | null> {
   const key = await getSetting('TVDB_API_KEY');
