@@ -113,6 +113,8 @@ Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und
 
 **Neue Plex-Reviewtexte:** Ihre automatische Übernahme ist weiterhin offen, weil kein dokumentierter Review-Webhook vorliegt. Trakt-Reviews und in Geza geschriebene Reviews funktionieren unabhängig davon.
 
+**Plex-Bibliotheks-Scan und Bucketliste:** Unter **Admin → Plex-Bibliotheks-Scan** (sichtbar sobald Plex-URL und -Token gespeichert sind) lässt sich ein nächtlicher Scan um 03:00 Uhr (Europe/Berlin) aktivieren oder jederzeit manuell anstoßen; einzelne Plex-Bibliotheken sind dafür gezielt auswählbar. Ist „Ungesehene Medien zur Bucketliste hinzufügen“ aktiv, landen noch nicht gesehene Filme/Serien (ohne eigene Bewertung oder Review) statt im normalen Katalog in der **Bucketliste** – einem eigenen Navigationspunkt mit Filme-/Serien-Umschaltung. Ein Titel verlässt die Bucketliste automatisch, sobald er per Plex-Scrobble oder manuell gesetztem Anschau-Datum als gesehen gilt; ein erneuter Scan setzt ihn dann nicht zurück. Über den „+“-Button auf der Bucketliste-Seite lassen sich zusätzlich Titel hinzufügen, die noch gar nicht in Plex vorhanden sind: Titel-/Jahressuche gegen TMDB, Auswahl eines Treffers lädt FSK, Regie, Besetzung, Genres, Laufzeit und TMDB-Bewertung und öffnet die Detailseite direkt im Bearbeitungsmodus zur Kontrolle vor dem Speichern.
+
 ## Hosting und Google
 
 Auf dem Zielserver in `.env` setzen:
@@ -245,6 +247,15 @@ Filmdienst und wortvogel.de werden für aufgerufene Filme im Hintergrund gesucht
 Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
 
 ## Changelog
+
+### v1.3.0
+
+- Neuer Plex-Bibliotheks-Scan (nächtlich um 03:00 Uhr oder manuell in Admin → Plex-Bibliotheks-Scan) erkennt gesehene/ungesehene Filme und Serien; einzelne Bibliotheken sind gezielt auswählbar.
+- Neue Bucketliste (eigener Tab, Filme-/Serien-Umschaltung) für noch ungesehene Titel; per Checkbox steuerbar, ob sie statt im Katalog dort gesammelt werden. Titel mit Bewertung/Review bleiben immer im Katalog.
+- Bucketliste-Einträge lassen sich per „+“ und TMDB-Titelsuche auch manuell hinzufügen, inklusive sofort geladener FSK, Regie, Besetzung, Genres, Laufzeit und TMDB-Bewertung; Übernahme öffnet die Detailseite im Bearbeitungsmodus.
+- Titel verlassen die Bucketliste automatisch, sobald sie per Plex-Scrobble oder manuellem Anschau-Datum als gesehen gelten.
+- Plex-Admin-Bereiche (Webhook, Bibliotheks-Scan, Review-Abgleich) erscheinen erst nach gespeicherter Plex-URL und -Token.
+- Absturzursache durch unbehandelte Datenbankverbindungsfehler bei inaktiven Verbindungen behoben.
 
 ### v1.2.1
 
