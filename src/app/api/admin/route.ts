@@ -10,6 +10,8 @@ import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
 import { normalizeCertification } from '@/lib/certification';
+import { fetchTmdbDetails } from '@/lib/providers';
+import { saveProviderRating } from '@/lib/provider-ratings';
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -272,13 +274,36 @@ export async function POST(req: Request) {
           [id],
         );
       } else {
+        let details: Awaited<ReturnType<typeof fetchTmdbDetails>> | null = null;
+        try {
+          details = await fetchTmdbDetails(data.kind, data.tmdbId);
+        } catch {
+          // Falls back to the lightweight search-result fields below; the background
+          // enrich job (queued when the detail page loads) fills the rest later.
+        }
         id = (
           await query<{ id: string }>(
-            `INSERT INTO media(kind,title,original_title,year,ids,summary,poster,bucketlist,manual_entry)
-             VALUES($1,$2,$3,$4,jsonb_build_object('tmdb',$5::text),$6,$7,true,true) RETURNING id`,
-            [data.kind, data.title, data.original_title, data.year, data.tmdbId, data.summary, data.poster],
+            `INSERT INTO media(kind,title,original_title,year,ids,summary,poster,countries,genres,directors,actors,certification,runtime,bucketlist,manual_entry)
+             VALUES($1,$2,$3,$4,jsonb_build_object('tmdb',$5::text),$6,$7,$8,$9,$10,$11,$12,$13,true,true) RETURNING id`,
+            [
+              data.kind,
+              details?.title || data.title,
+              details?.original_title ?? data.original_title,
+              details?.year ?? data.year,
+              data.tmdbId,
+              details?.summary || data.summary,
+              details?.poster || data.poster,
+              details?.countries || [],
+              details?.genres || [],
+              details?.directors || [],
+              details?.actors || [],
+              details?.certification ?? null,
+              details?.runtime ?? null,
+            ],
           )
         )[0].id;
+        if (details && details.voteCount > 0)
+          await saveProviderRating(id, 'tmdb', details.voteAverage, details.url, details.voteCount);
       }
       return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
