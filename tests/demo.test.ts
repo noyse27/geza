@@ -9,6 +9,49 @@ import { importTrakt } from '../src/lib/importer';
 import { pool } from '../src/lib/db';
 import { isDemo, demoResetMinutes } from '../src/lib/demo-mode';
 import { createHash } from 'node:crypto';
+import { demoPlaybackItems, type DemoPlaybackMedia } from '../src/lib/demo-now-playing';
+
+test('demo playback advances across refreshes, pauses episodes and loops without writing data', () => {
+  const media: DemoPlaybackMedia[] = [
+    {
+      id: '1',
+      kind: 'movie',
+      title: 'Film',
+      year: 2026,
+      runtime: 90,
+      poster: '/api/posters/1',
+      parent_title: null,
+      season: null,
+      episode: null,
+    },
+    {
+      id: '11',
+      kind: 'episode',
+      title: 'Episode 1',
+      year: 2026,
+      runtime: null,
+      poster: '/api/posters/11',
+      parent_title: 'Serie',
+      season: 1,
+      episode: 1,
+    },
+  ];
+  const first = demoPlaybackItems(media, 60000);
+  const next = demoPlaybackItems(media, 75000);
+  assert.equal(next[0].position - first[0].position, 15000);
+  assert.equal(first[0].poster, '/api/posters/1');
+  assert.equal(first[0].simulated, true);
+  assert.equal(next[1].position, first[1].position);
+  assert.equal(first[1].state, 'paused');
+  assert.equal(first[1].title, 'Serie');
+  assert.equal(first[1].duration, 45 * 60000);
+  assert.equal(demoPlaybackItems(media, 90 * 60000)[0].position, 0);
+  assert.equal(
+    demoPlaybackItems([{ ...media[0], poster: 'https://example.com/image.jpg' }])[0].poster,
+    undefined,
+  );
+  assert.deepEqual(demoPlaybackItems([]), []);
+});
 
 test('bundled demo has usable credentials, related media, reviews and unresolved scrobbles', async () => {
   const archive = decodeArchive(await readFile('demo.geza'));

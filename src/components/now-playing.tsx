@@ -41,7 +41,10 @@ export function NowPlaying() {
   }, []);
   if (!items.length) return null;
   return (
-    <section className="now-playing" aria-label="Jetzt auf Plex">
+    <section
+      className="now-playing"
+      aria-label={items.some((item) => item.simulated) ? 'Simulierte Wiedergabe' : 'Jetzt auf Plex'}
+    >
       {items.map((item) => {
         const position = Math.min(
           item.duration,
@@ -63,7 +66,7 @@ export function NowPlaying() {
                   : item.state === 'buffering'
                     ? 'Wird geladen'
                     : 'Now Playing'}{' '}
-                · Plex
+                · {item.simulated ? 'Demo · Simuliert' : 'Plex'}
               </span>
               <h2>{item.mediaId ? <Link href={`/title/${item.mediaId}`}>{item.title}</Link> : item.title}</h2>
               <p className="muted">{item.subtitle}</p>

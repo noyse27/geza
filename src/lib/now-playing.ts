@@ -7,6 +7,7 @@ export type NowPlayingItem = {
   position: number;
   mediaId?: string;
   poster?: string;
+  simulated?: boolean;
 };
 
 // Keep only display data: session responses also contain tokens, addresses and user data.

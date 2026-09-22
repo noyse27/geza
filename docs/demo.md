@@ -21,6 +21,10 @@ Reviews, Bewertungen, Metadatenbearbeitung und Scrobble-Nachpflege funktionieren
 
 Bei einem Update einer bestehenden Demo werden die neuen Titel und Cover mit dem nächsten planmäßigen Reset übernommen. Das aktualisierte Image muss für App und Worker neu gebaut und gestartet werden; die Datenbank muss dafür nicht gelöscht werden.
 
+## Simulierte Wiedergabe
+
+Nach Anmeldung zeigt **Home** eine simulierte Wiedergabe: ein laufender Film mit fortschreitendem Balken, Restlaufzeit und geschätztem Ende sowie eine pausierte Episode. Beide Karten sind als „Demo · Simuliert“ gekennzeichnet und verlinken auf vorhandene Katalogtitel mit lokalen Covern. Es gibt keine Plex-Verbindung und keine neuen Anschauereignisse. Der Film beginnt nach seiner Laufzeit wieder von vorn; die Episode bleibt pausiert. Gelöschte Titel werden automatisch durch die nächsten passenden Katalogeinträge ersetzt.
+
 ## Einbindung
 
 Ein normaler Link auf die Demo funktioniert unabhängig von Browser-Cookie-Regeln. Für ein iframe in `.env.demo` zusätzlich `DEMO_FRAME_ANCESTORS=https://www.example.com` setzen (mehrere exakte HTTPS-Origins durch Leerzeichen trennen). Nur diese Ursprünge dürfen die Demo einbetten:
