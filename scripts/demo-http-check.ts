@@ -52,7 +52,25 @@ try {
   assert.equal((await db.query('SELECT count(*)::int AS n FROM media')).rows[0].n, 12);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM jobs WHERE status='failed'")).rows[0].n, 3);
   assert.equal((await request('/api/admin', { action: 'rating', id: '1', rating: 9 })).status, 401);
+  assert.equal((await request('/api/admin/now-playing')).status, 401);
   await login();
+  const playbackBefore = await snapshot();
+  const playbackResponse = await request('/api/admin/now-playing');
+  assert.equal(playbackResponse.status, 200);
+  assert.equal(playbackResponse.headers.get('cache-control'), 'private, no-store');
+  const playback = (await playbackResponse.json()).items;
+  assert.equal(playback.length, 2);
+  assert.deepEqual(
+    playback.map((item: { state: string }) => item.state),
+    ['playing', 'paused'],
+  );
+  for (const item of playback) {
+    assert.equal(item.simulated, true);
+    assert.match(item.poster, /^\/api\/posters\/\d+$/);
+    assert.ok(item.position >= 0 && item.position < item.duration);
+  }
+  assert.deepEqual(await snapshot(), playbackBefore);
+  console.log('PASS authenticated demo playback without data changes');
   for (const path of ['/', '/home', '/admin', '/data', '/title/1', '/collections', '/history']) {
     const response = await request(path);
     assert.equal(response.status, 200, path);
