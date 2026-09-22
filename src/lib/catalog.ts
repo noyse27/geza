@@ -65,10 +65,10 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
 export async function getBucketlist() {
   const [movies, shows] = await Promise.all([
     query<Media>(
-      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='movie' ORDER BY m.title,m.id`,
+      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='movie' ORDER BY m.manual_entry DESC,m.title,m.id`,
     ),
     query<Media>(
-      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='show' ORDER BY m.title,m.id`,
+      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='show' ORDER BY m.manual_entry DESC,m.title,m.id`,
     ),
   ]);
   return { movies, shows };

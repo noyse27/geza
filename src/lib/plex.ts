@@ -149,6 +149,9 @@ export async function processPlex(payload: {
       `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
       [id, payload.eventId, at || payload.receivedAt, !at],
     );
+    await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=ANY($1::bigint[])', [
+      [id, parent].filter(Boolean),
+    ]);
   } else if (payload.event === 'media.rate') {
     if (m.userRating === undefined)
       throw Error('Plex liefert keine persönliche Bewertung; Serverzugriff prüfen.');

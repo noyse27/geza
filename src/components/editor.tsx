@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Pencil, Save, X, Globe, Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
@@ -21,7 +21,8 @@ export function MediaEditor({
   item: Media;
   seriesOptions?: { id: string; title: string }[];
 }) {
-  const [open, setOpen] = useState(false),
+  const params = useSearchParams();
+  const [open, setOpen] = useState(() => params.get('new') === '1'),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const router = useRouter();

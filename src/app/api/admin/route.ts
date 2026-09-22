@@ -184,6 +184,7 @@ export async function POST(req: Request) {
         [body.id, data.watched_at, body.mediaId],
       );
       if (!updated.length) throw Error('Anschauereignis nicht gefunden');
+      await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=$1', [body.mediaId]);
     } else if (body.action === 'watch-delete') {
       const deleted = await query('DELETE FROM watches WHERE id=$1 AND media_id=$2 RETURNING id', [
         body.id,
@@ -203,6 +204,7 @@ export async function POST(req: Request) {
         `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'geza',$2,CASE WHEN $3::text IS NULL THEN NULL ELSE ($3::timestamp AT TIME ZONE 'Europe/Berlin') END,false)`,
         [body.mediaId, crypto.randomUUID(), data.watched_at],
       );
+      await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=$1', [body.mediaId]);
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
       if (rating === null) await query('DELETE FROM ratings WHERE media_id=$1', [body.id]);
@@ -246,6 +248,39 @@ export async function POST(req: Request) {
         `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{"manual":true}'::jsonb,now())
          ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL,payload='{"manual":true}'::jsonb`,
       );
+    } else if (body.action === 'bucketlist-add') {
+      const data = z
+        .object({
+          kind: z.enum(['movie', 'show']),
+          tmdbId: z.number().int().positive(),
+          title: z.string().min(1).max(500),
+          original_title: z.string().max(500).default(''),
+          year: z.number().int().min(1800).max(2200).nullable(),
+          summary: z.string().max(20000).default(''),
+          poster: z.string().max(500).nullable().default(null),
+        })
+        .parse(body.data);
+      const existing = await query<{ id: string }>(`SELECT id FROM media WHERE kind=$1 AND ids->>'tmdb'=$2`, [
+        data.kind,
+        String(data.tmdbId),
+      ]);
+      let id: string;
+      if (existing.length) {
+        id = existing[0].id;
+        await query(
+          `UPDATE media SET bucketlist=true,manual_entry=true WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM watches WHERE media_id=$1)`,
+          [id],
+        );
+      } else {
+        id = (
+          await query<{ id: string }>(
+            `INSERT INTO media(kind,title,original_title,year,ids,summary,poster,bucketlist,manual_entry)
+             VALUES($1,$2,$3,$4,jsonb_build_object('tmdb',$5::text),$6,$7,true,true) RETURNING id`,
+            [data.kind, data.title, data.original_title, data.year, data.tmdbId, data.summary, data.poster],
+          )
+        )[0].id;
+      }
+      return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {

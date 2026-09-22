@@ -602,6 +602,19 @@ nav .active:after {
   color: var(--muted);
   font-size: 14px;
 }
+.bucketlist-add {
+  margin-bottom: 22px;
+}
+.bucketlist-search-results {
+  position: static;
+  margin-top: 14px;
+}
+.bucketlist-search-results .suggestion {
+  width: 100%;
+  background: none;
+  border: 0;
+  text-align: left;
+}
 .spin {
   animation: spin 1s linear infinite;
 }

@@ -128,6 +128,25 @@ async function tmdb(m: Raw): Promise<Raw | null> {
         : undefined,
   };
 }
+export async function searchTmdb(kind: 'movie' | 'show', term: string, year?: number) {
+  const token = await getSetting('TMDB_TOKEN');
+  if (!token) throw Error('TMDB ist nicht konfiguriert.');
+  const headers = { Authorization: `Bearer ${token}` };
+  const params = new URLSearchParams({ query: term, language: 'de-DE' });
+  if (year) params.set(kind === 'movie' ? 'year' : 'first_air_date_year', String(year));
+  const d = await json(
+    `https://api.themoviedb.org/3/search/${kind === 'movie' ? 'movie' : 'tv'}?${params}`,
+    headers,
+  );
+  return (d.results || []).slice(0, 8).map((r: Raw) => ({
+    tmdbId: r.id,
+    title: r.title || r.name,
+    original_title: r.original_title || r.original_name || '',
+    year: Number((r.release_date || r.first_air_date || '').slice(0, 4)) || null,
+    summary: r.overview || '',
+    poster: r.poster_path ? `https://image.tmdb.org/t/p/w185${r.poster_path}` : null,
+  }));
+}
 let tvdbSession: { key: string; token: string; expires: number } | null = null;
 async function tvdb(m: Raw): Promise<Raw | null> {
   const key = await getSetting('TVDB_API_KEY');
