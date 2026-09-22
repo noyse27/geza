@@ -57,7 +57,7 @@ export async function processPlexScan(payload: { manual?: boolean } = {}) {
       const exceptions = new Set(
         (
           await query<{ id: string }>(
-            `SELECT id FROM media WHERE id=ANY($1::bigint[]) AND (EXISTS(SELECT 1 FROM ratings WHERE media_id=media.id) OR EXISTS(SELECT 1 FROM reviews WHERE media_id=media.id))`,
+            `SELECT id FROM media WHERE id=ANY($1::bigint[]) AND (EXISTS(SELECT 1 FROM ratings WHERE media_id=media.id) OR EXISTS(SELECT 1 FROM reviews WHERE media_id=media.id) OR EXISTS(SELECT 1 FROM watches WHERE media_id=media.id))`,
             [ids],
           )
         ).map((r) => r.id),
