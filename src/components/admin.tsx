@@ -307,8 +307,9 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
         <div className="panel">
           <h2>Plex-Bibliotheks-Scan</h2>
           <p className="muted">
-            Durchsucht deine Plex-Bibliothek und ordnet ungesehene Filme/Serien der Bucketliste statt dem
-            Katalog zu. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
+            Durchsucht deine Plex-Bibliothek. Ungesehene Titel ohne eigene Bewertung, Review oder Sichtung
+            landen mit der Option unten automatisch in der Bucketliste, ohne sie in der Rumpelkammer, wo du
+            sie selbst einsortierst. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
           </p>
           <label className="checkbox">
             <input
@@ -323,8 +324,8 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
                 })
               }
             />
-            Ungesehene Medien zur Bucketliste hinzufügen (Titel mit Bewertung oder Review bleiben immer im
-            Katalog).
+            Ungesehene Medien zur Bucketliste hinzufügen (gilt für alle durchsuchten Bibliotheken; Titel mit
+            Bewertung, Review oder Sichtung bleiben immer im Katalog).
           </label>
           <label className="checkbox">
             <input

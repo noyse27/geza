@@ -114,13 +114,13 @@ test('Rumpel-Einträge erscheinen weder in Suche noch in Sammlungen, aber in der
   assert.equal((await searchCatalog(params, true)).items.length, 0);
   assert.equal((await searchCatalog(params, false)).items.length, 0);
   assert.equal((await collectionGroups('genre')).some((g) => g.value === `G${suffix}`), false);
-  const list = await listRumpel({ q: suffix, type: 'all' }, 0);
+  const list = await listRumpel({ q: suffix, type: 'all', source: 'all' }, 0);
   assert.equal(list.total, 1);
   assert.equal(list.items[0].id, id);
   await query("INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,6,now(),'test')", [id]);
   assert.equal((await searchCatalog(params, true)).items[0].id, id);
   assert.equal((await collectionGroups('genre')).some((g) => g.value === `G${suffix}`), true);
-  assert.equal((await listRumpel({ q: suffix, type: 'all' }, 0)).total, 0);
+  assert.equal((await listRumpel({ q: suffix, type: 'all', source: 'all' }, 0)).total, 0);
 });
 
 test('Massenaktionen: Bucketliste, Bewerten, Löschen mit Gedächtnis; nur Rumpel-Einträge sind betroffen', async () => {
@@ -229,7 +229,7 @@ test('Serie löschen entfernt Staffeln und Episoden und merkt sich nur die Serie
       [season],
     )
   ).map((r) => r.id);
-  const listed = await listRumpel({ q: suffix, type: 'show' }, 0);
+  const listed = await listRumpel({ q: suffix, type: 'show', source: 'all' }, 0);
   assert.equal(listed.total, 1);
   assert.equal(listed.items[0].children, 4);
   assert.deepEqual(await runRumpelAction({ action: 'delete', ids: [show] }), { count: 1, skipped: 0 });
@@ -239,3 +239,19 @@ test('Serie löschen entfernt Staffeln und Episoden und merkt sich nur die Serie
   assert.equal(tombstones.matches('movie', { tmdb: 99000077 }).length, 0);
   await query("DELETE FROM rumpel_deleted WHERE ids->>'tmdb'='99000077'");
 });
+
+test('Herkunftsfilter trennt Titel mit und ohne Plex-Verweis, auch bei Massenaktionen', async () => {
+  const withPlex = await movie('MitPlex', 'ids=$2', [JSON.stringify({ plex: 'q' + suffix })]);
+  const without = await movie('OhnePlex');
+  const count = async (source: 'all' | 'plex' | 'other') =>
+    (await listRumpel({ q: suffix, type: 'all', source }, 0)).items.map((i) => [i.id, i.has_plex]);
+  assert.deepEqual(await count('plex'), [[withPlex, true]]);
+  assert.deepEqual(await count('other'), [[without, false]]);
+  assert.equal((await count('all')).length, 2);
+  // Die Massenaktion über den Filter trifft nur die gefilterte Herkunft.
+  const filter = { q: suffix, type: 'all', source: 'plex' };
+  assert.deepEqual(await runRumpelAction({ action: 'bucketlist', filter, expectedCount: 1 }), { count: 1, skipped: 0 });
+  assert.equal((await state(withPlex)).bucketlist, true);
+  assert.equal((await state(without)).rumpel, true);
+});
+
