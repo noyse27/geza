@@ -262,6 +262,21 @@ export function RumpelList({
                   <h3>
                     {item.title} {item.year && <span>({item.year})</span>}
                   </h3>
+                  {(item.directors.length > 0 || item.ids.imdb) && (
+                    <span className="muted row-subtitle">
+                      {item.directors.length > 0 && `Regie: ${item.directors.slice(0, 2).join(', ')}`}
+                      {item.directors.length > 0 && item.ids.imdb && ' · '}
+                      {item.ids.imdb && (
+                        <a
+                          href={`https://www.imdb.com/title/${encodeURIComponent(String(item.ids.imdb))}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          IMDb {String(item.ids.imdb)}
+                        </a>
+                      )}
+                    </span>
+                  )}
                   <span className="muted row-subtitle">
                     {item.genres.slice(0, 3).join(' · ') ||
                       (item.original_title && item.original_title !== item.title ? item.original_title : '')}

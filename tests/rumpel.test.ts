@@ -112,6 +112,7 @@ test('Serien: Aktivität in Staffel oder Episode nimmt die ganze Serie aus der R
 
 test('Rumpel-Einträge erscheinen weder in Suche noch in Sammlungen, aber in der Rumpelkammer', async () => {
   const id = await movie('Sichtbarkeitstest', 'genres=$2', [[`G${suffix}`]]);
+  await query("UPDATE media SET directors=ARRAY['Regie Test'],ids=$2 WHERE id=$1", [id, JSON.stringify({ imdb: 'tt9900555' })]);
   const params = new URLSearchParams({ q: suffix });
   assert.equal((await searchCatalog(params, true)).items.length, 0);
   assert.equal((await searchCatalog(params, false)).items.length, 0);
@@ -119,6 +120,8 @@ test('Rumpel-Einträge erscheinen weder in Suche noch in Sammlungen, aber in der
   const list = await listRumpel({ q: suffix, type: 'all', source: 'all', library: '' }, 0);
   assert.equal(list.total, 1);
   assert.equal(list.items[0].id, id);
+  assert.deepEqual(list.items[0].directors, ['Regie Test']);
+  assert.equal(list.items[0].ids.imdb, 'tt9900555');
   await query("INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,6,now(),'test')", [id]);
   assert.equal((await searchCatalog(params, true)).items[0].id, id);
   assert.equal((await collectionGroups('genre')).some((g) => g.value === `G${suffix}`), true);

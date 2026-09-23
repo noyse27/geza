@@ -51,7 +51,7 @@ export async function listRumpel(filter: RumpelFilter, page: number) {
     values,
   );
   const rows = await query<Media & { children: number; plex_libraries: string[]; plex_checked_at: string | null }>(
-    `SELECT ${cardColumns},m.summary,m.ids,m.plex_libraries,m.plex_checked_at,
+    `SELECT ${cardColumns},m.directors,m.summary,m.ids,m.plex_libraries,m.plex_checked_at,
        (SELECT count(*)::int FROM media c WHERE c.parent_id=m.id OR c.parent_id IN (SELECT s.id FROM media s WHERE s.parent_id=m.id)) AS children
      FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE ${clause}
      ORDER BY lower(m.title),m.id LIMIT ${PAGE_SIZE} OFFSET ${Math.max(0, page) * PAGE_SIZE}`,
