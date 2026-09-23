@@ -12,6 +12,7 @@ export function Navigation({ admin }: { admin: boolean }) {
         ['/collections', 'Sammlungen'],
         ['/data', 'Data'],
         ['/bucketlist', 'Bucketliste'],
+        ['/admin/rumpelkammer', 'Rumpelkammer'],
         ['/stats', 'Statistik'],
         ['/admin', 'Admin'],
       ]
