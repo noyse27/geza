@@ -6,7 +6,14 @@ import { Bookmark, Pencil, Star, Trash2 } from 'lucide-react';
 import { Poster, kindLabel } from './media';
 import type { Media } from '@/lib/types';
 
-type Item = Media & { children: number; has_plex: boolean };
+type Item = Media & { children: number; plex_libraries: string[]; plex_checked_at: string | null };
+type Source = 'all' | 'plex' | 'none' | 'unchecked';
+const plexLabel = (item: Item) =>
+  !item.plex_checked_at
+    ? 'Plex nicht geprüft'
+    : item.plex_libraries.length
+      ? `Plex (${item.plex_libraries.join(', ')})`
+      : 'Nicht in Plex';
 type Action = { kind: 'bucketlist' } | { kind: 'rate'; rating: number } | { kind: 'delete' };
 
 export function RumpelList({
@@ -17,6 +24,12 @@ export function RumpelList({
   q,
   type,
   source,
+  library,
+  libraries,
+  checkedAt,
+  checking,
+  checkFailed,
+  plexConfigured,
 }: {
   items: Item[];
   total: number;
@@ -24,7 +37,13 @@ export function RumpelList({
   page: number;
   q: string;
   type: 'all' | 'movie' | 'show';
-  source: 'all' | 'plex' | 'other';
+  source: Source;
+  library: string;
+  libraries: string[];
+  checkedAt: string | null;
+  checking: boolean;
+  checkFailed: boolean;
+  plexConfigured: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -40,6 +59,7 @@ export function RumpelList({
     if (q) params.set('q', q);
     if (type !== 'all') params.set('type', type);
     if (source !== 'all') params.set('source', source);
+    if (library) params.set('library', library);
     if (p) params.set('page', String(p));
     const s = params.toString();
     return `/admin/rumpelkammer${s ? `?${s}` : ''}`;
@@ -75,7 +95,7 @@ export function RumpelList({
         action: pending.kind,
         ...(pending.kind === 'rate' ? { rating: pending.rating } : {}),
         ...(allMatching
-          ? { filter: { q, type, source }, expectedCount: total }
+          ? { filter: { q, type, source, library }, expectedCount: total }
           : { ids: [...selected] }),
       };
       const response = await fetch('/api/admin/rumpelkammer', {
@@ -106,9 +126,54 @@ export function RumpelList({
       setBusy(false);
     }
   }
+  async function startCheck() {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/rumpelkammer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'plex-check' }),
+      });
+      if (!response.ok) throw Error((await response.json()).error || 'Start fehlgeschlagen.');
+      setNotice('Plex-Abgleich gestartet. Das dauert je nach Bibliotheksgröße einige Minuten; danach die Seite neu laden.');
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const preview = allMatching ? [] : items.filter((i) => selected.has(i.id)).slice(0, 8);
   return (
     <>
+      <div className="panel rumpel-check-panel">
+        <p>
+          <strong>Plex-Abgleich:</strong>{' '}
+          {checking
+            ? 'läuft oder wartet auf den Worker …'
+            : checkedAt
+              ? `zuletzt ${new Date(checkedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}`
+              : 'noch nie durchgeführt'}
+          {checkFailed && <span className="error"> · der letzte Lauf ist fehlgeschlagen (siehe Ereignisprotokoll)</span>}
+        </p>
+        <p className="muted small">
+          Prüft, ob die Titel der Rumpelkammer aktuell in einer Plex-Bibliothek liegen, und merkt sich die
+          Bibliothek. Läuft außerdem nachts um 04:00 Uhr.
+        </p>
+        {plexConfigured ? (
+          <button type="button" className="button" disabled={busy || checking} onClick={startCheck}>
+            Plex-Abgleich jetzt starten
+          </button>
+        ) : (
+          <p className="muted small">Plex ist im Admin-Bereich noch nicht verbunden.</p>
+        )}
+        {error && !pending && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
       <form className="toolbar rumpel-filter" method="get" action="/admin/rumpelkammer">
         <input type="search" name="q" defaultValue={q} placeholder="Titel, Regie, Besetzung, IMDb-ID …" />
         <select name="type" defaultValue={type} aria-label="Art">
@@ -116,13 +181,24 @@ export function RumpelList({
           <option value="movie">Nur Filme</option>
           <option value="show">Nur Serien</option>
         </select>
-        <select name="source" defaultValue={source} aria-label="Herkunft">
-          <option value="all">Alle Herkünfte</option>
-          <option value="plex">Mit Plex-Verweis</option>
-          <option value="other">Ohne Plex-Verweis</option>
+        <select name="source" defaultValue={source} aria-label="Plex-Stand">
+          <option value="all">Alle Plex-Stände</option>
+          <option value="plex">In einer Plex-Bibliothek</option>
+          <option value="none">Nicht in Plex</option>
+          <option value="unchecked">Noch nicht geprüft</option>
         </select>
+        {libraries.length > 0 && (
+          <select name="library" defaultValue={library} aria-label="Bibliothek">
+            <option value="">Alle Bibliotheken</option>
+            {libraries.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
         <button className="button">Filtern</button>
-        {(q || type !== 'all' || source !== 'all') && (
+        {(q || type !== 'all' || source !== 'all' || library) && (
           <Link className="button" href="/admin/rumpelkammer">
             Zurücksetzen
           </Link>
@@ -135,7 +211,7 @@ export function RumpelList({
       )}
       {!items.length ? (
         <p className="muted">
-          {q || type !== 'all' || source !== 'all' ? 'Keine Treffer für diesen Filter.' : 'Die Rumpelkammer ist leer.'}
+          {q || type !== 'all' || source !== 'all' || library ? 'Keine Treffer für diesen Filter.' : 'Die Rumpelkammer ist leer.'}
         </p>
       ) : (
         <>
@@ -181,7 +257,7 @@ export function RumpelList({
                   <span className="eyebrow">
                     {kindLabel(item.kind)}
                     {item.kind === 'show' && item.children > 0 && ` · ${item.children} Staffeln/Episoden`}
-                    {` · ${item.has_plex ? 'Plex-Verweis' : 'Ohne Plex-Verweis'}`}
+                    {` · ${plexLabel(item)}`}
                   </span>
                   <h3>
                     {item.title} {item.year && <span>({item.year})</span>}

@@ -1,14 +1,19 @@
 import { z } from 'zod';
 import { demoBlocked, isDemo } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
-import { RumpelError, runRumpelAction } from '@/lib/rumpel';
+import { RumpelError, requestPlexCheck, runRumpelAction } from '@/lib/rumpel';
 const headers = { 'Cache-Control': 'no-store' };
 export async function POST(req: Request) {
   if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401 });
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
   if (isDemo()) return demoBlocked();
   try {
-    return Response.json(await runRumpelAction(await req.json()), { headers });
+    const body = await req.json();
+    if (body?.action === 'plex-check') {
+      await requestPlexCheck();
+      return Response.json({ ok: true }, { headers });
+    }
+    return Response.json(await runRumpelAction(body), { headers });
   } catch (e) {
     if (e instanceof RumpelError) return Response.json({ error: e.message }, { status: 409, headers });
     if (e instanceof z.ZodError) return Response.json({ error: 'Bitte Eingaben prüfen.' }, { status: 400, headers });

@@ -98,7 +98,9 @@ export default async function Page() {
                       ? 'Plex-Reviews'
                       : j.kind === 'plex-scan'
                         ? 'Bibliotheks-Scan'
-                        : 'Plex'}{' '}
+                        : j.kind === 'plex-presence'
+                          ? 'Plex-Abgleich'
+                          : 'Plex'}{' '}
                   · {j.status}
                 </span>
                 <strong>{j.count.toLocaleString('de-DE')}</strong>

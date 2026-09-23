@@ -84,6 +84,8 @@ Typische Herkunft: Plex-Bibliothekseinträge aus den `collection-*.json`-Dateien
 - **In die Bucketliste verschieben**: der Titel wird dort fixiert, der automatische Plex-Scan setzt ihn nicht zurück. Nimmst du ihn später wieder aus der Bucketliste, ohne dass er Aktivität hat, liegt er wieder in der Rumpelkammer.
 - **Löschen**: entfernt den Titel (bei Serien samt Staffeln und Episoden) und merkt ihn in `rumpel_deleted` vor. Trakt-Import und Plex-Scan legen ihn danach nicht erneut an. Die Sperre endet nur, wenn der Import zu diesem Titel wieder Sichtungen, Bewertungen oder Kommentare enthält (bzw. der Plex-Scan ihn als gesehen meldet). Auch das reguläre Löschen einer Waise über die Titelseite wird vorgemerkt. Die Vormerkungen sind Teil des Serverumzugs.
 
+**Plex-Abgleich:** Ob ein Titel wirklich in einer Plex-Bibliothek liegt, lässt sich nicht an seiner Plex-ID ablesen (auch Trakt-Einträge tragen eine). Deshalb liest der Abgleich (Button auf der Rumpelkammer-Seite, zusätzlich nachts um 04:00 Uhr) jeweils die komplette Titelliste jeder Film- und Serienbibliothek in einer Anfrage und gleicht sie über Plex-, IMDb-, TMDB- und TVDB-ID mit der Rumpelkammer ab. Jeder Titel zeigt danach „Plex (Bibliothek, …)“, „Nicht in Plex“ oder „Plex nicht geprüft“; Filter und Massenaktionen (z. B. alle Titel der Bibliothek „Filme“ in die Bucketliste) nutzen dieses Ergebnis. Schlägt ein Lauf fehl, ändert er nichts.
+
 Alle Aktionen betreffen ausschließlich Titel, die gerade wirklich in der Rumpelkammer liegen; Archiv-Einträge werden serverseitig übersprungen.
 
 ## Trakt-Import
@@ -265,6 +267,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 - Neue **Rumpelkammer** (Admin → Rumpelkammer): Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag – bislang meist Plex-Bibliothekseinträge aus dem Trakt-Collection-Export – erscheinen nur noch dort und lassen sich einzeln oder gesammelt bearbeiten, bewerten, in die Bucketliste verschieben oder löschen. Gelöschte Titel merkt sich Geza (`rumpel_deleted`, Teil des Serverumzugs), damit Trakt-Import und Plex-Scan sie nicht erneut anlegen.
 - Bucketliste und Rumpelkammer schließen sich per Datenbank-Constraint aus; aus der Rumpelkammer verschobene Titel sind vor dem Plex-Scan geschützt.
+- Plex-Abgleich der Rumpelkammer (manuell und nachts) merkt sich pro Titel die Plex-Bibliothek(en); Migration 018. Filter nach Plex-Stand und Bibliothek.
 - Migration 017 ordnet den Bestand einmalig ein. Der Trakt-Importer legt Collection-only-Einträge nur noch als Rumpel an.
 
 ### v1.3.0

@@ -12,8 +12,9 @@ const idSchema = z.string().regex(/^[1-9]\d{0,17}$/);
 export const filterSchema = z.object({
   q: z.string().trim().max(160).default(''),
   type: z.enum(['all', 'movie', 'show']).default('all'),
-  // Herkunft: mit oder ohne Plex-Verweis (die Plex-ID stammt aus Plex-Scan oder Trakt-Collection).
-  source: z.enum(['all', 'plex', 'other']).default('all'),
+  // Ergebnis des Plex-Abgleichs: in einer Bibliothek, geprüft aber in keiner, oder noch nicht geprüft.
+  source: z.enum(['all', 'plex', 'none', 'unchecked']).default('all'),
+  library: z.string().trim().max(200).default(''),
 });
 export type RumpelFilter = z.infer<typeof filterSchema>;
 export const actionSchema = z
@@ -31,8 +32,10 @@ export const actionSchema = z
 function where(filter: RumpelFilter, values: unknown[]) {
   const conditions = ["m.rumpel", "m.kind IN ('movie','show')"];
   if (filter.type !== 'all') conditions.push(`m.kind=$${values.push(filter.type)}`);
-  if (filter.source === 'plex') conditions.push("m.ids ? 'plex'");
-  if (filter.source === 'other') conditions.push("NOT (m.ids ? 'plex')");
+  if (filter.source === 'plex') conditions.push('cardinality(m.plex_libraries)>0');
+  if (filter.source === 'none') conditions.push('m.plex_checked_at IS NOT NULL AND cardinality(m.plex_libraries)=0');
+  if (filter.source === 'unchecked') conditions.push('m.plex_checked_at IS NULL');
+  if (filter.library) conditions.push(`m.plex_libraries @> ARRAY[$${values.push(filter.library)}]::text[]`);
   if (filter.q) {
     values.push('%' + filter.q.toLowerCase().replace(/[\\%_]/g, '\\$&') + '%');
     conditions.push(`m.search_text LIKE $${values.length}`);
@@ -47,14 +50,37 @@ export async function listRumpel(filter: RumpelFilter, page: number) {
     `SELECT count(*)::int AS total FROM media m WHERE ${clause}`,
     values,
   );
-  const rows = await query<Media & { children: number; has_plex: boolean }>(
-    `SELECT ${cardColumns},m.summary,m.ids,(m.ids ? 'plex') AS has_plex,
+  const rows = await query<Media & { children: number; plex_libraries: string[]; plex_checked_at: string | null }>(
+    `SELECT ${cardColumns},m.summary,m.ids,m.plex_libraries,m.plex_checked_at,
        (SELECT count(*)::int FROM media c WHERE c.parent_id=m.id OR c.parent_id IN (SELECT s.id FROM media s WHERE s.parent_id=m.id)) AS children
      FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE ${clause}
      ORDER BY lower(m.title),m.id LIMIT ${PAGE_SIZE} OFFSET ${Math.max(0, page) * PAGE_SIZE}`,
     values,
   );
   return { items: rows, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+}
+
+export async function plexPresenceState() {
+  const [libraries, [state], [job]] = await Promise.all([
+    query<{ name: string }>(`SELECT DISTINCT unnest(plex_libraries) AS name FROM media WHERE rumpel ORDER BY 1`),
+    query<{ checked: string | null }>('SELECT max(plex_checked_at) AS checked FROM media WHERE rumpel'),
+    query<{ status: string; payload: { manual?: boolean } }>(
+      "SELECT status,payload FROM jobs WHERE dedupe_key='plex-presence-daily'",
+    ),
+  ]);
+  return {
+    libraries: libraries.map((l) => l.name),
+    checkedAt: state?.checked ?? null,
+    running: !!job && ['pending', 'running'].includes(job.status) && job.payload?.manual === true,
+    failed: job?.status === 'failed',
+  };
+}
+
+export async function requestPlexCheck() {
+  await query(
+    `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-presence','plex-presence-daily','{"manual":true}'::jsonb,now())
+     ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL,payload='{"manual":true}'::jsonb`,
+  );
 }
 
 export async function rumpelCounts() {
