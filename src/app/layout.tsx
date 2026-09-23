@@ -13,6 +13,7 @@ import { Navigation, Logout, RestoreScroll } from '@/components/navigation';
 import { ScrollTop } from '@/components/scroll-top';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
+  metadataBase: process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL) : undefined,
   title: { default: 'Geza — Film & Serie', template: '%s · Geza' },
   description: 'Filme, Serien und persönliche Perspektiven.',
   robots: !isDemo() && process.env.PUBLIC_URL ? undefined : { index: false, follow: false },
