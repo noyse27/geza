@@ -10,13 +10,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const stars = rating != null ? '★'.repeat(rating) + '☆'.repeat(10 - rating) + ` (${rating}/10) — ` : '';
   const description = stars + (m.summary.slice(0, 160) || `${m.title} — Informationen und Reviews auf Geza.`);
   const url = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/title/${id}` : undefined;
-  const image = m.poster
-    ? m.poster.startsWith('http')
-      ? m.poster
-      : process.env.PUBLIC_URL
-        ? `${process.env.PUBLIC_URL}${m.poster}`
-        : undefined
-    : undefined;
   return {
     title,
     description,
@@ -26,15 +19,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       description,
       url,
       siteName: 'Geza',
-      images: image ? [{ url: image }] : undefined,
       locale: 'de_DE',
       type: 'website',
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      images: image ? [image] : undefined,
     },
   };
 }
