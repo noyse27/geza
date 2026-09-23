@@ -11,7 +11,11 @@ export default async function Page({
   await requireAdmin();
   const raw = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  const parsed = filterSchema.safeParse({ q: one(raw.q) ?? '', type: one(raw.type) ?? 'all' });
+  const parsed = filterSchema.safeParse({
+    q: one(raw.q) ?? '',
+    type: one(raw.type) ?? 'all',
+    source: one(raw.source) ?? 'all',
+  });
   const filter = parsed.success ? parsed.data : filterSchema.parse({});
   const requested = Math.max(0, Math.min(100000, Number(one(raw.page)) || 0));
   const [counts, first] = await Promise.all([rumpelCounts(), listRumpel(filter, requested)]);
@@ -25,8 +29,10 @@ export default async function Page({
           Rumpelkammer<span className="accent">.</span>
         </h1>
         <p>
-          Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag. Hier tauchen sie auf –
-          und nur hier.
+          Alles, was da ist, aber noch keine Entscheidung hat: weder gesehen, bewertet oder besprochen noch auf
+          der Bucketliste – etwa Titel aus Plex-Bibliotheken oder der Trakt-Collection. Sortiere sie aus:
+          bewerten (ins Archiv), in die Bucketliste verschieben oder löschen. Hier tauchen sie auf – und nur
+          hier.
         </p>
         <p className="muted small">
           {counts.movies.toLocaleString('de-DE')} Filme · {counts.shows.toLocaleString('de-DE')} Serien ·{' '}
@@ -40,6 +46,7 @@ export default async function Page({
         page={page}
         q={filter.q}
         type={filter.type}
+        source={filter.source}
       />
     </div>
   );

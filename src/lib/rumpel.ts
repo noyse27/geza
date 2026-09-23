@@ -12,6 +12,8 @@ const idSchema = z.string().regex(/^[1-9]\d{0,17}$/);
 export const filterSchema = z.object({
   q: z.string().trim().max(160).default(''),
   type: z.enum(['all', 'movie', 'show']).default('all'),
+  // Herkunft: mit oder ohne Plex-Verweis (die Plex-ID stammt aus Plex-Scan oder Trakt-Collection).
+  source: z.enum(['all', 'plex', 'other']).default('all'),
 });
 export type RumpelFilter = z.infer<typeof filterSchema>;
 export const actionSchema = z
@@ -29,6 +31,8 @@ export const actionSchema = z
 function where(filter: RumpelFilter, values: unknown[]) {
   const conditions = ["m.rumpel", "m.kind IN ('movie','show')"];
   if (filter.type !== 'all') conditions.push(`m.kind=$${values.push(filter.type)}`);
+  if (filter.source === 'plex') conditions.push("m.ids ? 'plex'");
+  if (filter.source === 'other') conditions.push("NOT (m.ids ? 'plex')");
   if (filter.q) {
     values.push('%' + filter.q.toLowerCase().replace(/[\\%_]/g, '\\$&') + '%');
     conditions.push(`m.search_text LIKE $${values.length}`);
@@ -43,8 +47,8 @@ export async function listRumpel(filter: RumpelFilter, page: number) {
     `SELECT count(*)::int AS total FROM media m WHERE ${clause}`,
     values,
   );
-  const rows = await query<Media & { children: number }>(
-    `SELECT ${cardColumns},m.summary,m.ids,
+  const rows = await query<Media & { children: number; has_plex: boolean }>(
+    `SELECT ${cardColumns},m.summary,m.ids,(m.ids ? 'plex') AS has_plex,
        (SELECT count(*)::int FROM media c WHERE c.parent_id=m.id OR c.parent_id IN (SELECT s.id FROM media s WHERE s.parent_id=m.id)) AS children
      FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE ${clause}
      ORDER BY lower(m.title),m.id LIMIT ${PAGE_SIZE} OFFSET ${Math.max(0, page) * PAGE_SIZE}`,

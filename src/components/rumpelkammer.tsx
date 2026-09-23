@@ -6,7 +6,7 @@ import { Bookmark, Pencil, Star, Trash2 } from 'lucide-react';
 import { Poster, kindLabel } from './media';
 import type { Media } from '@/lib/types';
 
-type Item = Media & { children: number };
+type Item = Media & { children: number; has_plex: boolean };
 type Action = { kind: 'bucketlist' } | { kind: 'rate'; rating: number } | { kind: 'delete' };
 
 export function RumpelList({
@@ -16,6 +16,7 @@ export function RumpelList({
   page,
   q,
   type,
+  source,
 }: {
   items: Item[];
   total: number;
@@ -23,6 +24,7 @@ export function RumpelList({
   page: number;
   q: string;
   type: 'all' | 'movie' | 'show';
+  source: 'all' | 'plex' | 'other';
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -37,6 +39,7 @@ export function RumpelList({
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (type !== 'all') params.set('type', type);
+    if (source !== 'all') params.set('source', source);
     if (p) params.set('page', String(p));
     const s = params.toString();
     return `/admin/rumpelkammer${s ? `?${s}` : ''}`;
@@ -72,7 +75,7 @@ export function RumpelList({
         action: pending.kind,
         ...(pending.kind === 'rate' ? { rating: pending.rating } : {}),
         ...(allMatching
-          ? { filter: { q, type }, expectedCount: total }
+          ? { filter: { q, type, source }, expectedCount: total }
           : { ids: [...selected] }),
       };
       const response = await fetch('/api/admin/rumpelkammer', {
@@ -113,8 +116,13 @@ export function RumpelList({
           <option value="movie">Nur Filme</option>
           <option value="show">Nur Serien</option>
         </select>
+        <select name="source" defaultValue={source} aria-label="Herkunft">
+          <option value="all">Alle Herkünfte</option>
+          <option value="plex">Mit Plex-Verweis</option>
+          <option value="other">Ohne Plex-Verweis</option>
+        </select>
         <button className="button">Filtern</button>
-        {(q || type !== 'all') && (
+        {(q || type !== 'all' || source !== 'all') && (
           <Link className="button" href="/admin/rumpelkammer">
             Zurücksetzen
           </Link>
@@ -127,7 +135,7 @@ export function RumpelList({
       )}
       {!items.length ? (
         <p className="muted">
-          {q || type !== 'all' ? 'Keine Treffer für diesen Filter.' : 'Die Rumpelkammer ist leer.'}
+          {q || type !== 'all' || source !== 'all' ? 'Keine Treffer für diesen Filter.' : 'Die Rumpelkammer ist leer.'}
         </p>
       ) : (
         <>
@@ -173,6 +181,7 @@ export function RumpelList({
                   <span className="eyebrow">
                     {kindLabel(item.kind)}
                     {item.kind === 'show' && item.children > 0 && ` · ${item.children} Staffeln/Episoden`}
+                    {` · ${item.has_plex ? 'Plex-Verweis' : 'Ohne Plex-Verweis'}`}
                   </span>
                   <h3>
                     {item.title} {item.year && <span>({item.year})</span>}
