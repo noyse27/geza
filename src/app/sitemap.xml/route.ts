@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const base = process.env.PUBLIC_URL;
   if (!base) return new Response('Sitemap erst nach Domain-Konfiguration verfügbar.', { status: 404 });
-  const count = Number((await query('SELECT count(*) FROM media'))[0].count);
+  const count = Number((await query('SELECT count(*) FROM media WHERE NOT rumpel'))[0].count);
   const pages = Math.ceil(count / 10000);
   const body = Array.from(
     { length: pages },

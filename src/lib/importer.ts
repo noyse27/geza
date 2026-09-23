@@ -2,6 +2,7 @@ import { isDemo } from './demo-mode';
 import { readdir, readFile } from 'node:fs/promises';
 import { pool } from './db';
 import { watchedTime } from './security';
+import { loadTombstones, forgetTombstones } from './rumpel';
 type Raw = Record<string, any>; // Trakt export has heterogeneous resource envelopes; only whitelisted fields are persisted.
 export async function importTrakt(directory: string) {
   const files = (await readdir(directory)).filter((f) =>
@@ -10,7 +11,9 @@ export async function importTrakt(directory: string) {
   const media = new Map<string, Raw>(),
     history: Raw[] = [],
     ratings: Raw[] = [],
-    reviews: Raw[] = [];
+    reviews: Raw[] = [],
+    // Nur Collection-Dateien (Plex-Bibliothek) belegen keine Aktivität; alles andere gilt als gesehen oder bewertet.
+    active = new Set<string>();
   function add(kind: string, raw: Raw, parent?: string): string | undefined {
     if (!raw?.ids?.trakt) return;
     const key = `${kind}:${raw.ids.trakt}`;
@@ -41,6 +44,7 @@ export async function importTrakt(directory: string) {
         r.type || (r.movie ? 'movie' : r.episode ? 'episode' : r.season ? 'season' : r.show ? 'show' : null);
       const key = kind === 'show' ? show : kind ? add(kind, r[kind], show) : undefined;
       if (!key) continue;
+      if (!file.startsWith('collection-')) active.add(key);
       if (file.startsWith('watched-history-'))
         history.push({
           key,
@@ -77,7 +81,29 @@ export async function importTrakt(directory: string) {
     await client.query('BEGIN');
     await client.query('SET LOCAL statement_timeout=0');
     await client.query('SELECT pg_advisory_xact_lock(729383)');
+    // Die Rumpelkammer-Zuordnung wird einmal am Ende neu berechnet statt pro Zeile.
+    await client.query("SET LOCAL geza.skip_rumpel='on'");
     const run = (await client.query('INSERT INTO import_runs DEFAULT VALUES RETURNING id')).rows[0].id;
+    // In der Rumpelkammer gelöschte Titel nicht erneut anlegen, außer die Datei belegt jetzt Aktivität.
+    const tombstones = await loadTombstones(client);
+    const rootOf = (key: string) => {
+      let k = key;
+      for (let i = 0; i < 5 && media.get(k)?.parent; i++) k = media.get(k)!.parent;
+      return k;
+    };
+    const activeRoots = new Set([...active].map(rootOf));
+    const skippedRoots = new Set<string>(),
+      forgotten: number[] = [];
+    for (const [key, entry] of media) {
+      if (entry.kind !== 'movie' && entry.kind !== 'show') continue;
+      const hits = tombstones.matches(entry.kind, { ...entry.ids, trakt: entry.trakt_id });
+      if (!hits.length) continue;
+      if (activeRoots.has(key)) forgotten.push(...hits);
+      else skippedRoots.add(key);
+    }
+    if (skippedRoots.size)
+      for (const key of [...media.keys()]) if (skippedRoots.has(rootOf(key))) media.delete(key);
+    await forgetTombstones(forgotten, client);
     const entries = [...media.values()];
     for (let i = 0; i < entries.length; i += 1000)
       await client.query(
@@ -122,6 +148,10 @@ export async function importTrakt(directory: string) {
         "SELECT kind,ids->>'plex' AS plex,count(*)::int AS count FROM media WHERE ids ? 'plex' GROUP BY kind,ids->>'plex' HAVING count(*)>1",
       )
     ).rows;
+    await client.query('SELECT rumpel_refresh(NULL)');
+    const rumpel = (
+      await client.query("SELECT count(*)::int AS n FROM media WHERE rumpel AND kind IN ('movie','show')")
+    ).rows[0].n;
     const report = {
       files: files.length,
       media: media.size,
@@ -130,6 +160,8 @@ export async function importTrakt(directory: string) {
       ratings: ratings.length,
       reviews: reviews.length,
       providerCollisions: collisions,
+      rumpel,
+      skippedDeleted: skippedRoots.size,
     };
     await client.query('UPDATE import_runs SET finished_at=now(),report=$1 WHERE id=$2', [
       JSON.stringify(report),

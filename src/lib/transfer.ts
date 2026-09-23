@@ -148,6 +148,8 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
         );
     }
     await validateTarget(client, archive);
+    // Die Rumpelkammer-Zuordnung wird nach dem Einspielen einmal neu berechnet statt pro Zeile.
+    await client.query("SET LOCAL geza.skip_rumpel='on'");
     await client.query('DELETE FROM sessions');
     await client.query('DELETE FROM login_attempts');
     for (const table of dataTables) {
@@ -159,6 +161,7 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
         [JSON.stringify(rows)],
       );
     }
+    await client.query('SELECT rumpel_refresh(NULL)');
     const providers = reviewModules.filter((m) => m.discover).map((m) => m.id);
     await client.query(
       `UPDATE review_boxes SET automatic_enabled=false WHERE NOT $1 OR NOT(provider=ANY($2::text[]))`,
@@ -184,7 +187,7 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
       ]);
     } else await client.query('INSERT INTO setup_restore(id,owner_hash) VALUES(1,$1)', [digest(owner)]);
     // ALTER SEQUENCE is transactional, unlike setval: failed restores also roll back counters.
-    for (const table of ['media', 'watches', 'reviews', 'film_series', 'jobs', 'import_runs']) {
+    for (const table of ['media', 'watches', 'reviews', 'film_series', 'jobs', 'import_runs', 'rumpel_deleted']) {
       const next = (await client.query(`SELECT (COALESCE(MAX(id),0)+1)::text AS next FROM "${table}"`))
         .rows[0].next;
       if (!/^\d+$/.test(next)) throw Error('Ungültiger Zähler.');

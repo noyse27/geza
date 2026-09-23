@@ -13,9 +13,9 @@ import { ReviewBody } from '@/components/review-body';
 import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
-  const m = await getMedia(id);
-  if (!m) notFound();
   const admin = await isAdmin();
+  const m = await getMedia(id, admin);
+  if (!m) notFound();
   const seriesOptions = admin ? await listFilmSeries() : [];
   if (['movie', 'show', 'episode'].includes(m.kind))
     await query(

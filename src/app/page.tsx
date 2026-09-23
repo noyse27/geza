@@ -12,7 +12,7 @@ export default async function Page() {
   const items = reviewed.length
     ? reviewed
     : await query<Media>(
-        `SELECT ${publicColumns},rating.rating FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings rating ON rating.media_id=m.id WHERE m.kind='movie' ORDER BY m.enriched_at DESC NULLS LAST,m.title LIMIT 12`,
+        `SELECT ${publicColumns},rating.rating FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings rating ON rating.media_id=m.id WHERE m.kind='movie' AND NOT m.rumpel ORDER BY m.enriched_at DESC NULLS LAST,m.title LIMIT 12`,
       );
   return (
     <div className="page">

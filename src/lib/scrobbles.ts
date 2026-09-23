@@ -48,7 +48,7 @@ export async function saveScrobble(input: unknown) {
       source = 'plex';
     }
     const media = (
-      await client.query("SELECT id,kind FROM media WHERE id=$1 AND kind IN ('movie','episode') FOR SHARE", [
+      await client.query("SELECT id,kind FROM media WHERE id=$1 AND kind IN ('movie','episode') FOR NO KEY UPDATE", [
         data.mediaId,
       ])
     ).rows[0];

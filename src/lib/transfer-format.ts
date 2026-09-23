@@ -16,6 +16,7 @@ export const dataTables = [
   'review_boxes',
   'jobs',
   'import_runs',
+  'rumpel_deleted',
 ] as const;
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
 export const MAX_JSON_BYTES = 512 * 1024 * 1024;

@@ -60,8 +60,14 @@ try {
   assert.equal((await query('SELECT rating FROM ratings WHERE media_id=$1', [episode.id]))[0].rating, 7);
   assert.equal((await query('SELECT body FROM reviews WHERE media_id=$1', [episode.id]))[0].body, 'Review');
   const results = await searchCatalog(new URLSearchParams({ q: 'Lidia Test', type: 'series' }));
-  assert.equal(results.items.length, 2);
+  // Die alte Serie ist nach der Umzuordnung ohne Aktivität und liegt in der Rumpelkammer.
+  assert.equal(results.items.length, 1);
+  assert.equal(results.items[0].id, show.id);
   assert.ok(results.items.every((item) => item.kind === 'show'));
+  assert.equal(
+    (await query("SELECT count(*)::int AS n FROM media WHERE kind='show' AND title='Lidia Test' AND rumpel"))[0].n,
+    1,
+  );
   assert.ok((await deleteMedia({ id: show.id, title: 'Lidia Test' })).error);
   assert.ok((await deleteMedia({ id: episode.id, title: 'Wrong title' })).error);
   assert.equal((await query('SELECT 1 FROM watches WHERE media_id=$1', [episode.id])).length, 1);

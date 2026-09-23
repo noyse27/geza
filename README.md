@@ -73,6 +73,19 @@ Ein Film aus einer Sammlung öffnet seine vollständigen Details **im Modal**, e
 
 Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbieter. Migration **011** ergänzt passende Indizes; vollständige Details werden erst beim Öffnen geladen. Änderungen im Modal aktualisieren anschließend die Liste und deren Anzahl. Technische Hinweise und Testmessungen stehen in [Sammlungen](docs/sammlungen.md).
 
+## Rumpelkammer
+
+Jeder Film und jede Serie ist in genau einem von drei Zuständen: **Archiv** (mindestens eine Sichtung, Bewertung, Review, ein manueller Friend-Review oder eine Filmreihe; bei Serien zählt der ganze Baum aus Staffeln und Episoden), **Bucketliste** oder **Rumpelkammer** (nichts davon). Die Zuordnung pflegen Datenbank-Trigger, ein Constraint verhindert, dass ein Titel zugleich in Bucketliste und Rumpelkammer liegt. Rumpel-Titel tauchen nirgends sonst auf: nicht in Suche, Sammlungen, Sitemaps oder auf öffentlichen Titelseiten (dort 404; als Admin bleiben sie über die Rumpelkammer erreichbar).
+
+Typische Herkunft: Plex-Bibliothekseinträge aus den `collection-*.json`-Dateien des Trakt-Exports und aus dem Plex-Scan, die nie gesehen wurden. Unter **Admin → Rumpelkammer** (`/admin/rumpelkammer`) lassen sie sich einzeln oder gesammelt (Checkboxen, „Alle auf dieser Seite“, „Alle Treffer“) bearbeiten:
+
+- **Bearbeiten**: öffnet die Titelseite mit Editor. Nur Metadaten zu ändern lässt den Titel in der Rumpelkammer; eine Bewertung, ein Review oder eine Sichtung macht ihn zum Archiv-Eintrag.
+- **Bewerten** (auch für die Auswahl): vergibt eine Bewertung, der Titel wandert ins Archiv.
+- **In die Bucketliste verschieben**: der Titel wird dort fixiert, der automatische Plex-Scan setzt ihn nicht zurück. Nimmst du ihn später wieder aus der Bucketliste, ohne dass er Aktivität hat, liegt er wieder in der Rumpelkammer.
+- **Löschen**: entfernt den Titel (bei Serien samt Staffeln und Episoden) und merkt ihn in `rumpel_deleted` vor. Trakt-Import und Plex-Scan legen ihn danach nicht erneut an. Die Sperre endet nur, wenn der Import zu diesem Titel wieder Sichtungen, Bewertungen oder Kommentare enthält (bzw. der Plex-Scan ihn als gesehen meldet). Auch das reguläre Löschen einer Waise über die Titelseite wird vorgemerkt. Die Vormerkungen sind Teil des Serverumzugs.
+
+Alle Aktionen betreffen ausschließlich Titel, die gerade wirklich in der Rumpelkammer liegen; Archiv-Einträge werden serverseitig übersprungen.
+
 ## Trakt-Import
 
 Nach der Anmeldung unter **Admin → Trakt-Export importieren** die ZIP-Datei aus dem Trakt-Export
@@ -226,7 +239,7 @@ Migrationen laufen vor App und Worker. Das benannte Datenbankvolume überlebt Co
 
 ## Prüfungen
 
-Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run build`. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
+Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run test:rumpel`, `npm run build`. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
 
 Die GitHub-CI folgt `adolar-songster` und `bloeki`: Typprüfung, Tests, Build, Trivy, Gitleaks, CodeQL und Image-Scan. Dependabot prüft npm, Docker und GitHub Actions montags in Europe/Berlin mit gruppierten Minor-/Patch-Updates. Entwicklungscompiler und Paketmanager werden nicht im Laufzeitimage ausgeliefert.
 
@@ -247,6 +260,12 @@ Filmdienst und wortvogel.de werden für aufgerufene Filme im Hintergrund gesucht
 Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
 
 ## Changelog
+
+### Unveröffentlicht
+
+- Neue **Rumpelkammer** (Admin → Rumpelkammer): Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag – bislang meist Plex-Bibliothekseinträge aus dem Trakt-Collection-Export – erscheinen nur noch dort und lassen sich einzeln oder gesammelt bearbeiten, bewerten, in die Bucketliste verschieben oder löschen. Gelöschte Titel merkt sich Geza (`rumpel_deleted`, Teil des Serverumzugs), damit Trakt-Import und Plex-Scan sie nicht erneut anlegen.
+- Bucketliste und Rumpelkammer schließen sich per Datenbank-Constraint aus; aus der Rumpelkammer verschobene Titel sind vor dem Plex-Scan geschützt.
+- Migration 017 ordnet den Bestand einmalig ein. Der Trakt-Importer legt Collection-only-Einträge nur noch als Rumpel an.
 
 ### v1.3.0
 

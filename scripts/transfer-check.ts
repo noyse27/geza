@@ -72,6 +72,7 @@ try {
     `INSERT INTO jobs(kind,status,payload) VALUES('plex','pending','{"event":"media.scrobble","eventId":"5fbaac04-c234-4d7b-9140-1a7108dfb830","metadata":{"title":"Unresolved"}}')`,
   );
   await query(`INSERT INTO import_runs(report) VALUES('{"files":1,"media":3}')`);
+  await query(`INSERT INTO rumpel_deleted(kind,title,year,ids) VALUES('movie','Gelöscht',2001,'{"imdb":"tt1"}')`);
   await query(`INSERT INTO settings VALUES('TMDB_TOKEN',$1),('PLEX_WEBHOOK_SECRET',$2)`, [
     encrypt('source-tmdb-token'),
     encrypt('old-webhook-secret'),
@@ -79,7 +80,9 @@ try {
   process.env.TVDB_API_KEY = 'environment-provider-key';
   const key = newTransferKey(),
     archive = decodeArchive(await exportInstallation(key));
-  assert.equal(archive.tables.media[0].id, '9007199254740993');
+  // Die Reihenfolge der Zeilen ist nicht garantiert (Trigger schreiben Zeilen um); daher nach ID suchen.
+  assert.ok(archive.tables.media.some((m) => m.id === '9007199254740993'));
+  assert.equal(archive.tables.rumpel_deleted.length, 1);
   assert.equal(openCredentials(archive, key).settings.TVDB_API_KEY, 'environment-provider-key');
   assert.ok(!('PLEX_WEBHOOK_SECRET' in openCredentials(archive, key).settings));
   assert.equal((await inspectInstallation(archive)).counts.media, 3);
@@ -124,6 +127,10 @@ try {
   assert.equal(
     (await query(`INSERT INTO media(kind,title) VALUES('movie','New') RETURNING id`))[0].id,
     '9007199254740995',
+  );
+  assert.equal(
+    (await query(`INSERT INTO rumpel_deleted(kind,title) VALUES('movie','Neu') RETURNING id`))[0].id,
+    '2',
   );
   await assert.rejects(restoreInstallation(archive, options, 'browser-owner'), /bereits/);
   await reset();

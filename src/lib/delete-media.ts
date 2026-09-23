@@ -12,7 +12,7 @@ export async function deleteMedia(input: unknown) {
   let committed = false;
   try {
     await client.query('BEGIN');
-    const media = (await client.query('SELECT title FROM media WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    const media = (await client.query('SELECT title,rumpel FROM media WHERE id=$1 FOR UPDATE', [id])).rows[0];
     if (!media) return { error: 'Datensatz nicht gefunden.' };
     if (media.title !== title) return { error: 'Bitte den aktuellen Titel zur Bestätigung eingeben.' };
     if ((await client.query('SELECT 1 FROM media WHERE parent_id=$1 LIMIT 1', [id])).rowCount)
@@ -20,6 +20,14 @@ export async function deleteMedia(input: unknown) {
         error:
           'Dieser Serie sind noch Staffeln oder Episoden zugeordnet. Bitte zuerst deren Zuordnung korrigieren oder die einzelnen Datensätze löschen.',
       };
+    // Auch das reguläre Löschen einer Waise wird gemerkt, damit spätere Importe sie nicht erneut anlegen.
+    if (media.rumpel)
+      await client.query(
+        `INSERT INTO rumpel_deleted(kind,title,year,ids)
+         SELECT kind,title,year,ids||CASE WHEN trakt_id IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('trakt',trakt_id) END
+         FROM media WHERE id=$1 AND kind IN ('movie','show')`,
+        [id],
+      );
     for (const table of ['watches', 'ratings', 'reviews', 'posters'])
       await client.query(`DELETE FROM ${table} WHERE media_id=$1`, [id]);
     await client.query("DELETE FROM jobs WHERE payload->>'mediaId'=$1", [id]);

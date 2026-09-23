@@ -8,13 +8,13 @@ export async function collectionGroups(category: CollectionCategory) {
     return query<{ value: string; label: string; count: number }>(
       `SELECT fs.id::text AS value,fs.title AS label,count(*)::int AS count FROM film_series fs
      JOIN film_series_members fsm ON fsm.series_id=fs.id JOIN media m ON m.id=fsm.media_id
-     WHERE m.kind='movie' GROUP BY fs.id ORDER BY fs.title,fs.id`,
+     WHERE m.kind='movie' AND NOT m.rumpel GROUP BY fs.id ORDER BY fs.title,fs.id`,
     );
   if (category === 'certification')
     return query<{ value: string; label: string; count: number }>(
       `SELECT COALESCE(value,'none') AS value,COALESCE(value,'Keine Altersangabe') AS label,
         count(DISTINCT id)::int AS count FROM (
-        SELECT m.id,m.certification AS value FROM media m WHERE m.kind='movie'
+        SELECT m.id,m.certification AS value FROM media m WHERE m.kind='movie' AND NOT m.rumpel
       ) groups GROUP BY value ORDER BY value IS NULL,value`,
     );
   const expressions = {
@@ -28,7 +28,7 @@ export async function collectionGroups(category: CollectionCategory) {
   return query<{ value: string; label: string; count: number }>(
     `SELECT value,value AS label,count(DISTINCT id)::int AS count FROM (
       SELECT m.id,${expressions[category]} AS value FROM media m
-      ${category === 'rating' ? 'JOIN ratings r ON r.media_id=m.id' : ''} WHERE m.kind='movie'
+      ${category === 'rating' ? 'JOIN ratings r ON r.media_id=m.id' : ''} WHERE m.kind='movie' AND NOT m.rumpel
     ) groups WHERE value IS NOT NULL AND trim(value)<>'' GROUP BY value
     ORDER BY ${category === 'year' || category === 'rating' ? 'value::integer DESC' : 'value'}`,
   );
@@ -37,7 +37,7 @@ export async function collectionGroups(category: CollectionCategory) {
 export async function collectionItems(category: CollectionCategory, value: string, params: URLSearchParams) {
   const isUncertified = category === 'certification' && value === 'none';
   const values: unknown[] = isUncertified ? [] : [value];
-  const filters = ["m.kind='movie'"];
+  const filters = ["m.kind='movie'", 'NOT m.rumpel'];
   const predicates = {
     genre: 'm.genres @> ARRAY[$1]::text[]',
     country: 'm.countries @> ARRAY[$1]::text[]',

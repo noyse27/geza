@@ -7,6 +7,7 @@ import { query } from '@/lib/db';
 import { plexRequest } from '@/lib/plex';
 import { AdminControls } from '@/components/admin';
 import { TransferExport } from '@/components/transfer';
+import { rumpelCounts } from '@/lib/rumpel';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -28,10 +29,11 @@ export default async function Page() {
       plexSections = [];
     }
   }
-  const [jobs, imports, errors] = await Promise.all([
+  const [jobs, imports, errors, rumpel] = await Promise.all([
     query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
     query("SELECT kind,error,updated_at FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 8"),
+    rumpelCounts(),
   ]);
   return (
     <div className="page">
@@ -67,6 +69,12 @@ export default async function Page() {
       ) : (
         <TransferExport />
       )}
+      <p>
+        <a className="button" href="/admin/rumpelkammer">
+          Rumpelkammer: {(rumpel.movies + rumpel.shows).toLocaleString('de-DE')} Titel ohne Sichtung,
+          Bewertung und Bucketliste aufräumen
+        </a>
+      </p>
       <p>
         <a className="button" href="/admin/logs">
           Ereignisprotokoll: Webhooks und Fehler ansehen
@@ -115,6 +123,15 @@ export default async function Page() {
                   {r.report?.watches?.toLocaleString('de-DE')} Ereignisse ·{' '}
                   {r.report?.ratings?.toLocaleString('de-DE')} Bewertungen · {r.report?.reviews} Kommentare
                 </p>
+                {r.report?.rumpel != null && (
+                  <p className="small muted">
+                    {r.report.rumpel.toLocaleString('de-DE')} Titel in der Rumpelkammer
+                    {r.report.skippedDeleted
+                      ? ` · ${r.report.skippedDeleted.toLocaleString('de-DE')} gelöschte übersprungen`
+                      : ''}
+                    .
+                  </p>
+                )}
                 <p className="small muted">
                   {r.report?.unknownDates} ungeklärte Anschauzeitpunkte bleiben erhalten.{' '}
                   {r.report?.providerCollisions?.length || 0} mehrfach zugeordnete Plex-IDs werden beim

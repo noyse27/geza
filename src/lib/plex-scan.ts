@@ -2,7 +2,8 @@ import { isDemo } from './demo-mode';
 import { logEvent } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
-import { plexRequest, ensurePlexMedia } from './plex';
+import { plexRequest, ensurePlexMedia, plexIds } from './plex';
+import { loadTombstones, forgetTombstones } from './rumpel';
 import { mergeMetadata, fromPlex } from './providers';
 type PlexMetadata = Record<string, any>;
 const RESCHEDULE_SQL = `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{}',
@@ -31,8 +32,11 @@ export async function processPlexScan(payload: { manual?: boolean } = {}) {
       (s: PlexMetadata) =>
         ['movie', 'show'].includes(s.type) && (!sectionFilter.length || sectionFilter.includes(String(s.key))),
     );
+    // In der Rumpelkammer gelöschte Titel nicht neu anlegen, solange sie in Plex ungesehen sind.
+    const tombstones = await loadTombstones();
     let touched = 0,
-      bucketed = 0;
+      bucketed = 0,
+      skipped = 0;
     for (const section of sections) {
       const listing = await plexRequest(
         `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1`,
@@ -43,6 +47,12 @@ export async function processPlexScan(payload: { manual?: boolean } = {}) {
         if (!['movie', 'show'].includes(item.type)) continue;
         const watched = item.type === 'movie' ? Number(item.viewCount) > 0 : Number(item.viewedLeafCount) > 0;
         try {
+          const hits = tombstones.matches(item.type, plexIds(item));
+          if (hits.length && !watched) {
+            skipped++;
+            continue;
+          }
+          await forgetTombstones(hits);
           entries.push(await scanItem(item, watched));
         } catch (error) {
           await logEvent('warn', 'plex-scan', 'Titel konnte nicht verarbeitet werden', {
@@ -68,7 +78,7 @@ export async function processPlexScan(payload: { manual?: boolean } = {}) {
       }));
       bucketed += rows.filter((r) => r.bucketlist).length;
       await query(
-        `UPDATE media m SET bucketlist=x.bucketlist FROM jsonb_to_recordset($1::jsonb) AS x(id bigint,bucketlist boolean) WHERE m.id=x.id AND m.bucketlist IS DISTINCT FROM x.bucketlist`,
+        `UPDATE media m SET bucketlist=x.bucketlist FROM jsonb_to_recordset($1::jsonb) AS x(id bigint,bucketlist boolean) WHERE m.id=x.id AND NOT m.bucketlist_pinned AND m.bucketlist IS DISTINCT FROM x.bucketlist`,
         [JSON.stringify(rows)],
       );
       await query(
@@ -81,6 +91,7 @@ export async function processPlexScan(payload: { manual?: boolean } = {}) {
       sections: sections.length,
       titles: touched,
       bucketlist: bucketed,
+      skippedDeleted: skipped,
     });
   } catch (error) {
     await logEvent('error', 'plex-scan', 'Bibliotheks-Scan fehlgeschlagen', { error });
