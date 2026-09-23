@@ -6,6 +6,7 @@ import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { processPlexScan } from '../src/lib/plex-scan';
+import { processPlexPresence, PRESENCE_SEED_SQL } from '../src/lib/plex-presence';
 import { installationReady } from '../src/lib/setup';
 let running = true;
 process.on('SIGTERM', () => {
@@ -49,6 +50,7 @@ while (running) {
           ((date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day' + interval '3 hours') AT TIME ZONE 'Europe/Berlin'))
          ON CONFLICT(dedupe_key) DO NOTHING`,
       );
+      await query(`${PRESENCE_SEED_SQL} ON CONFLICT(dedupe_key) DO NOTHING`);
       plexScanSeeded = true;
     }
     await query(
@@ -78,6 +80,7 @@ while (running) {
           else if (job.kind === 'plex') await processPlex(job.payload);
           else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
           else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
+          else if (job.kind === 'plex-presence') await processPlexPresence(job.payload);
           else throw Error('Unbekannter Aufgabentyp');
           await query("UPDATE jobs SET status='done',updated_at=now(),error=NULL WHERE id=$1", [job.id]);
           await logEvent('info', job.kind, 'Verarbeitung erfolgreich abgeschlossen');

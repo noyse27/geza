@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
-import { filterSchema, listRumpel, rumpelCounts } from '@/lib/rumpel';
+import { filterSchema, listRumpel, plexPresenceState, rumpelCounts } from '@/lib/rumpel';
+import { getSetting } from '@/lib/settings';
+import { isDemo } from '@/lib/demo-mode';
 import { RumpelList } from '@/components/rumpelkammer';
 export const metadata = { title: 'Rumpelkammer', robots: { index: false, follow: false } };
 export default async function Page({
@@ -15,10 +17,17 @@ export default async function Page({
     q: one(raw.q) ?? '',
     type: one(raw.type) ?? 'all',
     source: one(raw.source) ?? 'all',
+    library: one(raw.library) ?? '',
   });
   const filter = parsed.success ? parsed.data : filterSchema.parse({});
   const requested = Math.max(0, Math.min(100000, Number(one(raw.page)) || 0));
-  const [counts, first] = await Promise.all([rumpelCounts(), listRumpel(filter, requested)]);
+  const [counts, first, presence, plexUrl, plexToken] = await Promise.all([
+    rumpelCounts(),
+    listRumpel(filter, requested),
+    plexPresenceState(),
+    getSetting('PLEX_URL'),
+    getSetting('PLEX_TOKEN'),
+  ]);
   const page = Math.min(requested, first.pages - 1);
   const list = page === requested ? first : await listRumpel(filter, page);
   return (
@@ -47,6 +56,12 @@ export default async function Page({
         q={filter.q}
         type={filter.type}
         source={filter.source}
+        library={filter.library}
+        libraries={presence.libraries}
+        checkedAt={presence.checkedAt}
+        checking={presence.running}
+        checkFailed={presence.failed}
+        plexConfigured={!!plexUrl && !!plexToken && !isDemo()}
       />
     </div>
   );
