@@ -30,6 +30,8 @@ test('collections filter exact values, deduplicate films, paginate, and preserve
       await query(`INSERT INTO media(kind,title) VALUES('movie','Uncertified ' || $1) RETURNING id`, [suffix])
     )[0].id;
     ids.push(uncertifiedId);
+    // Ohne Aktivität wären die Testfilme Rumpel und aus den Sammlungen ausgeblendet.
+    await query("INSERT INTO watches(media_id,source,source_id) SELECT id,'test',$2||'-'||id FROM unnest($1::bigint[]) AS id", [ids, suffix]);
     await query(
       "INSERT INTO watches(media_id,source,source_id,watched_at) VALUES($1,'test',$2,now()),($1,'test',$3,now())",
       [ids[0], suffix + 'a', suffix + 'b'],

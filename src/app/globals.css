@@ -2221,3 +2221,107 @@ footer > a:nth-of-type(2) {
 
 .demo-banner { padding: 14px 24px; background: #322b12; color: #fff4c2; text-align: center; font-size: 14px; }
 .demo-banner a { text-decoration: underline; }
+
+.rumpel-filter {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.rumpel-filter input[type='search'] {
+  flex: 1;
+  min-width: 220px;
+}
+.rumpel-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.rumpel-select .checkbox {
+  margin: 0;
+}
+.rumpel-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 8px;
+}
+.rumpel-row.selected {
+  background: var(--surface);
+}
+.rumpel-row .poster {
+  width: 55px;
+  height: 80px;
+}
+.rumpel-row .poster-placeholder {
+  padding: 5px;
+  gap: 3px;
+}
+.rumpel-row .poster-placeholder > span:not(.poster-frame) {
+  font-size: 8px;
+  -webkit-line-clamp: 3;
+}
+.rumpel-row .poster-placeholder > svg {
+  width: 13px;
+  height: 13px;
+}
+.rumpel-row .poster-placeholder small {
+  display: none;
+}
+.rumpel-check {
+  margin: 0;
+}
+.rumpel-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.rumpel-actions .button {
+  padding: 8px 12px;
+}
+.rumpel-pages {
+  align-items: center;
+  justify-content: center;
+  margin: 28px 0;
+}
+.rumpel-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px #0006;
+}
+.rumpel-rate {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.rumpel-rate select {
+  width: auto;
+  font-size: 13px;
+}
+.rumpel-preview {
+  margin: 12px 0 20px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .rumpel-row {
+    flex-wrap: wrap;
+  }
+  .rumpel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

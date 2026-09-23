@@ -6,7 +6,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ page: s
     { page } = await params;
   if (!base || !/^\d{1,6}$/.test(page)) return new Response(null, { status: 404 });
   const rows = await query(
-    'SELECT m.id,GREATEST(m.updated_at,(SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public)) AS updated_at FROM media m ORDER BY m.id LIMIT 10000 OFFSET $1',
+    'SELECT m.id,GREATEST(m.updated_at,(SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public)) AS updated_at FROM media m WHERE NOT m.rumpel ORDER BY m.id LIMIT 10000 OFFSET $1',
     [Number(page) * 10000],
   );
   if (!rows.length) return new Response(null, { status: 404 });

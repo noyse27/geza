@@ -50,6 +50,8 @@ for (let n = 1; n <= 12; n++) {
     field_sources: {},
     bucketlist: false,
     manual_entry: false,
+    rumpel: false,
+    bucketlist_pinned: false,
   });
   // bytea uses PostgreSQL's JSON-compatible hex representation, as in normal backups.
   // Every entry gets a stored poster, including season/episodes using the series artwork.

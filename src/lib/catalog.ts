@@ -11,7 +11,7 @@ export async function searchCatalog(params: URLSearchParams, admin = false): Pro
   };
   const q = (params.get('q') || '').trim().slice(0, 160),
     type = params.get('type') || 'all';
-  const filters: string[] = ['NOT m.bucketlist'];
+  const filters: string[] = ['NOT m.bucketlist', 'NOT m.rumpel'];
   let candidates = '';
   let rank = 'm.title ASC,m.id ASC';
   if (type === 'movie') filters.push("m.kind='movie'");
@@ -73,13 +73,13 @@ export async function getBucketlist() {
   ]);
   return { movies, shows };
 }
-export async function getMedia(id: string) {
+export async function getMedia(id: string, admin = false) {
   if (!/^\d+$/.test(id)) return null;
   return (
     (
       await query<Media>(
-        `SELECT ${publicColumns},m.locked_fields,fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1`,
-        [id],
+        `SELECT ${publicColumns},m.locked_fields,fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1 AND ($2 OR NOT m.rumpel)`,
+        [id, admin],
       )
     )[0] || null
   );
