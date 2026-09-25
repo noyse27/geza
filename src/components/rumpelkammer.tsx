@@ -1,4 +1,5 @@
 'use client';
+import { originLabel } from '@/lib/media-origin';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -25,6 +26,7 @@ export function RumpelList({
   type,
   source,
   library,
+  origin,
   libraries,
   checkedAt,
   checking,
@@ -39,6 +41,7 @@ export function RumpelList({
   type: 'all' | 'movie' | 'show';
   source: Source;
   library: string;
+  origin?: 'trakt-collection' | 'trakt-watchlist' | 'plex' | 'unknown';
   libraries: string[];
   checkedAt: string | null;
   checking: boolean;
@@ -60,6 +63,7 @@ export function RumpelList({
     if (type !== 'all') params.set('type', type);
     if (source !== 'all') params.set('source', source);
     if (library) params.set('library', library);
+    if (origin) params.set('origin', origin);
     if (p) params.set('page', String(p));
     const s = params.toString();
     return `/admin/rumpelkammer${s ? `?${s}` : ''}`;
@@ -95,7 +99,7 @@ export function RumpelList({
         action: pending.kind,
         ...(pending.kind === 'rate' ? { rating: pending.rating } : {}),
         ...(allMatching
-          ? { filter: { q, type, source, library }, expectedCount: total }
+          ? { filter: { q, type, source, library, origin }, expectedCount: total }
           : { ids: [...selected] }),
       };
       const response = await fetch('/api/admin/rumpelkammer', {
@@ -136,7 +140,9 @@ export function RumpelList({
         body: JSON.stringify({ action: 'plex-check' }),
       });
       if (!response.ok) throw Error((await response.json()).error || 'Start fehlgeschlagen.');
-      setNotice('Plex-Abgleich gestartet. Das dauert je nach Bibliotheksgröße einige Minuten; danach die Seite neu laden.');
+      setNotice(
+        'Plex-Abgleich gestartet. Das dauert je nach Bibliotheksgröße einige Minuten; danach die Seite neu laden.',
+      );
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -155,11 +161,14 @@ export function RumpelList({
             : checkedAt
               ? `zuletzt ${new Date(checkedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}`
               : 'noch nie durchgeführt'}
-          {checkFailed && <span className="error"> · der letzte Lauf ist fehlgeschlagen (siehe Ereignisprotokoll)</span>}
+          {checkFailed && (
+            <span className="error"> · der letzte Lauf ist fehlgeschlagen (siehe Ereignisprotokoll)</span>
+          )}
         </p>
         <p className="muted small">
-          Prüft, ob die Titel der Rumpelkammer aktuell in einer Plex-Bibliothek liegen, und merkt sich die
-          Bibliothek. Läuft außerdem nachts um 04:00 Uhr.
+          Gleicht Bestand und Zuordnung gemeinsam ab. Vorhandene ungesehene Titel und Staffeln werden bei
+          aktivierter Automatik in die Bucketliste übernommen. Den täglichen Zeitplan findest du im
+          Admin-Bereich.
         </p>
         {plexConfigured ? (
           <button type="button" className="button" disabled={busy || checking} onClick={startCheck}>
@@ -176,6 +185,13 @@ export function RumpelList({
       </div>
       <form className="toolbar rumpel-filter" method="get" action="/admin/rumpelkammer">
         <input type="search" name="q" defaultValue={q} placeholder="Titel, Regie, Besetzung, IMDb-ID …" />
+        <select name="origin" defaultValue={origin || ''} aria-label="Herkunft">
+          <option value="">Alle Herkünfte</option>
+          <option value="trakt-collection">Trakt Collection</option>
+          <option value="trakt-watchlist">Trakt Watchlist</option>
+          <option value="plex">Plex-Abgleich</option>
+          <option value="unknown">Altbestand ohne Herkunft</option>
+        </select>
         <select name="type" defaultValue={type} aria-label="Art">
           <option value="all">Filme und Serien</option>
           <option value="movie">Nur Filme</option>
@@ -198,7 +214,7 @@ export function RumpelList({
           </select>
         )}
         <button className="button">Filtern</button>
-        {(q || type !== 'all' || source !== 'all' || library) && (
+        {(q || type !== 'all' || source !== 'all' || library || origin) && (
           <Link className="button" href="/admin/rumpelkammer">
             Zurücksetzen
           </Link>
@@ -211,7 +227,9 @@ export function RumpelList({
       )}
       {!items.length ? (
         <p className="muted">
-          {q || type !== 'all' || source !== 'all' || library ? 'Keine Treffer für diesen Filter.' : 'Die Rumpelkammer ist leer.'}
+          {q || type !== 'all' || source !== 'all' || library
+            ? 'Keine Treffer für diesen Filter.'
+            : 'Die Rumpelkammer ist leer.'}
         </p>
       ) : (
         <>
@@ -262,6 +280,9 @@ export function RumpelList({
                   <h3>
                     {item.title} {item.year && <span>({item.year})</span>}
                   </h3>
+                  <p className="muted">
+                    {item.assignment_reason} · Herkunft: {originLabel(item.origins)}
+                  </p>
                   {(item.directors.length > 0 || item.ids.imdb) && (
                     <span className="muted row-subtitle">
                       {item.directors.length > 0 && `Regie: ${item.directors.slice(0, 2).join(', ')}`}
@@ -335,7 +356,11 @@ export function RumpelList({
               <Bookmark size={15} /> In die Bucketliste
             </button>
             <label className="rumpel-rate">
-              <select value={rating} onChange={(e) => setRating(Number(e.target.value))} aria-label="Bewertung">
+              <select
+                value={rating}
+                onChange={(e) => setRating(Number(e.target.value))}
+                aria-label="Bewertung"
+              >
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
                     {n}/10

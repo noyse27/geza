@@ -23,10 +23,12 @@ async function movie(title: string, extra = '', values: unknown[] = []) {
   return row.id;
 }
 const state = async (id: string) =>
-  (await query<{ rumpel: boolean; bucketlist: boolean; pinned: boolean }>(
-    'SELECT rumpel,bucketlist,bucketlist_pinned AS pinned FROM media WHERE id=$1',
-    [id],
-  ))[0];
+  (
+    await query<{ rumpel: boolean; bucketlist: boolean; pinned: boolean }>(
+      'SELECT rumpel,bucketlist,bucketlist_pinned AS pinned FROM media WHERE id=$1',
+      [id],
+    )
+  )[0];
 async function wipe() {
   const all = (
     await query<{ id: string }>(
@@ -41,7 +43,9 @@ async function wipe() {
   await query('DELETE FROM media WHERE id=ANY($1::bigint[])', [all]);
 }
 test.beforeEach(async () => {
-  await query("DELETE FROM rumpel_deleted WHERE title LIKE $1 OR ids->>'trakt' LIKE '9900000%'", [`%${suffix}%`]);
+  await query("DELETE FROM rumpel_deleted WHERE title LIKE $1 OR ids->>'trakt' LIKE '9900000%'", [
+    `%${suffix}%`,
+  ]);
 });
 test.afterEach(wipe);
 
@@ -50,7 +54,7 @@ test('Zustände Archiv, Bucketliste und Rumpelkammer schließen sich aus und fol
   assert.equal((await state(id)).rumpel, true, 'neuer Film ohne Aktivität ist Rumpel');
   // Bucketliste verlässt die Rumpelkammer …
   await query('UPDATE media SET bucketlist=true WHERE id=$1', [id]);
-  assert.deepEqual(await state(id), { rumpel: false, bucketlist: true, pinned: false });
+  assert.deepEqual(await state(id), { rumpel: false, bucketlist: true, pinned: true });
   // … und die Rücknahme ohne Aktivität führt zurück in die Rumpelkammer.
   await query('UPDATE media SET bucketlist=false WHERE id=$1', [id]);
   assert.equal((await state(id)).rumpel, true);
@@ -87,22 +91,44 @@ test('Zustände Archiv, Bucketliste und Rumpelkammer schließen sich aus und fol
 });
 
 test('Serien: Aktivität in Staffel oder Episode nimmt die ganze Serie aus der Rumpelkammer', async () => {
-  const show = (await query<{ id: string }>("INSERT INTO media(kind,title) VALUES('show',$1) RETURNING id", [`Serie ${suffix}`]))[0].id;
-  const season = (await query<{ id: string }>("INSERT INTO media(kind,title,parent_id,season) VALUES('season','S1',$1,1) RETURNING id", [show]))[0].id;
+  const show = (
+    await query<{ id: string }>("INSERT INTO media(kind,title) VALUES('show',$1) RETURNING id", [
+      `Serie ${suffix}`,
+    ])
+  )[0].id;
+  const season = (
+    await query<{ id: string }>(
+      "INSERT INTO media(kind,title,parent_id,season) VALUES('season','S1',$1,1) RETURNING id",
+      [show],
+    )
+  )[0].id;
   const episodes = (
     await query<{ id: string }>(
       "INSERT INTO media(kind,title,parent_id,season,episode) SELECT 'episode','E'||n,$1,1,n FROM generate_series(1,3) n RETURNING id",
       [season],
     )
   ).map((r) => r.id);
-  const flags = async () => (await query<{ id: string; rumpel: boolean }>('SELECT id,rumpel FROM media WHERE id=ANY($1::bigint[])', [[show, season, ...episodes]])).map((r) => r.rumpel);
+  const flags = async () =>
+    (
+      await query<{ id: string; rumpel: boolean }>('SELECT id,rumpel FROM media WHERE id=ANY($1::bigint[])', [
+        [show, season, ...episodes],
+      ])
+    ).map((r) => r.rumpel);
   assert.deepEqual(await flags(), [true, true, true, true, true], 'Serie samt Kindern ist Rumpel');
   await query("INSERT INTO watches(media_id,source,source_id) VALUES($1,'test',$2)", [episodes[1], suffix]);
-  assert.deepEqual(await flags(), [false, false, false, false, false], 'eine gesehene Episode rettet die Serie');
+  assert.deepEqual(
+    await flags(),
+    [false, false, false, false, false],
+    'eine gesehene Episode rettet die Serie',
+  );
   await query('DELETE FROM watches WHERE media_id=$1', [episodes[1]]);
   assert.deepEqual(await flags(), [true, true, true, true, true]);
   await query('UPDATE media SET bucketlist=true WHERE id=$1', [show]);
-  assert.deepEqual(await flags(), [false, false, false, false, false], 'Bucketliste-Serie: Kinder sind kein Rumpel');
+  assert.deepEqual(
+    await flags(),
+    [false, false, false, false, false],
+    'Bucketliste-Serie: Kinder sind kein Rumpel',
+  );
   await query('UPDATE media SET bucketlist=false WHERE id=$1', [show]);
   assert.deepEqual(await flags(), [true, true, true, true, true]);
   await query('DELETE FROM media WHERE id=ANY($1::bigint[])', [episodes]);
@@ -112,11 +138,17 @@ test('Serien: Aktivität in Staffel oder Episode nimmt die ganze Serie aus der R
 
 test('Rumpel-Einträge erscheinen weder in Suche noch in Sammlungen, aber in der Rumpelkammer', async () => {
   const id = await movie('Sichtbarkeitstest', 'genres=$2', [[`G${suffix}`]]);
-  await query("UPDATE media SET directors=ARRAY['Regie Test'],ids=$2 WHERE id=$1", [id, JSON.stringify({ imdb: 'tt9900555' })]);
+  await query("UPDATE media SET directors=ARRAY['Regie Test'],ids=$2 WHERE id=$1", [
+    id,
+    JSON.stringify({ imdb: 'tt9900555' }),
+  ]);
   const params = new URLSearchParams({ q: suffix });
   assert.equal((await searchCatalog(params, true)).items.length, 0);
   assert.equal((await searchCatalog(params, false)).items.length, 0);
-  assert.equal((await collectionGroups('genre')).some((g) => g.value === `G${suffix}`), false);
+  assert.equal(
+    (await collectionGroups('genre')).some((g) => g.value === `G${suffix}`),
+    false,
+  );
   const list = await listRumpel({ q: suffix, type: 'all', source: 'all', library: '' }, 0);
   assert.equal(list.total, 1);
   assert.equal(list.items[0].id, id);
@@ -124,7 +156,10 @@ test('Rumpel-Einträge erscheinen weder in Suche noch in Sammlungen, aber in der
   assert.equal(list.items[0].ids.imdb, 'tt9900555');
   await query("INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,6,now(),'test')", [id]);
   assert.equal((await searchCatalog(params, true)).items[0].id, id);
-  assert.equal((await collectionGroups('genre')).some((g) => g.value === `G${suffix}`), true);
+  assert.equal(
+    (await collectionGroups('genre')).some((g) => g.value === `G${suffix}`),
+    true,
+  );
   assert.equal((await listRumpel({ q: suffix, type: 'all', source: 'all', library: '' }, 0)).total, 0);
 });
 
@@ -146,7 +181,10 @@ test('Massenaktionen: Bucketliste, Bewerten, Löschen mit Gedächtnis; nur Rumpe
   await query('UPDATE media SET bucketlist=false WHERE id=$1', [a]);
   assert.deepEqual(await state(a), { rumpel: true, bucketlist: false, pinned: false });
   // Bewerten: danach Archiv.
-  assert.deepEqual(await runRumpelAction({ action: 'rate', ids: [b, c], rating: 8 }), { count: 2, skipped: 0 });
+  assert.deepEqual(await runRumpelAction({ action: 'rate', ids: [b, c], rating: 8 }), {
+    count: 2,
+    skipped: 0,
+  });
   assert.equal((await state(b)).rumpel, false);
   assert.equal((await query('SELECT rating FROM ratings WHERE media_id=$1', [c]))[0].rating, 8);
   // Filter-Auswahl verlangt die erwartete Anzahl.
@@ -156,7 +194,10 @@ test('Massenaktionen: Bucketliste, Bewerten, Löschen mit Gedächtnis; nur Rumpe
   );
   assert.equal((await query('SELECT 1 FROM media WHERE id=$1', [a])).length, 1);
   // Löschen über Filter: a und d sind noch Rumpel.
-  assert.deepEqual(await runRumpelAction({ action: 'delete', filter: { q: suffix, type: 'all' }, expectedCount: 2 }), { count: 2, skipped: 0 });
+  assert.deepEqual(
+    await runRumpelAction({ action: 'delete', filter: { q: suffix, type: 'all' }, expectedCount: 2 }),
+    { count: 2, skipped: 0 },
+  );
   assert.equal((await query('SELECT 1 FROM media WHERE id=ANY($1::bigint[])', [[a, d]])).length, 0);
   assert.equal((await query('SELECT 1 FROM media WHERE id=ANY($1::bigint[])', [[b, c, keep]])).length, 3);
   const tombstones = await loadTombstones();
@@ -188,10 +229,20 @@ test('Trakt-Import: Collection-Einträge werden Rumpel, Gelöschtes bleibt drau�
       { movie: item(seen, 'Gesehen') },
     ]);
     await file('ratings-movies.json', [
-      { rated_at: '2026-01-02T03:04:05.000Z', rating: 8, type: 'movie', movie: item(deletedRated, 'Gelöscht bewertet') },
+      {
+        rated_at: '2026-01-02T03:04:05.000Z',
+        rating: 8,
+        type: 'movie',
+        movie: item(deletedRated, 'Gelöscht bewertet'),
+      },
     ]);
     await file('watched-history-movies.json', [
-      { id: 990000000 + 7, watched_at: '2026-01-02T03:04:05.000Z', type: 'movie', movie: item(seen, 'Gesehen') },
+      {
+        id: 990000000 + 7,
+        watched_at: '2026-01-02T03:04:05.000Z',
+        type: 'movie',
+        movie: item(seen, 'Gesehen'),
+      },
     ]);
     const report = (await importTrakt(dir)) as { skippedDeleted: number; rumpel: number };
     assert.equal(report.skippedDeleted, 1);
@@ -206,15 +257,25 @@ test('Trakt-Import: Collection-Einträge werden Rumpel, Gelöschtes bleibt drau�
         [seen, false],
       ],
     );
-    assert.equal((await query("SELECT 1 FROM rumpel_deleted WHERE ids->>'trakt'=$1", [String(deleted)])).length, 1, 'Sperre bleibt');
-    assert.equal((await query("SELECT 1 FROM rumpel_deleted WHERE ids->>'tmdb'=$1", [String(deletedRated)])).length, 0, 'Sperre fällt bei Aktivität');
+    assert.equal(
+      (await query("SELECT 1 FROM rumpel_deleted WHERE ids->>'trakt'=$1", [String(deleted)])).length,
+      1,
+      'Sperre bleibt',
+    );
+    assert.equal(
+      (await query("SELECT 1 FROM rumpel_deleted WHERE ids->>'tmdb'=$1", [String(deletedRated)])).length,
+      0,
+      'Sperre fällt bei Aktivität',
+    );
     assert.ok(report.rumpel >= 1);
     // Ein zweiter Lauf ändert nichts.
     const again = (await importTrakt(dir)) as { skippedDeleted: number };
     assert.equal(again.skippedDeleted, 1);
   } finally {
     await rm(dir, { recursive: true, force: true });
-    await query("DELETE FROM rumpel_deleted WHERE ids->>'trakt' LIKE '9900000%' OR ids->>'tmdb' LIKE '9900000%'");
+    await query(
+      "DELETE FROM rumpel_deleted WHERE ids->>'trakt' LIKE '9900000%' OR ids->>'tmdb' LIKE '9900000%'",
+    );
     await query('DELETE FROM watches WHERE source_id=$1', ['990000007']);
   }
 });
@@ -238,7 +299,10 @@ test('Serie löschen entfernt Staffeln und Episoden und merkt sich nur die Serie
   assert.equal(listed.total, 1);
   assert.equal(listed.items[0].children, 4);
   assert.deepEqual(await runRumpelAction({ action: 'delete', ids: [show] }), { count: 1, skipped: 0 });
-  assert.equal((await query('SELECT 1 FROM media WHERE id=ANY($1::bigint[])', [[show, season, ...episodes]])).length, 0);
+  assert.equal(
+    (await query('SELECT 1 FROM media WHERE id=ANY($1::bigint[])', [[show, season, ...episodes]])).length,
+    0,
+  );
   const tombstones = await loadTombstones();
   assert.equal(tombstones.matches('show', { tmdb: 99000077 }).length, 1);
   assert.equal(tombstones.matches('movie', { tmdb: 99000077 }).length, 0);
@@ -247,11 +311,14 @@ test('Serie löschen entfernt Staffeln und Episoden und merkt sich nur die Serie
 
 test('Plex-Abgleich merkt die Bibliotheken pro Rumpel-Titel; Filter und Massenaktion nutzen sie; Fehler ändern nichts', async () => {
   process.env.SESSION_SECRET ||= crypto.randomUUID() + crypto.randomUUID();
-  const saved = await query<{ key: string; value: string }>('SELECT key,value FROM settings WHERE key=ANY($1)', [
-    ['PLEX_URL', 'PLEX_TOKEN'],
-  ]);
+  const saved = await query<{ key: string; value: string }>(
+    'SELECT key,value FROM settings WHERE key=ANY($1)',
+    [['PLEX_URL', 'PLEX_TOKEN', 'PLEX_SCAN_WATCHED_ONLY']],
+  );
   await setSetting('PLEX_URL', 'http://plex.test:32400');
   await setSetting('PLEX_TOKEN', 'token');
+  // Availability-only mode keeps these fixtures in the Rumpelkammer.
+  await setSetting('PLEX_SCAN_WATCHED_ONLY', '0');
   const realFetch = globalThis.fetch;
   let broken = false;
   const json = (value: unknown) =>
@@ -279,13 +346,31 @@ test('Plex-Abgleich merkt die Bibliotheken pro Rumpel-Titel; Filter und Massenak
         },
       });
     if (pathname === '/library/sections/2/all')
-      return json({ MediaContainer: { Metadata: [{ type: 'movie', guid: 'plex://movie/x', Guid: [{ id: 'tmdb://99000101' }] }] } });
+      return json({
+        MediaContainer: {
+          Metadata: [{ type: 'movie', guid: 'plex://movie/x', Guid: [{ id: 'tmdb://99000101' }] }],
+        },
+      });
     if (pathname === '/library/sections/3/all')
-      return json({ MediaContainer: { Metadata: [{ type: 'show', guid: 'plex://show/y', Guid: [{ id: 'tvdb://99000104' }] }] } });
+      return json({
+        MediaContainer: {
+          Metadata: [
+            { type: 'show', ratingKey: 'y', guid: 'plex://show/y', Guid: [{ id: 'tvdb://99000104' }] },
+          ],
+        },
+      });
+    if (pathname === '/library/metadata/y/allLeaves')
+      return json({
+        MediaContainer: {
+          Metadata: [{ type: 'episode', title: 'E1', parentIndex: 1, index: 1, viewCount: 0 }],
+        },
+      });
     return new Response('{}', { status: 404 });
   }) as typeof fetch;
   const list = (source: 'all' | 'plex' | 'none' | 'unchecked', library = '') =>
-    listRumpel({ q: suffix, type: 'all', source, library }, 0).then((r) => r.items.map((i) => i.title.split(' ')[0]).sort());
+    listRumpel({ q: suffix, type: 'all', source, library }, 0).then((r) =>
+      r.items.map((i) => i.title.split(' ')[0]).sort(),
+    );
   try {
     await movie('A', 'ids=$2', [JSON.stringify({ tmdb: 99000101 })]);
     await movie('B', 'ids=$2', [JSON.stringify({ imdb: 'tt9900102' })]);
@@ -294,7 +379,11 @@ test('Plex-Abgleich merkt die Bibliotheken pro Rumpel-Titel; Filter und Massenak
       ['D', 'show', { tvdb: 99000104 }],
       ['E', 'show', { tmdb: 99000101 }], // gleiche TMDB-Nummer, aber Serie statt Film
     ] as const)
-      await query("INSERT INTO media(kind,title,ids) VALUES($1,$2,$3)", [kind, `${title} ${suffix}`, JSON.stringify(ids)]);
+      await query('INSERT INTO media(kind,title,ids) VALUES($1,$2,$3)', [
+        kind,
+        `${title} ${suffix}`,
+        JSON.stringify(ids),
+      ]);
     assert.deepEqual(await list('unchecked'), ['A', 'B', 'C', 'D', 'E']);
     await processPlexPresence({ manual: true });
     assert.deepEqual(await list('plex'), ['A', 'B', 'D']);
@@ -307,7 +396,10 @@ test('Plex-Abgleich merkt die Bibliotheken pro Rumpel-Titel; Filter und Massenak
     assert.ok(a.plex_checked_at);
     // Massenaktion über den Filter: nur die Titel der Bibliothek "Kinder".
     const filter = { q: suffix, type: 'all', source: 'all', library: 'Kinder' };
-    assert.deepEqual(await runRumpelAction({ action: 'bucketlist', filter, expectedCount: 1 }), { count: 1, skipped: 0 });
+    assert.deepEqual(await runRumpelAction({ action: 'bucketlist', filter, expectedCount: 1 }), {
+      count: 1,
+      skipped: 0,
+    });
     assert.deepEqual(await list('all'), ['B', 'C', 'D', 'E']);
     // Ein Titel, der nach dem Abgleich dazukommt, gilt als nicht geprüft; ein fehlgeschlagener Lauf ändert nichts.
     await movie('F');
@@ -318,8 +410,9 @@ test('Plex-Abgleich merkt die Bibliotheken pro Rumpel-Titel; Filter und Massenak
     assert.deepEqual(await list('none'), ['C', 'E']);
   } finally {
     globalThis.fetch = realFetch;
-    await query("DELETE FROM settings WHERE key IN ('PLEX_URL','PLEX_TOKEN')");
-    for (const row of saved) await query('INSERT INTO settings(key,value) VALUES($1,$2)', [row.key, row.value]);
+    await query("DELETE FROM settings WHERE key IN ('PLEX_URL','PLEX_TOKEN','PLEX_SCAN_WATCHED_ONLY')");
+    for (const row of saved)
+      await query('INSERT INTO settings(key,value) VALUES($1,$2)', [row.key, row.value]);
     await query("DELETE FROM jobs WHERE dedupe_key='plex-presence-daily'");
   }
 });

@@ -17,6 +17,8 @@
     "test:integration": "tsx --test tests/integration.test.ts",
     "test:collections": "tsx --test tests/collections.test.ts",
     "test:rumpel": "tsx --test tests/rumpel.test.ts",
+    "test:classification": "tsx scripts/classification-check.ts",
+    "test:classification:http": "tsx scripts/classification-http-check.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "import:trakt": "tsx scripts/import.ts",
     "worker": "tsx scripts/worker.ts",

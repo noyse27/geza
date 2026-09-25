@@ -18,6 +18,7 @@ export default async function Page({
     type: one(raw.type) ?? 'all',
     source: one(raw.source) ?? 'all',
     library: one(raw.library) ?? '',
+    origin: one(raw.origin) || undefined,
   });
   const filter = parsed.success ? parsed.data : filterSchema.parse({});
   const requested = Math.max(0, Math.min(100000, Number(one(raw.page)) || 0));
@@ -38,8 +39,8 @@ export default async function Page({
           Rumpelkammer<span className="accent">.</span>
         </h1>
         <p>
-          Alles, was da ist, aber noch keine Entscheidung hat: weder gesehen, bewertet oder besprochen noch auf
-          der Bucketliste – etwa Titel aus Plex-Bibliotheken oder der Trakt-Collection. Sortiere sie aus:
+          Alles, was da ist, aber noch keine Entscheidung hat: weder gesehen, bewertet oder besprochen noch
+          auf der Bucketliste – etwa Titel aus Plex-Bibliotheken oder der Trakt-Collection. Sortiere sie aus:
           bewerten (ins Archiv), in die Bucketliste verschieben oder löschen. Hier tauchen sie auf – und nur
           hier.
         </p>
@@ -57,6 +58,7 @@ export default async function Page({
         type={filter.type}
         source={filter.source}
         library={filter.library}
+        origin={filter.origin}
         libraries={presence.libraries}
         checkedAt={presence.checkedAt}
         checking={presence.running}

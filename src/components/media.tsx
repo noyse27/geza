@@ -107,7 +107,8 @@ export function MediaCard({ item }: { item: Media }) {
       <h3>{item.title}</h3>
       {item.parent_title && (
         <p className="muted">
-          {item.parent_title} · S{item.season} E{item.episode}
+          {item.parent_title} · Staffel {item.season}
+          {item.kind === 'episode' ? ` · Episode ${item.episode}` : ''}
         </p>
       )}
     </Link>

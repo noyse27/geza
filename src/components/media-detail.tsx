@@ -12,6 +12,8 @@ import { MediaEditor, ReviewEditor, RatingEditor, WatchEditor, WatchCreator } fr
 import { ReviewBody } from '@/components/review-body';
 import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
+import { BucketPreference } from './bucket-preference';
+import { originLabel } from '@/lib/media-origin';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
   const admin = await isAdmin();
   const m = await getMedia(id, admin);
@@ -41,8 +43,10 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
   const children =
     m.kind === 'show' || m.kind === 'season'
       ? await query<Media>(
-          `SELECT ${publicColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.parent_id=$1 ORDER BY m.season,m.episode,m.id LIMIT 500`,
-          [id],
+          `SELECT ${publicColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE
+           (m.parent_id=$1 OR ($2::text='season' AND m.parent_id=$3 AND m.kind='episode' AND m.season=$4))
+           AND ($5 OR NOT m.rumpel) ORDER BY m.season,m.episode,m.id LIMIT 500`,
+          [id, m.kind, m.parent_id, m.season, admin],
         )
       : [];
   const structured = {
@@ -75,6 +79,13 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
   return (
     <div className="page detail-page">
       {!modal && <Back />}
+      {admin && (
+        <div className="panel">
+          <p>{m.assignment_reason}</p>
+          <p className="muted">Herkunft: {originLabel(m.origins)}</p>
+          {m.kind !== 'episode' && <BucketPreference id={id} preference={m.bucket_preference || 'auto'} />}
+        </div>
+      )}
       <div className="detail-top">
         <div className="detail-poster">
           <Poster item={m} large />
@@ -209,7 +220,12 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
               <span className="eyebrow">BESETZUNG</span>
               <div className="tags">
                 {m.actors.slice(0, 10).map((actor) => (
-                  <Link key={actor} className="fact-button" replace={modal} href={collectionHref('actor', actor)}>
+                  <Link
+                    key={actor}
+                    className="fact-button"
+                    replace={modal}
+                    href={collectionHref('actor', actor)}
+                  >
                     {actor}
                   </Link>
                 ))}

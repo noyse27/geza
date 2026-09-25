@@ -159,7 +159,7 @@ export function BucketlistTabs({ movies, shows }: { movies: Media[]; shows: Medi
           Filme ({movies.length})
         </button>
         <button className={tab === 'shows' ? 'active' : ''} onClick={() => setTab('shows')}>
-          Serien ({shows.length})
+          Serien / Staffeln ({shows.length})
         </button>
       </div>
       <AddBucketlistItem kind={tab === 'movies' ? 'movie' : 'show'} />
@@ -171,7 +171,9 @@ export function BucketlistTabs({ movies, shows }: { movies: Media[]; shows: Medi
         </div>
       ) : (
         <div className="empty">
-          <h3>{tab === 'movies' ? 'Keine ungesehenen Filme gefunden.' : 'Keine ungesehenen Serien gefunden.'}</h3>
+          <h3>
+            {tab === 'movies' ? 'Keine ungesehenen Filme gefunden.' : 'Keine ungesehenen Serien gefunden.'}
+          </h3>
         </div>
       )}
     </>

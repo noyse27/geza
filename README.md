@@ -24,16 +24,16 @@ Seit **v1.2.0** lässt sich Geza als öffentliche Demo für die eigene Website i
 sh setup.sh demo
 ```
 
-| | Produktion | Demo |
-| --- | --- | --- |
-| Installation | `./setup.ps1` / `sh setup.sh` | `./setup.ps1 -Mode demo` / `sh setup.sh demo` |
-| Lokale Adresse | `http://localhost:3080` | `http://localhost:3081` |
-| Konfiguration | `.env` | `.env.demo` |
-| Adminzugang | Bei der Einrichtung selbst festlegen | **admin / admin** |
-| Ausgangsdaten | Leer oder eigene Wiederherstellung | Automatisch aus [demo.geza](demo.geza) |
-| Trakt-Upload | Import | Vorschau ohne Datenbankänderung |
-| Provider und Geza-Wiederherstellung | Verfügbar | Gesperrt; Verbindungen zeigen Fantasieschlüssel |
-| Zurücksetzen | Kein automatischer Reset | Standardmäßig alle 60 Minuten |
+|                                     | Produktion                           | Demo                                            |
+| ----------------------------------- | ------------------------------------ | ----------------------------------------------- |
+| Installation                        | `./setup.ps1` / `sh setup.sh`        | `./setup.ps1 -Mode demo` / `sh setup.sh demo`   |
+| Lokale Adresse                      | `http://localhost:3080`              | `http://localhost:3081`                         |
+| Konfiguration                       | `.env`                               | `.env.demo`                                     |
+| Adminzugang                         | Bei der Einrichtung selbst festlegen | **admin / admin**                               |
+| Ausgangsdaten                       | Leer oder eigene Wiederherstellung   | Automatisch aus [demo.geza](demo.geza)          |
+| Trakt-Upload                        | Import                               | Vorschau ohne Datenbankänderung                 |
+| Provider und Geza-Wiederherstellung | Verfügbar                            | Gesperrt; Verbindungen zeigen Fantasieschlüssel |
+| Zurücksetzen                        | Kein automatischer Reset             | Standardmäßig alle 60 Minuten                   |
 
 Die Demo verwendet eine eigene Datenbank und zwölf Medieneinträge mit lokalen Film- und Seriencovern sowie erfundene Bewertungen, Reviews und drei offene Scrobbles zur Nachpflege. Reviews, Bewertungen und Bearbeitung können ausprobiert werden. Alle Besucher teilen denselben Datenbestand; beim Reset verschwinden Änderungen und Anmeldungen. Bitte keine persönlichen Daten eingeben.
 
@@ -75,16 +75,16 @@ Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbiet
 
 ## Rumpelkammer
 
-Jeder Film und jede Serie ist in genau einem von drei Zuständen: **Archiv** (mindestens eine Sichtung, Bewertung, Review, ein manueller Friend-Review oder eine Filmreihe; bei Serien zählt der ganze Baum aus Staffeln und Episoden), **Bucketliste** oder **Rumpelkammer** (nichts davon). Die Zuordnung pflegen Datenbank-Trigger, ein Constraint verhindert, dass ein Titel zugleich in Bucketliste und Rumpelkammer liegt. Rumpel-Titel tauchen nirgends sonst auf: nicht in Suche, Sammlungen, Sitemaps oder auf öffentlichen Titelseiten (dort 404; als Admin bleiben sie über die Rumpelkammer erreichbar).
+Die gemeinsame Einordnung trennt Herkunft, Sichtungsbelege, ausdrückliche Wünsche und aktuelle Plex-Verfügbarkeit. Ohne Aktivität oder Wunsch bleibt ein Titel in der **Rumpelkammer**. Sichtungen, Bewertungen, Reviews, manuelle Friend-Reviews und Filmreihen begründen das **Archiv**; ungesehene Wünsche erscheinen auf der **Bucketliste**. Eine Serie kann im Archiv stehen und ihre ungesehene nächste Staffel auf der Bucketliste. Datenbank-Trigger berechnen die Zuordnung auch nach Sichtungskorrekturen neu. Rumpel-Titel sind öffentlich nicht erreichbar; als Admin bleiben sie bearbeitbar.
 
-Typische Herkunft: Plex-Bibliothekseinträge aus den `collection-*.json`-Dateien des Trakt-Exports und aus dem Plex-Scan, die nie gesehen wurden. Unter **Admin → Rumpelkammer** (`/admin/rumpelkammer`) lassen sie sich einzeln oder gesammelt (Checkboxen, „Alle auf dieser Seite“, „Alle Treffer“) bearbeiten:
+Typische Herkunft: reine `collection-*.json`-Einträge aus Trakt ohne Aktivität. Eine Collection oder Plex-ID beweist keine aktuelle Plex-Verfügbarkeit. Herkunft und Zuordnungsgrund stehen im Admin an jedem Titel. Unter **Admin → Rumpelkammer** (`/admin/rumpelkammer`) lassen sich Titel einzeln oder gesammelt bearbeiten:
 
 - **Bearbeiten**: öffnet die Titelseite mit Editor. Nur Metadaten zu ändern lässt den Titel in der Rumpelkammer; eine Bewertung, ein Review oder eine Sichtung macht ihn zum Archiv-Eintrag.
 - **Bewerten** (auch für die Auswahl): vergibt eine Bewertung, der Titel wandert ins Archiv.
-- **In die Bucketliste verschieben**: der Titel wird dort fixiert, der automatische Plex-Scan setzt ihn nicht zurück. Nimmst du ihn später wieder aus der Bucketliste, ohne dass er Aktivität hat, liegt er wieder in der Rumpelkammer.
+- **In die Bucketliste verschieben**: als manuellen Wunsch bis zur Sichtung speichern. Auf der Titelseite lässt sich ein Titel ausdrücklich ausschließen oder wieder automatisch berücksichtigen. Ein ausgeschlossener Titel wird beim nächsten Scan nicht sofort erneut aufgenommen.
 - **Löschen**: entfernt den Titel (bei Serien samt Staffeln und Episoden) und merkt ihn in `rumpel_deleted` vor. Trakt-Import und Plex-Scan legen ihn danach nicht erneut an. Die Sperre endet nur, wenn der Import zu diesem Titel wieder Sichtungen, Bewertungen oder Kommentare enthält (bzw. der Plex-Scan ihn als gesehen meldet). Auch das reguläre Löschen einer Waise über die Titelseite wird vorgemerkt. Die Vormerkungen sind Teil des Serverumzugs.
 
-**Plex-Abgleich:** Ob ein Titel wirklich in einer Plex-Bibliothek liegt, lässt sich nicht an seiner Plex-ID ablesen (auch Trakt-Einträge tragen eine). Deshalb liest der Abgleich (Button auf der Rumpelkammer-Seite, zusätzlich nachts um 04:00 Uhr) jeweils die komplette Titelliste jeder Film- und Serienbibliothek in einer Anfrage und gleicht sie über Plex-, IMDb-, TMDB- und TVDB-ID mit der Rumpelkammer ab. Jeder Titel zeigt danach „Plex (Bibliothek, …)“, „Nicht in Plex“ oder „Plex nicht geprüft“; Filter und Massenaktionen (z. B. alle Titel der Bibliothek „Filme“ in die Bucketliste) nutzen dieses Ergebnis. Schlägt ein Lauf fehl, ändert er nichts.
+**Plex-Abgleich:** Ein gemeinsamer Lauf liest alle Film-/Serienbibliotheken samt Episoden mit Vollständigkeitsprüfung und gleicht den gesamten Bestand ab. Erst danach werden Verfügbarkeit und Zuordnung zusammen veröffentlicht. Fehler ändern keine Zuordnungen. Der bisherige separate Lauf um 04:00 Uhr entfällt. Filter und Massenaktionen nutzen die zuletzt erfolgreich geprüfte Verfügbarkeit.
 
 Alle Aktionen betreffen ausschließlich Titel, die gerade wirklich in der Rumpelkammer liegen; Archiv-Einträge werden serverseitig übersprungen.
 
@@ -92,7 +92,9 @@ Alle Aktionen betreffen ausschließlich Titel, die gerade wirklich in der Rumpel
 
 Nach der Anmeldung unter **Admin → Trakt-Export importieren** die ZIP-Datei aus dem Trakt-Export
 hochladen. Geza entpackt die ZIP in ein temporäres Verzeichnis, übernimmt nur passende JSON-Dateien
-für History, Bewertungen, Kommentare und Sammlung und entfernt die temporären Dateien danach wieder.
+für History, Gesehen-Zusammenfassungen, Watchlist, Bewertungen, Kommentare und Sammlung und entfernt die temporären Dateien danach wieder.
+
+Plex muss nicht vorher eingerichtet sein. Ohne Plex werden reine Collection-Titel zunächst in die Rumpelkammer einsortiert; die Watchlist liefert ausdrückliche Wünsche. Optional lassen sich Collection-Titel als Wünsche übernehmen, ohne Verfügbarkeit zu behaupten. Mit eingerichteter Plex-Verbindung wird nach dem Import ein Abgleich eingeplant. Wird Plex später verbunden, geschieht derselbe Abgleich ohne erneuten Trakt-Import. Gesehen-Zusammenfassungen bleiben als Belege erhalten, ohne erfundene historische Sichtungsereignisse zu erzeugen.
 
 Als CLI-Alternative den entpackten Export in `data/trakt-export-noyse` ablegen:
 
@@ -128,7 +130,9 @@ Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und
 
 **Neue Plex-Reviewtexte:** Ihre automatische Übernahme ist weiterhin offen, weil kein dokumentierter Review-Webhook vorliegt. Trakt-Reviews und in Geza geschriebene Reviews funktionieren unabhängig davon.
 
-**Plex-Bibliotheks-Scan und Bucketliste:** Unter **Admin → Plex-Bibliotheks-Scan** (sichtbar sobald Plex-URL und -Token gespeichert sind) lässt sich ein nächtlicher Scan um 03:00 Uhr (Europe/Berlin) aktivieren oder jederzeit manuell anstoßen; einzelne Plex-Bibliotheken sind dafür gezielt auswählbar. Ist „Ungesehene Medien zur Bucketliste hinzufügen“ aktiv, landen noch nicht gesehene Filme/Serien (ohne eigene Bewertung oder Review) statt im normalen Katalog in der **Bucketliste** – einem eigenen Navigationspunkt mit Filme-/Serien-Umschaltung. Ein Titel verlässt die Bucketliste automatisch, sobald er per Plex-Scrobble oder manuell gesetztem Anschau-Datum als gesehen gilt; ein erneuter Scan setzt ihn dann nicht zurück. Über den „+“-Button auf der Bucketliste-Seite lassen sich zusätzlich Titel hinzufügen, die noch gar nicht in Plex vorhanden sind: Titel-/Jahressuche gegen TMDB, Auswahl eines Treffers lädt FSK, Regie, Besetzung, Genres, Laufzeit und TMDB-Bewertung und öffnet die Detailseite direkt im Bearbeitungsmodus zur Kontrolle vor dem Speichern.
+**Plex-Bibliotheks-Scan und Bucketliste:** Standardmäßig täglich um 03:00 Uhr (Europe/Berlin); Automatik und Stunde sind im Admin einstellbar. Gespeicherte frühere Einstellungen bleiben erhalten. Ungesehene vorhandene Filme und vollständig ungesehene Serien kommen auf die Bucketliste. Bei begonnenen Serien erscheinen nur vorhandene Staffeln ohne gesehene Episode, einschließlich Specials (Staffel 0). Teilweise vorhandene Staffeln zählen als vorhanden, leere Staffeln nicht. Trakt-/Geza-Sichtungen zählen mit; Bewertungen allein gelten nicht als gesehene Episode. Die Bibliotheksauswahl begrenzt automatische Wünsche, die Verfügbarkeit wird weiterhin überall geprüft. Manuelle Wünsche bleiben bei Wegfall aus Plex erhalten; rein automatische Einträge werden nach vollständigem Abgleich neu zugeordnet, niemals gelöscht. Abschalten des täglichen Scans führt selbst keine Umsortierung aus.
+
+„Änderungen vorab prüfen“ zeigt bis zu 200 Vorher-/Nachher-Zuordnungen und rollt die Vorschau zurück. „Jetzt scannen“ verarbeitet den dann aktuellen Bestand. Bestehende manuelle Bucketlisteneinträge werden durch Migration 019 geschützt; alte automatische Einträge bleiben bis zum nächsten vollständigen Scan erhalten. Auf der Bucketliste können weiterhin per TMDB-Suche manuelle Wünsche ergänzt werden. Weitere technische Entscheidungen und Abnahmekriterien stehen im [Refactoring-Plan](docs/refactoring-import-plex.md).
 
 ## Hosting und Google
 
@@ -306,6 +310,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 - Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; automatische Aktualisierung alle 15 Sekunden.
 
 ### v1.1.1 (current)
+
 - Migrationen laufen nicht mehr in den 8s-Statement-Timeout der App; verhinderte auf größeren Produktivbeständen den Abschluss von Migration 013
 
 ### v1.1.0
@@ -320,13 +325,16 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 - FSK-Angaben werden beim Anbieterabgleich und bei manueller Bearbeitung einheitlich auf „FSK <Wert>" normalisiert; Filme ohne Altersangabe erscheinen in einer eigenen Sammlung „Keine Altersangabe" statt zu fehlen
 
 ### v1.0.2
+
 - Titel-Links in Reviews grün hervorgehoben (Akzentfarbe mit Pfeil), analog zu den anderen Geza-Links
 
 ### v1.0.1
+
 - Footer zeigt Copyright-Hinweis mit Link auf PolzeSoft; Kontaktblock mit Mailadresse unter „Daten & Quellen"
 - Interne Titel-Links in Reviews zeigen statt der nackten URL den Filmtitel als Link
 
 ### v1.0
+
 - Öffentlicher Katalog mit Suche, Detailseiten, Zehnerbewertungen und Reviews; privates Anschautagebuch nach Login
 - Trakt-Import per ZIP-Upload im Admin oder CLI für History, Bewertungen, Kommentare und Sammlung
 - Plex-Webhook-Sync für Anschauereignisse sowie persönliche Reviews via community.plex.tv, mit Schutz vor doppelten Reviews

@@ -24,7 +24,11 @@ export default async function Page() {
       const data = await plexRequest('/library/sections');
       plexSections = (data?.MediaContainer?.Directory || [])
         .filter((s: { type: string }) => ['movie', 'show'].includes(s.type))
-        .map((s: { key: string; title: string; type: string }) => ({ key: s.key, title: s.title, type: s.type }));
+        .map((s: { key: string; title: string; type: string }) => ({
+          key: s.key,
+          title: s.title,
+          type: s.type,
+        }));
     } catch {
       plexSections = [];
     }
@@ -35,6 +39,12 @@ export default async function Page() {
     query("SELECT kind,error,updated_at FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 8"),
     rumpelCounts(),
   ]);
+  const [lastScan] = await query(
+    "SELECT created_at,context FROM event_logs WHERE source='plex-scan' AND message='Plex-Bestand und Einordnung abgeglichen' ORDER BY id DESC LIMIT 1",
+  );
+  const [nextScan] = await query(
+    "SELECT available_at,status,error FROM jobs WHERE dedupe_key='plex-scan-daily'",
+  );
   return (
     <div className="page">
       <div className="page-heading">
@@ -88,6 +98,21 @@ export default async function Page() {
       <div className="stats-columns">
         <section className="panel">
           <h2>Verarbeitung</h2>
+          {lastScan && (
+            <p>
+              Letzter vollständiger Plex-Abgleich:{' '}
+              {new Date(lastScan.created_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} ·{' '}
+              {lastScan.context.titles} Medienobjekte · {lastScan.context.changed} Änderungen ·{' '}
+              {lastScan.context.skippedDeleted} gelöschte Titel übersprungen.
+            </p>
+          )}
+          {nextScan && settings.PLEX_SCAN_ENABLED !== '0' && (
+            <p>
+              Nächster täglicher Plex-Abgleich:{' '}
+              {new Date(nextScan.available_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}{' '}
+              (Berlin). {nextScan.error && `Letzter Fehler: ${nextScan.error}`}
+            </p>
+          )}
           {jobs.length ? (
             jobs.map((j, i) => (
               <p key={i} className="status-row">

@@ -161,6 +161,8 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
         [JSON.stringify(rows)],
       );
     }
+    // Preserve wishes and evidence, but never advertise a source server check as current.
+    await client.query('UPDATE media SET plex_checked_at=NULL');
     await client.query('SELECT rumpel_refresh(NULL)');
     const providers = reviewModules.filter((m) => m.discover).map((m) => m.id);
     await client.query(
@@ -187,7 +189,15 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
       ]);
     } else await client.query('INSERT INTO setup_restore(id,owner_hash) VALUES(1,$1)', [digest(owner)]);
     // ALTER SEQUENCE is transactional, unlike setval: failed restores also roll back counters.
-    for (const table of ['media', 'watches', 'reviews', 'film_series', 'jobs', 'import_runs', 'rumpel_deleted']) {
+    for (const table of [
+      'media',
+      'watches',
+      'reviews',
+      'film_series',
+      'jobs',
+      'import_runs',
+      'rumpel_deleted',
+    ]) {
       const next = (await client.query(`SELECT (COALESCE(MAX(id),0)+1)::text AS next FROM "${table}"`))
         .rows[0].next;
       if (!/^\d+$/.test(next)) throw Error('Ungültiger Zähler.');

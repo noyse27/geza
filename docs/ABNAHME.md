@@ -57,3 +57,11 @@ Zugriffstests prüfen öffentliche Bewertungen/veröffentlichte Reviews, verborg
 - Zielserver, DNS und HTTPS auf Port 777. Sitemaps sind vorbereitet, lokal aber deaktiviert.
 
 Ein öffentlicher Host wurde noch nicht aktiviert. „Öffentlich“ bezeichnet derzeit den ohne Login erreichbaren lokalen Geza-Bereich.
+
+# Import-/Plex-Refactoring, 25. September 2026
+
+Migration 019 und die gemeinsame Zuordnung wurden in isolierten PostgreSQL-17-Datenbanken geprüft. Der vollständige vorhandene Trakt-Export wurde zweimal importiert: unverändert 32.597 Medienobjekte und 25.326 Sichtungsereignisse nach beiden Läufen; 23 Provider-Kollisionen bleiben gemeldet. Produktivdaten wurden nicht geändert.
+
+Node 22: Typprüfung und Produktionsbuild erfolgreich. Neue Regressionen decken Legacy-Wünsche, vollständig ungesehene Serien, einzelne ungesehene Staffeln, lokale Sichtungen und Korrekturen, manuelle Ausschlüsse, wiederholten Import, vollständige Scan-Antworten, Vorschau-Rollback und Folgeläufe ab. HTTP-Prüfung mit lokalem Plex-Testserver: Anmeldung, Adminanzeige, Vorschau, Staffel-Bucketliste, Ausschluss und ZIP-Import einschließlich Folgeauftrag erfolgreich. Bestehende Unit-, Rumpelkammer-, Katalog-, Sammlungs-, Zuordnungs-, Scrobble-, Umzugs- und Demo-Sicherheitsprüfungen erfolgreich.
+
+Live noch prüfen: echte Plex-Antworten für große Bibliotheken und Serien, erste Bestandsvorschau mit eigenen Daten, anschließend tatsächlicher täglicher Worker-Lauf. Siehe [Refactoring-Plan](refactoring-import-plex.md).

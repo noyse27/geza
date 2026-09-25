@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const exportFile =
-  /^(watched-history-|watched-movies-|watched-shows-|ratings-|comments-|collection-).*\.json$/;
+  /^(watched-history-|watched-movies-|watched-shows-|ratings-|comments-|collection-|watchlist).*\.json$/;
 const maxZipBytes = 200 * 1024 * 1024;
 const maxJsonBytes = 500 * 1024 * 1024;
 
@@ -78,7 +78,10 @@ export async function POST(req: Request) {
         { error: 'In der ZIP wurden keine passenden Trakt-Exportdateien gefunden.' },
         { status: 400 },
       );
-    const report = await importTrakt(root);
+    const report = await importTrakt(root, {
+      collectionWishes: form.get('collectionWishes') === 'on',
+      preview: form.get('preview') === '1',
+    });
     return Response.json({ ok: true, extracted, report }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     console.error('Trakt-ZIP-Import fehlgeschlagen:', e);

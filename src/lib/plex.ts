@@ -3,7 +3,23 @@ import { loggedFetch, logEvent } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
 import { watchedTime } from './security';
+import type { PoolClient } from 'pg';
 type PlexMetadata = Record<string, any>;
+export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
+  const consistent = matches.filter((r) =>
+    Object.entries(ids).every(
+      ([key, value]) => key === 'plex' || r.ids?.[key] == null || String(r.ids[key]) === value,
+    ),
+  );
+  const strong = consistent.filter((r) =>
+    Object.entries(ids).some(([key, value]) => key !== 'plex' && String(r.ids?.[key]) === value),
+  );
+  // A shared legacy Plex GUID alone must not outweigh a unique matching TMDB/TVDB/IMDb identity.
+  const candidates = strong.length ? strong : consistent;
+  if (matches.length && candidates.length !== 1)
+    throw Error('Mehrdeutige oder widersprüchliche Provider-IDs: manuelle Zuordnung erforderlich');
+  return candidates[0];
+}
 export function plexIds(m: PlexMetadata) {
   const ids: Record<string, string> = {};
   const guids = [m.guid, ...(m.Guid || []).map((g: { id: string }) => g.id)].filter(Boolean);
@@ -75,16 +91,41 @@ export async function processPlexReviewSync(payload: { mediaId: string }) {
   ]);
   await syncPlexReview(payload.mediaId, media?.ids?.plex);
 }
-export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promise<string> {
+export async function ensurePlexMedia(
+  m: PlexMetadata,
+  parentId?: string,
+  client?: PoolClient,
+): Promise<string> {
+  const run = client
+    ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
+    : query;
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');
   const ids = plexIds(m);
-  if (!Object.keys(ids).length) throw Error('Keine verlässliche Medien-ID im Plex-Ereignis');
-  const matches = await query(
-    `SELECT id,title,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND EXISTS(SELECT 1 FROM jsonb_each_text($2::jsonb) x WHERE ids->>x.key=x.value) ORDER BY id`,
-    [kind, JSON.stringify(ids)],
-  );
-  if (matches.length > 1) {
+  const structural = parentId && ['season', 'episode'].includes(kind);
+  const season = kind === 'season' ? m.index : m.parentIndex;
+  if (!Object.keys(ids).length && !structural) throw Error('Keine verlässliche Medien-ID im Plex-Ereignis');
+  if (structural && (!Number.isInteger(season) || season < 0)) throw Error('Ungültige Staffelnummer');
+  const providerKeys = ['plex', 'imdb', 'tmdb', 'tvdb'].filter((key) => ids[key]);
+  let matches = providerKeys.length
+    ? await run(
+        `SELECT id,title,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND (${providerKeys.map((key, i) => `(ids ? '${key}' AND ids->>'${key}'=$${i + 2})`).join(' OR ')}) ORDER BY id`,
+        [kind, ...providerKeys.map((key) => ids[key])],
+      )
+    : [];
+  if (structural) {
+    const siblings = await run(
+      `SELECT id,ids FROM media WHERE kind=$1 AND
+      (parent_id=$2 OR ($1='episode' AND parent_id IN (SELECT id FROM media WHERE kind='season' AND parent_id=$2))) AND season=$3
+      AND ($1='season' OR episode=$4)`,
+      [kind, parentId, season, m.index ?? null],
+    );
+    for (const sibling of siblings) if (!matches.some((r) => r.id === sibling.id)) matches.push(sibling);
+  }
+  try {
+    const selected = selectPlexMatch(matches, ids);
+    matches = selected ? [selected] : [];
+  } catch {
     await logEvent('error', 'plex', 'Medienzuordnung wegen widersprüchlicher Provider-IDs abgebrochen', {
       type: kind,
       title: m.title,
@@ -98,7 +139,7 @@ export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promi
     throw Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich');
   }
   if (matches.length) {
-    await query('UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3', [
+    await run('UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3', [
       JSON.stringify(ids),
       parentId || null,
       matches[0].id,
@@ -106,7 +147,7 @@ export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promi
     return matches[0].id;
   }
   return (
-    await query(
+    await run(
       `INSERT INTO media(kind,title,year,ids,parent_id,season,episode) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [
         kind,
@@ -114,7 +155,7 @@ export async function ensurePlexMedia(m: PlexMetadata, parentId?: string): Promi
         m.year || null,
         JSON.stringify(ids),
         parentId || null,
-        m.parentIndex ?? null,
+        season ?? null,
         kind === 'episode' ? m.index : null,
       ],
     )
@@ -149,9 +190,6 @@ export async function processPlex(payload: {
       `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
       [id, payload.eventId, at || payload.receivedAt, !at],
     );
-    await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=ANY($1::bigint[])', [
-      [id, parent].filter(Boolean),
-    ]);
   } else if (payload.event === 'media.rate') {
     if (m.userRating === undefined)
       throw Error('Plex liefert keine persönliche Bewertung; Serverzugriff prüfen.');
