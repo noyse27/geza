@@ -1,7 +1,9 @@
 import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { setSetting, settingKeys } from '@/lib/settings';
+import { getSetting, setSetting, settingKeys } from '@/lib/settings';
+import { requestPlexScan, scheduleNextScan } from '@/lib/plex-jobs';
+import { processPlexScan } from '@/lib/plex-scan';
 import { z } from 'zod';
 import { reviewModule } from '@/lib/review-modules';
 import { friendUrl } from '@/lib/friend-reviews';
@@ -12,6 +14,8 @@ import { deleteMedia } from '@/lib/delete-media';
 import { normalizeCertification } from '@/lib/certification';
 import { fetchTmdbDetails } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
+import { redact } from '@/lib/logging';
+export const maxDuration = 300;
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
   original_title: z.string().max(500),
@@ -27,9 +31,29 @@ const mediaSchema = z.object({
 export async function POST(req: Request) {
   if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401 });
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
+  let requestedAction = '';
   try {
     const body = await req.json();
-    if (isDemo() && !['delete-media','assignment','review-box-delete','review-box-edit','review-box-add','friend-review','media','series-reorder','review','watch','watch-delete','watch-create','rating'].includes(body.action)) return demoBlocked();
+    requestedAction = body.action;
+    if (
+      isDemo() &&
+      ![
+        'delete-media',
+        'assignment',
+        'review-box-delete',
+        'review-box-edit',
+        'review-box-add',
+        'friend-review',
+        'media',
+        'series-reorder',
+        'review',
+        'watch',
+        'watch-delete',
+        'watch-create',
+        'rating',
+      ].includes(body.action)
+    )
+      return demoBlocked();
     if (body.action === 'delete-media') {
       const result = await deleteMedia(body.data);
       return Response.json(result, {
@@ -186,7 +210,6 @@ export async function POST(req: Request) {
         [body.id, data.watched_at, body.mediaId],
       );
       if (!updated.length) throw Error('Anschauereignis nicht gefunden');
-      await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=$1', [body.mediaId]);
     } else if (body.action === 'watch-delete') {
       const deleted = await query('DELETE FROM watches WHERE id=$1 AND media_id=$2 RETURNING id', [
         body.id,
@@ -206,7 +229,6 @@ export async function POST(req: Request) {
         `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'geza',$2,CASE WHEN $3::text IS NULL THEN NULL ELSE ($3::timestamp AT TIME ZONE 'Europe/Berlin') END,false)`,
         [body.mediaId, crypto.randomUUID(), data.watched_at],
       );
-      await query('UPDATE media SET bucketlist=false WHERE bucketlist AND id=$1', [body.mediaId]);
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
       if (rating === null) await query('DELETE FROM ratings WHERE media_id=$1', [body.id]);
@@ -216,9 +238,18 @@ export async function POST(req: Request) {
           [body.id, rating],
         );
     } else if (body.action === 'settings') {
+      const previousPlex = (await getSetting('PLEX_URL')) + ':' + (await getSetting('PLEX_TOKEN'));
       for (const key of settingKeys)
         if (typeof body.data?.[key] === 'string' && body.data[key].trim())
           await setSetting(key, body.data[key].trim());
+      if (
+        (await getSetting('PLEX_URL')) &&
+        (await getSetting('PLEX_TOKEN')) &&
+        previousPlex !== (await getSetting('PLEX_URL')) + ':' + (await getSetting('PLEX_TOKEN'))
+      ) {
+        await query('UPDATE media SET plex_checked_at=NULL');
+        await requestPlexScan();
+      }
     } else if (body.action === 'generate-webhook-secret') {
       const secret = randomBytes(32).toString('base64url');
       await setSetting('PLEX_WEBHOOK_SECRET', secret);
@@ -240,15 +271,38 @@ export async function POST(req: Request) {
       );
     } else if (body.action === 'plex-scan-settings') {
       const data = z
-        .object({ watchedOnly: z.boolean(), enabled: z.boolean(), sections: z.array(z.string().max(50)).max(200) })
+        .object({
+          watchedOnly: z.boolean(),
+          enabled: z.boolean(),
+          sections: z.array(z.string().max(50)).max(200),
+          hour: z.number().int().min(0).max(23).default(3),
+        })
         .parse(body.data);
       await setSetting('PLEX_SCAN_WATCHED_ONLY', data.watchedOnly ? '1' : '0');
       await setSetting('PLEX_SCAN_ENABLED', data.enabled ? '1' : '0');
       await setSetting('PLEX_SCAN_SECTIONS', data.sections.join(','));
+      await setSetting('PLEX_SCAN_HOUR', String(data.hour));
+      const [daily] = await query(
+        "SELECT id FROM jobs WHERE dedupe_key='plex-scan-daily' AND status<>'running'",
+      );
+      if (daily) await scheduleNextScan(daily.id);
     } else if (body.action === 'plex-scan') {
+      await requestPlexScan();
+      return Response.json({
+        ok: true,
+        message: 'Plex-Abgleich eingeplant. Das Ergebnis erscheint im Aufgabenprotokoll.',
+      });
+    } else if (body.action === 'plex-scan-preview') {
+      return Response.json({ preview: await processPlexScan({ manual: true, preview: true }) });
+    } else if (body.action === 'bucketlist-preference') {
+      const id = z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .parse(body.id);
+      const preference = z.enum(['auto', 'include', 'exclude']).parse(body.preference);
       await query(
-        `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{"manual":true}'::jsonb,now())
-         ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL,payload='{"manual":true}'::jsonb`,
+        `UPDATE media SET bucket_preference=$2,origins=CASE WHEN $2='include' THEN ARRAY(SELECT DISTINCT unnest(origins||ARRAY['manual'])) ELSE origins END WHERE id=$1`,
+        [id, preference],
       );
     } else if (body.action === 'bucketlist-add') {
       const data = z
@@ -270,7 +324,7 @@ export async function POST(req: Request) {
       if (existing.length) {
         id = existing[0].id;
         await query(
-          `UPDATE media SET bucketlist=true,manual_entry=true WHERE id=$1 AND NOT EXISTS(SELECT 1 FROM watches WHERE media_id=$1)`,
+          `UPDATE media SET bucket_preference='include',manual_entry=true,origins=ARRAY(SELECT DISTINCT unnest(origins||ARRAY['manual'])) WHERE id=$1`,
           [id],
         );
       } else {
@@ -305,12 +359,23 @@ export async function POST(req: Request) {
         if (details && details.voteCount > 0)
           await saveProviderRating(id, 'tmdb', details.voteAverage, details.url, details.voteCount);
       }
+      await query(
+        "UPDATE media SET origins=ARRAY(SELECT DISTINCT unnest(origins||ARRAY['manual'])) WHERE id=$1",
+        [id],
+      );
       return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     return Response.json(
-      { error: e instanceof z.ZodError ? 'Bitte Eingaben prüfen.' : 'Speichern fehlgeschlagen.' },
+      {
+        error:
+          e instanceof z.ZodError
+            ? 'Bitte Eingaben prüfen.'
+            : requestedAction === 'plex-scan-preview'
+              ? `Plex-Vorschau abgebrochen: ${String(redact((e as Error).message))}`
+              : 'Speichern fehlgeschlagen.',
+      },
       { status: 400 },
     );
   }

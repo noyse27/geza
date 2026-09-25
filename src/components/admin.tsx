@@ -18,6 +18,7 @@ type ImportReport = {
   ratings: number;
   reviews: number;
   providerCollisions?: unknown[];
+  plexFollowup?: string;
 };
 const fields = [
   ['TMDB_TOKEN', 'TMDB Read Access Token'],
@@ -37,8 +38,20 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
     [importReport, setImportReport] = useState<ImportReport | null>(null),
     [shown, setShown] = useState<Record<string, boolean>>({}),
     [formValues, setFormValues] = useState<Record<string, string>>(values),
-    [watchedOnly, setWatchedOnly] = useState(values.PLEX_SCAN_WATCHED_ONLY === '1'),
-    [scanEnabled, setScanEnabled] = useState(values.PLEX_SCAN_ENABLED === '1'),
+    [watchedOnly, setWatchedOnly] = useState(values.PLEX_SCAN_WATCHED_ONLY !== '0'),
+    [scanEnabled, setScanEnabled] = useState(values.PLEX_SCAN_ENABLED !== '0'),
+    [scanHour, setScanHour] = useState(Number(values.PLEX_SCAN_HOUR || '3')),
+    [scanPreview, setScanPreview] = useState<{
+      changed: number;
+      changes: {
+        id: string;
+        title: string;
+        kind: string;
+        before: string;
+        after: string;
+        assignment_reason: string;
+      }[];
+    } | null>(null),
     [scanSections, setScanSections] = useState<string[]>(
       (values.PLEX_SCAN_SECTIONS || '').split(',').filter(Boolean),
     ),
@@ -74,7 +87,10 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
       if (!r.ok) throw Error((await r.json()).error);
       const data = await r.json();
       if (data.settings) setFormValues((current) => ({ ...current, ...data.settings }));
-      setMessage('Gespeichert.');
+      if (data.preview) setScanPreview(data.preview);
+      setMessage(
+        data.message || (data.preview ? 'Vorschau berechnet; keine Zuordnung gespeichert.' : 'Gespeichert.'),
+      );
       router.refresh();
     } catch (e) {
       setMessage((e as Error).message);
@@ -86,23 +102,25 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
     setWatchedOnly(next.watchedOnly);
     setScanEnabled(next.enabled);
     setScanSections(next.sections);
-    await action({ action: 'plex-scan-settings', data: next });
+    await action({ action: 'plex-scan-settings', data: { ...next, hour: scanHour } });
   }
-  async function uploadTrakt(form: HTMLFormElement) {
+  async function uploadTrakt(form: HTMLFormElement, preview = false) {
     setImporting(true);
     setImportReport(null);
     setMessage('');
     try {
-      const r = await fetch('/api/import/trakt', { method: 'POST', body: new FormData(form) });
+      const body = new FormData(form);
+      if (preview) body.set('preview', '1');
+      const r = await fetch('/api/import/trakt', { method: 'POST', body });
       const data = await r.json();
       if (!r.ok) throw Error(data.error);
       setImportReport(data.report);
       setMessage(
         data.report?.dryRun
-          ? 'Demo-Vorschau: Diese Datensätze würden verarbeitet. Nichts wurde gespeichert; vorhandene Dubletten wurden nicht abgeglichen.'
+          ? 'Import-Vorschau: Diese Datensätze würden verarbeitet. Nichts wurde gespeichert; vorhandene Dubletten wurden nicht abgeglichen.'
           : 'Trakt-Import abgeschlossen.',
       );
-      form.reset();
+      if (!data.report?.dryRun) form.reset();
       router.refresh();
     } catch (e) {
       setMessage((e as Error).message);
@@ -252,8 +270,20 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
         <h2>{demo ? 'Trakt-Import ausprobieren' : 'Trakt-Export importieren'}</h2>
         <p className="muted">
           Lade die ZIP aus deinem Trakt-Export hoch. Geza entpackt sie, erkennt die passenden JSON-Dateien und
-          importiert Watch-History, Bewertungen, Reviews und Sammlung.
+          importiert Sichtungen, Watchlist, Bewertungen, Reviews und Sammlung.
         </p>
+        <h3>Einordnung nach dem Import</h3>
+        <p>
+          {plexConfigured
+            ? `Anschließend wird Plex abgeglichen. ${watchedOnly ? 'Vorhandene ungesehene Filme und Serien kommen in die Bucketliste; bei begonnenen Serien nur Staffeln ohne gesehene Episode.' : 'Die automatische Aufnahme des Plex-Bestands ist ausgeschaltet.'}`
+            : 'Du kannst jetzt schon importieren. Collection-Titel ohne eigene Aktivität bleiben zunächst in der Rumpelkammer. Sobald Plex verbunden ist, wird der vorhandene Bestand ohne erneuten Import eingeordnet.'}
+        </p>
+        {!plexConfigured && (
+          <label className="checkbox">
+            <input type="checkbox" name="collectionWishes" />
+            Ungesehene Collection-Titel als Wünsche übernehmen (keine bestätigte Verfügbarkeit)
+          </label>
+        )}
         {demo && (
           <p>
             Nur Vorschau (max. 10 MiB ZIP / 20 MiB JSON): Es werden keine importierten Daten gespeichert. Kein
@@ -262,12 +292,32 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
         )}
         <div className="upload-box">
           <input name="file" type="file" accept=".zip,application/zip" required />
+          <button
+            type="button"
+            className="button"
+            disabled={importing || busy}
+            onClick={(e) => {
+              const form = e.currentTarget.form;
+              if (form?.reportValidity()) void uploadTrakt(form, true);
+            }}
+          >
+            Import-Vorschau
+          </button>
           <button className="button primary" disabled={importing || busy}>
             {importing ? 'Import lauft ...' : 'ZIP importieren'}
           </button>
         </div>
         {importReport && (
           <div className="import-report" role="status">
+            {importReport.plexFollowup && (
+              <p>
+                {importReport.plexFollowup === 'queued'
+                  ? 'Import gespeichert. Plex-Abgleich eingeplant.'
+                  : importReport.plexFollowup === 'failed-to-queue'
+                    ? 'Import gespeichert. Plex-Abgleich konnte nicht eingeplant werden; bitte manuell starten.'
+                    : 'Import gespeichert. Plex-Prüfung erfolgt nach Einrichtung.'}
+              </p>
+            )}
             <span>
               Dateien <strong>{importReport.files.toLocaleString('de-DE')}</strong>
             </span>
@@ -307,9 +357,10 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
         <div className="panel">
           <h2>Plex-Bibliotheks-Scan</h2>
           <p className="muted">
-            Durchsucht deine Plex-Bibliothek. Ungesehene Titel ohne eigene Bewertung, Review oder Sichtung
-            landen mit der Option unten automatisch in der Bucketliste, ohne sie in der Rumpelkammer, wo du
-            sie selbst einsortierst. Läuft automatisch nachts um 03:00 Uhr, sofern aktiviert.
+            Prüft den aktuellen Bestand einschließlich Staffeln. Eine vollständig ungesehene Serie erscheint
+            einmal auf der Bucketliste; bei begonnenen Serien nur vorhandene Staffeln ohne gesehene Episode.
+            Sichtungen aus Trakt und Geza zählen mit. Specials (Staffel 0) werden wie andere Staffeln
+            behandelt.
           </p>
           <label className="checkbox">
             <input
@@ -324,8 +375,7 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
                 })
               }
             />
-            Ungesehene Medien zur Bucketliste hinzufügen (gilt für alle durchsuchten Bibliotheken; Titel mit
-            Bewertung, Review oder Sichtung bleiben immer im Katalog).
+            Ungesehenen Plex-Bestand automatisch in die Bucketliste übernehmen
           </label>
           <label className="checkbox">
             <input
@@ -336,11 +386,51 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
                 void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
               }
             />
-            Nächtlichen Scan automatisch ausführen (täglich 03:00 Uhr)
+            Plex-Abgleich täglich automatisch ausführen
+          </label>
+          <label>
+            Uhrzeit (Europe/Berlin)
+            <select
+              value={scanHour}
+              disabled={busy}
+              onChange={(e) => {
+                const hour = Number(e.target.value);
+                setScanHour(hour);
+                void action({
+                  action: 'plex-scan-settings',
+                  data: { watchedOnly, enabled: scanEnabled, sections: scanSections, hour },
+                });
+              }}
+            >
+              {Array.from({ length: 24 }, (_, hour) => (
+                <option key={hour} value={hour}>
+                  {String(hour).padStart(2, '0')}:00 Uhr
+                </option>
+              ))}
+            </select>
           </label>
           {plexSections.length > 0 && (
             <fieldset>
-              <legend>Zu durchsuchende Bibliotheken (leer = alle)</legend>
+              <legend>Bibliotheken für automatische Wünsche</legend>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={!scanSections.length}
+                  disabled={busy}
+                  onChange={(e) =>
+                    void saveScanSettings({
+                      watchedOnly,
+                      enabled: scanEnabled,
+                      sections: e.target.checked ? [] : ['none'],
+                    })
+                  }
+                />
+                Alle Bibliotheken
+              </label>
+              <p className="muted">
+                Die Verfügbarkeit wird immer in allen Bibliotheken geprüft. Die Auswahl begrenzt automatische
+                Wünsche.
+              </p>
               {plexSections.map((s) => (
                 <label key={s.key} className="checkbox">
                   <input
@@ -352,8 +442,10 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
                         watchedOnly,
                         enabled: scanEnabled,
                         sections: e.target.checked
-                          ? [...scanSections, s.key]
-                          : scanSections.filter((k) => k !== s.key),
+                          ? [...scanSections.filter((k) => k !== 'none'), s.key]
+                          : scanSections.filter((k) => k !== s.key).length
+                            ? scanSections.filter((k) => k !== s.key)
+                            : ['none'],
                       })
                     }
                   />
@@ -363,10 +455,37 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
             </fieldset>
           )}
           <div className="button-row">
-            <button className="button primary" disabled={busy} onClick={() => action({ action: 'plex-scan' })}>
+            <button
+              className="button"
+              disabled={busy}
+              onClick={() => action({ action: 'plex-scan-preview' })}
+            >
+              Änderungen vorab prüfen
+            </button>
+            <button
+              className="button primary"
+              disabled={busy}
+              onClick={() => action({ action: 'plex-scan' })}
+            >
               Jetzt scannen
             </button>
           </div>
+          {scanPreview && (
+            <div>
+              <h3>Vorschau: {scanPreview.changed} Änderungen</h3>
+              <p>
+                Bis zu 200 Änderungen werden angezeigt. „Jetzt scannen“ prüft den dann aktuellen Bestand
+                erneut.
+              </p>
+              <ul>
+                {scanPreview.changes.map((c) => (
+                  <li key={c.id}>
+                    {c.title} ({c.kind}): {c.before} → {c.after} · {c.assignment_reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
       {plexConfigured && (

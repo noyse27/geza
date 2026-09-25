@@ -13,9 +13,11 @@ export const settingKeys = [
   'PLEX_SCAN_WATCHED_ONLY',
   'PLEX_SCAN_ENABLED',
   'PLEX_SCAN_SECTIONS',
+  'PLEX_SCAN_HOUR',
 ] as const;
 export async function getSetting(key: string) {
-  if (isDemo()) return key === 'PLEX_URL' ? 'https://plex.example.invalid' : `demo-fantasie-${key.toLowerCase()}`;
+  if (isDemo())
+    return key === 'PLEX_URL' ? 'https://plex.example.invalid' : `demo-fantasie-${key.toLowerCase()}`;
   const rows = await query('SELECT value FROM settings WHERE key=$1', [key]);
   return rows.length ? decrypt(rows[0].value) : process.env[key] || '';
 }

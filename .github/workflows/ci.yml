@@ -60,6 +60,12 @@ jobs:
       - name: Collection regression tests
         run: npm run test:collections
 
+      - name: Rumpelkammer regression tests
+        run: npm run test:rumpel
+
+      - name: Import and Plex classification regression tests
+        run: npm run test:classification
+
       - name: Assignment and deletion regression tests
         run: node --import tsx scripts/assignment-check.ts
 
@@ -80,6 +86,9 @@ jobs:
 
       - name: Transfer HTTP regression tests
         run: npm run test:transfer:http
+
+      - name: Import and Plex HTTP regression tests
+        run: npm run test:classification:http
 
   dependency-and-secret-scan:
     runs-on: ubuntu-latest

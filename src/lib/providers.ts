@@ -5,6 +5,7 @@ import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
 import { normalizeCertification } from './certification';
+import type { PoolClient } from 'pg';
 type Raw = Record<string, any>;
 const fields = [
   'title',
@@ -37,8 +38,11 @@ export function fromPlex(m: Raw): Raw {
     runtime: m.duration ? Math.round(m.duration / 60000) : undefined,
   };
 }
-export async function mergeMetadata(id: string, data: Raw, source = 'plex') {
-  const current = (await query('SELECT * FROM media WHERE id=$1', [id]))[0];
+export async function mergeMetadata(id: string, data: Raw, source = 'plex', client?: PoolClient) {
+  const run = client
+    ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
+    : query;
+  const current = (await run('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!current) return;
   const priority: Record<string, number> = { plex: 3, tvdb: 2, tmdb: 1 };
   const coverPriority: Record<string, number> = { tmdb: 3, tvdb: 2 };
@@ -55,7 +59,7 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex') {
           ((k === 'poster' ? coverPriority : priority)[current.field_sources?.[k]] || 0)),
   );
   if (keys.length)
-    await query(
+    await run(
       `UPDATE media SET ${keys.map((k, i) => `${k}=$${i + 1}`).join(',')},field_sources=field_sources||$${keys.length + 1}::jsonb,updated_at=now() WHERE id=$${keys.length + 2}`,
       [...keys.map((k) => data[k]), JSON.stringify(Object.fromEntries(keys.map((k) => [k, source]))), id],
     );
@@ -157,7 +161,8 @@ export async function fetchTmdbDetails(kind: 'movie' | 'show', tmdbId: number) {
     headers,
   );
   let overview = d.overview;
-  if (!overview) overview = (await json(`https://api.themoviedb.org/3/${path}?language=en-US`, headers)).overview;
+  if (!overview)
+    overview = (await json(`https://api.themoviedb.org/3/${path}?language=en-US`, headers)).overview;
   const de =
     d.release_dates?.results
       ?.find((x: Raw) => x.iso_3166_1 === 'DE')

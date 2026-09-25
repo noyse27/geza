@@ -31,11 +31,26 @@ export async function maintainDemo() {
     await client.query(
       `TRUNCATE ${[...dataTables, 'admin_account', 'settings', 'setup_restore', 'sessions', 'login_attempts', 'event_logs'].join(',')} RESTART IDENTITY`,
     );
+    await client.query("SET LOCAL geza.skip_rumpel='on'");
     for (const table of dataTables) {
       if (archive.tables[table].length)
         await client.query(
           `INSERT INTO "${table}" SELECT * FROM json_populate_recordset(NULL::"${table}",$1::json)`,
-          [JSON.stringify(archive.tables[table])],
+          [
+            JSON.stringify(
+              table === 'media'
+                ? archive.tables.media.map((row) => ({
+                    origins: row.bucketlist ? ['legacy-bucket'] : [],
+                    seen_sources: [],
+                    bucket_preference: 'auto',
+                    plex_watched: null,
+                    plex_automatic: false,
+                    assignment_reason: 'Demo-Bestand',
+                    ...row,
+                  }))
+                : archive.tables[table],
+            ),
+          ],
         );
       const sequences = (
         await client.query(
@@ -50,6 +65,7 @@ export async function maintainDemo() {
             [column.seq],
           );
     }
+    await client.query('SELECT rumpel_refresh(NULL)');
     await client.query('INSERT INTO admin_account VALUES(1,$1,$2)', ['admin', hashPassword('admin')]);
     await client.query(
       "INSERT INTO demo_state VALUES(1,now()+$1*interval '1 minute') ON CONFLICT(id) DO UPDATE SET reset_at=excluded.reset_at",

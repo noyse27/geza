@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { pool, query } from './db';
 import { cardColumns } from './catalog';
 import type { Media } from './types';
+import { requestPlexScan } from './plex-jobs';
 
 // Rumpelkammer: Filme und Serien ohne Aktivität, die nicht auf der Bucketliste stehen (siehe Migration 017).
 // Die Zugehörigkeit (media.rumpel) pflegen Datenbank-Trigger; hier wird sie nur gelesen und ausgewertet.
@@ -15,6 +16,7 @@ export const filterSchema = z.object({
   // Ergebnis des Plex-Abgleichs: in einer Bibliothek, geprüft aber in keiner, oder noch nicht geprüft.
   source: z.enum(['all', 'plex', 'none', 'unchecked']).default('all'),
   library: z.string().trim().max(200).default(''),
+  origin: z.enum(['trakt-collection', 'trakt-watchlist', 'plex', 'unknown']).optional(),
 });
 export type RumpelFilter = z.infer<typeof filterSchema>;
 export const actionSchema = z
@@ -30,10 +32,14 @@ export const actionSchema = z
   .refine((v) => v.action !== 'rate' || v.rating !== undefined, 'Bewertung fehlt.');
 
 function where(filter: RumpelFilter, values: unknown[]) {
-  const conditions = ["m.rumpel", "m.kind IN ('movie','show')"];
+  const conditions = ['m.rumpel', "m.kind IN ('movie','show')"];
+  if (filter.origin === 'unknown') conditions.push('cardinality(m.origins)=0');
+  else if (filter.origin) conditions.push(`$${values.push(filter.origin)}=ANY(m.origins)`);
   if (filter.type !== 'all') conditions.push(`m.kind=$${values.push(filter.type)}`);
-  if (filter.source === 'plex') conditions.push('cardinality(m.plex_libraries)>0');
-  if (filter.source === 'none') conditions.push('m.plex_checked_at IS NOT NULL AND cardinality(m.plex_libraries)=0');
+  if (filter.source === 'plex')
+    conditions.push('m.plex_checked_at IS NOT NULL AND cardinality(m.plex_libraries)>0');
+  if (filter.source === 'none')
+    conditions.push('m.plex_checked_at IS NOT NULL AND cardinality(m.plex_libraries)=0');
   if (filter.source === 'unchecked') conditions.push('m.plex_checked_at IS NULL');
   if (filter.library) conditions.push(`m.plex_libraries @> ARRAY[$${values.push(filter.library)}]::text[]`);
   if (filter.q) {
@@ -50,8 +56,10 @@ export async function listRumpel(filter: RumpelFilter, page: number) {
     `SELECT count(*)::int AS total FROM media m WHERE ${clause}`,
     values,
   );
-  const rows = await query<Media & { children: number; plex_libraries: string[]; plex_checked_at: string | null }>(
-    `SELECT ${cardColumns},m.directors,m.summary,m.ids,m.plex_libraries,m.plex_checked_at,
+  const rows = await query<
+    Media & { children: number; plex_libraries: string[]; plex_checked_at: string | null }
+  >(
+    `SELECT ${cardColumns},m.directors,m.summary,m.ids,m.plex_libraries,m.plex_checked_at,m.assignment_reason,m.origins,
        (SELECT count(*)::int FROM media c WHERE c.parent_id=m.id OR c.parent_id IN (SELECT s.id FROM media s WHERE s.parent_id=m.id)) AS children
      FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE ${clause}
      ORDER BY lower(m.title),m.id LIMIT ${PAGE_SIZE} OFFSET ${Math.max(0, page) * PAGE_SIZE}`,
@@ -62,25 +70,25 @@ export async function listRumpel(filter: RumpelFilter, page: number) {
 
 export async function plexPresenceState() {
   const [libraries, [state], [job]] = await Promise.all([
-    query<{ name: string }>(`SELECT DISTINCT unnest(plex_libraries) AS name FROM media WHERE rumpel ORDER BY 1`),
+    query<{ name: string }>(
+      `SELECT DISTINCT unnest(plex_libraries) AS name FROM media WHERE rumpel ORDER BY 1`,
+    ),
     query<{ checked: string | null }>('SELECT max(plex_checked_at) AS checked FROM media WHERE rumpel'),
-    query<{ status: string; payload: { manual?: boolean } }>(
-      "SELECT status,payload FROM jobs WHERE dedupe_key='plex-presence-daily'",
+    query<{ status: string; error: string | null; payload: { manual?: boolean } }>(
+      "SELECT status,payload,error FROM jobs WHERE kind='plex-scan' ORDER BY (status='running') DESC,(status='pending' AND payload->>'manual'='true') DESC,updated_at DESC LIMIT 1",
     ),
   ]);
   return {
     libraries: libraries.map((l) => l.name),
     checkedAt: state?.checked ?? null,
-    running: !!job && ['pending', 'running'].includes(job.status) && job.payload?.manual === true,
-    failed: job?.status === 'failed',
+    running:
+      !!job && (job.status === 'running' || (job.status === 'pending' && job.payload?.manual === true)),
+    failed: job?.status === 'failed' || !!job?.error,
   };
 }
 
 export async function requestPlexCheck() {
-  await query(
-    `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-presence','plex-presence-daily','{"manual":true}'::jsonb,now())
-     ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL,payload='{"manual":true}'::jsonb`,
-  );
+  await requestPlexScan();
 }
 
 export async function rumpelCounts() {
@@ -104,7 +112,10 @@ async function selectIds(client: PoolClient, input: z.infer<typeof actionSchema>
   const values: unknown[] = [];
   const clause = where(input.filter!, values);
   const found = (
-    await client.query<{ id: string }>(`SELECT m.id FROM media m WHERE ${clause} ORDER BY m.id FOR UPDATE OF m`, values)
+    await client.query<{ id: string }>(
+      `SELECT m.id FROM media m WHERE ${clause} ORDER BY m.id FOR UPDATE OF m`,
+      values,
+    )
   ).rows.map((r) => r.id);
   if (found.length !== input.expectedCount)
     throw new RumpelError('Die Auswahl hat sich geändert. Bitte die Seite neu laden und erneut auswählen.');
@@ -126,9 +137,10 @@ export async function runRumpelAction(raw: unknown) {
     }
     if (input.action === 'bucketlist') {
       // bucketlist_pinned schützt den Eintrag vor dem Plex-Scan; der Trigger nimmt ihn aus der Rumpelkammer.
-      await client.query('UPDATE media SET bucketlist=true,bucketlist_pinned=true WHERE id=ANY($1::bigint[])', [
-        ids,
-      ]);
+      await client.query(
+        'UPDATE media SET bucketlist=true,bucketlist_pinned=true WHERE id=ANY($1::bigint[])',
+        [ids],
+      );
     } else if (input.action === 'rate') {
       await client.query(
         `INSERT INTO ratings(media_id,rating,rated_at,source) SELECT id,$2,now(),'geza' FROM unnest($1::bigint[]) id

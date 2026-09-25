@@ -68,7 +68,7 @@ export async function getBucketlist() {
       `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='movie' ORDER BY m.manual_entry DESC,m.title,m.id`,
     ),
     query<Media>(
-      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind='show' ORDER BY m.manual_entry DESC,m.title,m.id`,
+      `SELECT ${cardColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.bucketlist AND m.kind IN ('show','season') ORDER BY m.manual_entry DESC,COALESCE(p.title,m.title),m.season,m.id`,
     ),
   ]);
   return { movies, shows };
@@ -78,7 +78,7 @@ export async function getMedia(id: string, admin = false) {
   return (
     (
       await query<Media>(
-        `SELECT ${publicColumns},m.locked_fields,fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1 AND ($2 OR NOT m.rumpel)`,
+        `SELECT ${publicColumns},m.locked_fields,${admin ? 'm.assignment_reason,m.origins,m.bucket_preference,' : ''}fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1 AND ($2 OR NOT m.rumpel)`,
         [id, admin],
       )
     )[0] || null
@@ -89,9 +89,10 @@ export async function listFilmSeries() {
 }
 export async function getFilmSeries(id: string) {
   if (!/^\d+$/.test(id)) return null;
-  const [series] = await query<{ id: string; title: string }>('SELECT id,title FROM film_series WHERE id=$1', [
-    id,
-  ]);
+  const [series] = await query<{ id: string; title: string }>(
+    'SELECT id,title FROM film_series WHERE id=$1',
+    [id],
+  );
   if (!series) return null;
   const items = await query<Media>(
     `SELECT ${cardColumns} FROM film_series_members fsm JOIN media m ON m.id=fsm.media_id LEFT JOIN media p ON p.id=m.parent_id WHERE fsm.series_id=$1 ORDER BY fsm.position`,
@@ -108,7 +109,7 @@ export async function history(params: URLSearchParams, admin = false, limit = 50
   const filters = ['w.watched_at IS NOT NULL'];
   if (!admin)
     filters.push(
-      "(r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public))",
+      '(r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public))',
     );
   if (params.get('type') === 'movie') filters.push("m.kind='movie'");
   if (params.get('type') === 'show') filters.push("m.kind='episode'");
@@ -145,6 +146,6 @@ export async function history(params: URLSearchParams, admin = false, limit = 50
 }
 export async function months(type: string, admin = false, reviewsOnly = false) {
   return query(
-    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id LEFT JOIN ratings r ON r.media_id=m.id WHERE w.watched_at IS NOT NULL ${admin ? '' : "AND (r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public)) "}${admin && reviewsOnly ? 'AND EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id) ' : ''}${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
+    `SELECT to_char(w.watched_at AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS month,count(*)::integer AS count FROM watches w JOIN media m ON m.id=w.media_id LEFT JOIN ratings r ON r.media_id=m.id WHERE w.watched_at IS NOT NULL ${admin ? '' : 'AND (r.rating IS NOT NULL OR EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id AND rv.is_public)) '}${admin && reviewsOnly ? 'AND EXISTS(SELECT 1 FROM reviews rv WHERE rv.media_id=m.id) ' : ''}${type === 'movie' ? "AND m.kind='movie'" : type === 'show' ? "AND m.kind='episode'" : ''} GROUP BY 1 ORDER BY 1 DESC`,
   );
 }

@@ -6,7 +6,9 @@ import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { processPlexScan } from '../src/lib/plex-scan';
-import { processPlexPresence, PRESENCE_SEED_SQL } from '../src/lib/plex-presence';
+import { processPlexPresence } from '../src/lib/plex-presence';
+import { nextPlexRun, scheduleNextScan } from '../src/lib/plex-jobs';
+import { getSetting } from '../src/lib/settings';
 import { installationReady } from '../src/lib/setup';
 let running = true;
 process.on('SIGTERM', () => {
@@ -47,10 +49,11 @@ while (running) {
       // Seeded here instead of a migration so fresh installs keep an empty jobs table (required by demo setup).
       await query(
         `INSERT INTO jobs(kind,dedupe_key,payload,available_at) VALUES('plex-scan','plex-scan-daily','{}',
-          ((date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day' + interval '3 hours') AT TIME ZONE 'Europe/Berlin'))
-         ON CONFLICT(dedupe_key) DO NOTHING`,
+          ${nextPlexRun(Number((await getSetting('PLEX_SCAN_HOUR')) || '3'))})
+         ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',payload='{}',attempts=0
+         WHERE jobs.status IN ('done','failed')`,
       );
-      await query(`${PRESENCE_SEED_SQL} ON CONFLICT(dedupe_key) DO NOTHING`);
+      await query("DELETE FROM jobs WHERE dedupe_key='plex-presence-daily' AND status<>'running'");
       plexScanSeeded = true;
     }
     await query(
@@ -64,47 +67,61 @@ while (running) {
       continue;
     }
     const job = jobs[0];
-    await logContext.run(
-      {
-        jobId: job.id,
-        requestId: job.payload.requestId,
-        mediaId: job.payload.mediaId,
-        event: job.payload.event,
-        title: job.payload.metadata?.title,
-        attempt: job.attempts,
-      },
-      async () => {
-        await logEvent('info', job.kind, 'Verarbeitung gestartet');
-        try {
-          if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
-          else if (job.kind === 'plex') await processPlex(job.payload);
-          else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
-          else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
-          else if (job.kind === 'plex-presence') await processPlexPresence(job.payload);
-          else throw Error('Unbekannter Aufgabentyp');
-          await query("UPDATE jobs SET status='done',updated_at=now(),error=NULL WHERE id=$1", [job.id]);
-          await logEvent('info', job.kind, 'Verarbeitung erfolgreich abgeschlossen');
-        } catch (e) {
-          await logEvent(
-            'error',
-            job.kind,
-            job.attempts >= 3
-              ? 'Verarbeitung endgï¿½ltig fehlgeschlagen'
-              : 'Verarbeitung fehlgeschlagen; erneuter Versuch geplant',
-            { error: e, retryInSeconds: job.attempts >= 3 ? null : Math.min(300, job.attempts * 30) },
-          );
-          await query(
-            "UPDATE jobs SET status=$1,available_at=now()+($2*interval '1 second'),updated_at=now(),error=$3 WHERE id=$4",
-            [
-              job.attempts >= 3 ? 'failed' : 'pending',
-              Math.min(300, job.attempts * 30),
-              String(redact((e as Error).message)).slice(0, 300),
-              job.id,
-            ],
-          );
-        }
-      },
-    );
+    const daily = job.dedupe_key === 'plex-scan-daily';
+    const heartbeat = setInterval(() => {
+      void query("UPDATE jobs SET updated_at=now() WHERE id=$1 AND status='running'", [job.id]).catch(
+        () => {},
+      );
+    }, 30000);
+    try {
+      await logContext.run(
+        {
+          jobId: job.id,
+          requestId: job.payload.requestId,
+          mediaId: job.payload.mediaId,
+          event: job.payload.event,
+          title: job.payload.metadata?.title,
+          attempt: job.attempts,
+        },
+        async () => {
+          await logEvent('info', job.kind, 'Verarbeitung gestartet');
+          try {
+            if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
+            else if (job.kind === 'plex') await processPlex(job.payload);
+            else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
+            else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
+            else if (job.kind === 'plex-presence') await processPlexPresence(job.payload);
+            else throw Error('Unbekannter Aufgabentyp');
+            if (daily) await scheduleNextScan(job.id);
+            else
+              await query("UPDATE jobs SET status='done',updated_at=now(),error=NULL WHERE id=$1", [job.id]);
+            await logEvent('info', job.kind, 'Verarbeitung erfolgreich abgeschlossen');
+          } catch (e) {
+            await logEvent(
+              'error',
+              job.kind,
+              job.attempts >= 3
+                ? 'Verarbeitung endgï¿½ltig fehlgeschlagen'
+                : 'Verarbeitung fehlgeschlagen; erneuter Versuch geplant',
+              { error: e, retryInSeconds: job.attempts >= 3 ? null : Math.min(300, job.attempts * 30) },
+            );
+            await query(
+              "UPDATE jobs SET status=$1,available_at=now()+($2*interval '1 second'),updated_at=now(),error=$3 WHERE id=$4",
+              [
+                job.attempts >= 3 ? 'failed' : 'pending',
+                Math.min(300, job.attempts * 30),
+                String(redact((e as Error).message)).slice(0, 300),
+                job.id,
+              ],
+            );
+            if (daily && job.attempts >= 3)
+              await scheduleNextScan(job.id, String(redact((e as Error).message)).slice(0, 300));
+          }
+        },
+      );
+    } finally {
+      clearInterval(heartbeat);
+    }
     await new Promise((r) => setTimeout(r, 250));
   } catch (error) {
     await logEvent('error', 'worker', 'Hintergrundprozess gestï¿½rt; neuer Versuch in 5 Sekunden', { error });

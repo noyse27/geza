@@ -26,5 +26,8 @@ export type Media = {
   watch_id?: string;
   updated_at: string;
   locked_fields: string[];
+  assignment_reason?: string;
+  origins?: string[];
+  bucket_preference?: string;
 };
 export type SearchResult = { items: Media[]; hasMore: boolean; elapsed: number };
