@@ -10,7 +10,7 @@ const name = `geza_test_http_${Date.now()}`;
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = '/' + name;
 let app: ChildProcess | undefined;
-let target: pg.Pool | undefined;
+let target: pg.Client | undefined;
 let appPool: pg.Pool | undefined;
 let output = '';
 const base = 'http://127.0.0.1:32119';
@@ -38,9 +38,12 @@ const plex = createServer((req, res) => {
 });
 try {
   await source.query(`CREATE DATABASE ${name}`);
-  target = new pg.Pool({ connectionString: url.toString() });
+  target = new pg.Client({ connectionString: url.toString() });
+  await target.connect();
   for (const file of (await readdir('migrations')).filter((f) => f.endsWith('.sql')).sort())
     await target.query(await readFile('migrations/' + file, 'utf8'));
+  await target.end();
+  target = undefined;
   process.env.DATABASE_URL = url.toString();
   process.env.SESSION_SECRET = 'classification-http-test-secret-long-enough';
   const { pool, query } = await import('../src/lib/db');
@@ -271,14 +274,18 @@ try {
   console.error(output);
   throw error;
 } finally {
-  if (app?.pid && app.exitCode === null) {
+  if (app?.pid && app.exitCode === null && app.signalCode === null) {
+    const exited = new Promise<void>((resolve) => app!.once('exit', () => resolve()));
+    const forceExit = setTimeout(() => app?.kill('SIGKILL'), 10000);
     if (process.platform === 'win32')
       spawnSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
     else app.kill('SIGTERM');
+    await exited;
+    clearTimeout(forceExit);
   }
   plex.close();
   await appPool?.end();
   await target?.end();
-  await source.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await source.query(`DROP DATABASE IF EXISTS ${name}`);
   await source.end();
 }
