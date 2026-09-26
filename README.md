@@ -81,6 +81,16 @@ Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbiet
 
 Eine **Karenzzeit** (Admin → Verbindungen → Feed-Karenzzeit, Standard 30 Minuten, 0 = sofort) fasst Änderungen zusammen: Wer eine Bewertung mehrfach ändert, erzeugt erst nach Ablauf der Karenz einen einzigen Eintrag mit dem letzten Stand; kehrt sie zum veröffentlichten Wert zurück, erscheint nichts. Änderungen an bereits veröffentlichten Titeln erscheinen als „Aktualisiert: …“ (bei Bewertungen mit „vorher n/10“). Die Feed-Tabelle `feed_entries` gehört nicht zum Serverumzug; nach einer Wiederherstellung beginnt der Feed leer.
 
+## Friends of Geza
+
+Befreundete Geza-Instanzen zeigen sich gegenseitig, ob sie zu einem Titel eine Bewertung oder ein Review haben. Auf der Detailseite erscheint ein Kästchen „Bei befreundeten Instanzen“ mit dem Nickname der Instanz (Link zu deren Datensatz), der Zehnerbewertung und – falls vorhanden – dem Hinweis „Review vorhanden“. Der Review-Text wird nie übertragen; Entwürfe, Bucketlisten- und Rumpel-Titel werden nicht beantwortet.
+
+- **Verbinden:** Admin → Friends of Geza → Adresse der anderen Instanz eintragen und „Freundschaft beantragen“. Bei der anderen Instanz erscheint ein Hinweis am Admin-Link und eine Anfrage, die angenommen oder abgelehnt wird. Beim Annehmen überträgt die Instanz ihren Nickname und ein zufälliges gemeinsames Geheimnis; danach fragen sich beide Seiten mit diesem Geheimnis ab. „Beenden“ löst die Freundschaft bei beiden Seiten.
+- **Nickname:** Admin → Verbindungen → Instanz-Nickname; bei der Ersteinrichtung optional abgefragt. Ohne Angabe gilt die Domain aus `PUBLIC_URL`.
+- **Voraussetzungen:** `PUBLIC_URL` muss gesetzt sein; im Demomodus ist die Funktion abgeschaltet. Zuordnung über Medientyp plus TMDB- oder IMDb-ID (Filme und Serien, nicht Staffeln oder Episoden).
+- **Sicherheit:** Anfragen anderer Instanzen werden erst nach einem Rückruf an die angegebene Adresse angenommen (kein Fälschen fremder Adressen). Ausgehende Verbindungen laufen nur über HTTPS, weisen private, lokale und Link-Local-Adressen auch beim Verbindungsaufbau ab, folgen keinen Weiterleitungen und sind auf 2–3 Sekunden und 64 KB begrenzt. Antworten werden 6 Stunden zwischengespeichert (Fehler 15 Minuten); eine langsame oder ausgefallene Freund-Instanz verzögert die Seite höchstens um zwei Sekunden. Für Heimnetz- oder Testbetrieb erlaubt `FEDERATION_ALLOW_PRIVATE=1` HTTP und private Adressen.
+- **Umzug:** Freundschaften (`friend_instances`) gehören nicht zum Serverumzug, weil ihre Geheimnisse an das `SESSION_SECRET` der Installation gebunden sind; nach einer Wiederherstellung neu verbinden.
+
 ## Rumpelkammer
 
 Die gemeinsame Einordnung trennt Herkunft, Sichtungsbelege, ausdrückliche Wünsche und aktuelle Plex-Verfügbarkeit. Ohne Aktivität oder Wunsch bleibt ein Titel in der **Rumpelkammer**. Sichtungen, Bewertungen, Reviews, manuelle Friend-Reviews und Filmreihen begründen das **Archiv**; ungesehene Wünsche erscheinen auf der **Bucketliste**. Eine Serie kann im Archiv stehen und ihre ungesehene nächste Staffel auf der Bucketliste. Datenbank-Trigger berechnen die Zuordnung auch nach Sichtungskorrekturen neu. Rumpel-Titel sind öffentlich nicht erreichbar; als Admin bleiben sie bearbeitbar.
@@ -277,6 +287,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ### Unveröffentlicht
 
+- Neu: **Friends of Geza** – befreundete Instanzen zeigen Bewertung und „Review vorhanden“ zu einem Titel samt Link; Freundschaftsanfragen im Admin, Instanz-Nickname (Einstellung und optional bei der Ersteinrichtung). Migration 023.
 - Neuer öffentlicher **RSS-Feed** (`/feed.xml`, Tab „ABO“) für neue Bewertungen und Reviews mit einstellbarer Karenzzeit gegen Wankelmut; Änderungen erscheinen als „Aktualisiert“. Migration 022.
 - Neue **Rumpelkammer** (Admin → Rumpelkammer): Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag – bislang meist Plex-Bibliothekseinträge aus dem Trakt-Collection-Export – erscheinen nur noch dort und lassen sich einzeln oder gesammelt bearbeiten, bewerten, in die Bucketliste verschieben oder löschen. Gelöschte Titel merkt sich Geza (`rumpel_deleted`, Teil des Serverumzugs), damit Trakt-Import und Plex-Scan sie nicht erneut anlegen.
 - Bucketliste und Rumpelkammer schließen sich per Datenbank-Constraint aus; aus der Rumpelkammer verschobene Titel sind vor dem Plex-Scan geschützt.

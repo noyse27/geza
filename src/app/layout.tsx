@@ -9,6 +9,7 @@ import '@fontsource/syne/700.css';
 import '@fontsource/syne/800.css';
 import './globals.css';
 import { isAdmin } from '@/lib/auth';
+import { pendingFriendCount } from '@/lib/federation';
 import { Navigation, Logout, RestoreScroll } from '@/components/navigation';
 import { ScrollTop } from '@/components/scroll-top';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const admin = await isAdmin();
   const year = new Date().getFullYear();
+  const pendingFriends = admin ? await pendingFriendCount() : 0;
   return (
     <html lang="de" data-scroll-behavior="smooth">
       <body>
@@ -34,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               geza<span className="brand-dot">.</span>
             </span>
           </Link>
-          <Navigation admin={admin} feed={!isDemo() && !!process.env.PUBLIC_URL} />
+          <Navigation admin={admin} pending={pendingFriends} feed={!isDemo() && !!process.env.PUBLIC_URL} />
           <div className="account">
             {admin ? (
               <>

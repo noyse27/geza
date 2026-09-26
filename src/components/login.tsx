@@ -23,6 +23,7 @@ export function LoginForm({ setupRequired = false }: { setupRequired?: boolean }
               username: data.get('username'),
               password: data.get('password'),
               passwordConfirm: data.get('passwordConfirm'),
+              nickname: data.get('nickname'),
             }),
           });
           const result = await r.json();
@@ -52,10 +53,25 @@ export function LoginForm({ setupRequired = false }: { setupRequired?: boolean }
         />
       </label>
       {setupRequired && (
-        <label>
-          Passwort wiederholen
-          <input name="passwordConfirm" type="password" autoComplete="new-password" minLength={12} required />
-        </label>
+        <>
+          <label>
+            Passwort wiederholen
+            <input
+              name="passwordConfirm"
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              required
+            />
+          </label>
+          <label>
+            Instanz-Nickname (optional)
+            <input name="nickname" maxLength={60} autoComplete="off" />
+            <span className="muted small">
+              So erscheint diese Instanz bei befreundeten Geza-Instanzen. Ohne Angabe gilt die Domain.
+            </span>
+          </label>
+        </>
       )}
       {error && (
         <p className="error" role="alert">

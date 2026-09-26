@@ -3,7 +3,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { LogOut, ArrowLeft, Rss } from 'lucide-react';
-export function Navigation({ admin, feed = false }: { admin: boolean; feed?: boolean }) {
+export function Navigation({
+  admin,
+  feed = false,
+  pending = 0,
+}: {
+  admin: boolean;
+  feed?: boolean;
+  pending?: number;
+}) {
   const path = usePathname();
   const links = admin
     ? [
@@ -33,6 +41,11 @@ export function Navigation({ admin, feed = false }: { admin: boolean; feed?: boo
           }
         >
           {label}
+          {url === '/admin' && pending > 0 && (
+            <span className="nav-badge" title="Offene Freundschaftsanfragen">
+              {pending}
+            </span>
+          )}
         </Link>
       ))}
       {!admin && feed && (

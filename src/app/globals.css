@@ -2070,6 +2070,17 @@ footer > a:nth-of-type(2) {
 .friend-reviews {
   margin-top: 3rem;
 }
+.nav-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--dark);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
 .friend-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));

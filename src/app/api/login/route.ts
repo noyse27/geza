@@ -4,6 +4,8 @@ import { hashPassword, verifyPassword, safeNext } from '@/lib/security';
 import { z } from 'zod';
 import { cookies } from 'next/headers';
 import { createInitialAdmin } from '@/lib/setup';
+import { setSetting } from '@/lib/settings';
+import { cleanNickname } from '@/lib/federation';
 const dummy = hashPassword('not-a-real-password');
 export async function POST(req: Request) {
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
@@ -17,6 +19,7 @@ export async function POST(req: Request) {
         username: z.string().trim().min(3).max(100),
         password: z.string().min(12).max(512),
         passwordConfirm: z.string().min(12).max(512),
+        nickname: z.string().trim().max(60).nullish(),
       })
       .safeParse(body);
     if (!data.success) return Response.json({ error: 'Bitte Eingaben prüfen.' }, { status: 400 });
@@ -31,6 +34,8 @@ export async function POST(req: Request) {
     } catch (error) {
       return Response.json({ error: (error as Error).message }, { status: 409 });
     }
+    const nickname = cleanNickname(data.data.nickname);
+    if (nickname) await setSetting('INSTANCE_NICKNAME', nickname).catch(() => undefined);
     await createSession();
     return Response.json({ next: '/admin' });
   }

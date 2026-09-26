@@ -22,7 +22,12 @@ export async function proxy(request: NextRequest) {
     return response;
   };
   const path = request.nextUrl.pathname;
-  if (isDemo() && (path.startsWith('/api/plex/') || path.startsWith('/api/admin/now-playing/cover')))
+  if (
+    isDemo() &&
+    (path.startsWith('/api/plex/') ||
+      path.startsWith('/api/federation/') ||
+      path.startsWith('/api/admin/now-playing/cover'))
+  )
     return demoBlocked();
   if (path === '/login' || path === '/api/login' || path === '/api/setup/transfer' || path === '/api/health')
     return next();

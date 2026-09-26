@@ -12,6 +12,8 @@ import { MediaEditor, ReviewEditor, RatingEditor, WatchEditor, WatchCreator } fr
 import { ReviewBody } from '@/components/review-body';
 import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
+import { FriendInstances } from '@/components/friend-instances';
+import { friendRatings } from '@/lib/federation';
 import { BucketPreference } from './bucket-preference';
 import { originLabel } from '@/lib/media-origin';
 import { seasonNavigation } from '@/lib/seasons';
@@ -43,6 +45,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
   ]);
 
   const friends = await configuredFriendReviews(id, m);
+  const friendInstances = await friendRatings(m);
   const reviews = await query(
     `SELECT id,body,spoiler,is_public,parent_source_id,created_at FROM reviews WHERE media_id=$1 ${admin ? '' : 'AND is_public'} ORDER BY created_at DESC`,
     [id],
@@ -320,6 +323,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
                 : 'Zu diesem Titel gibt es noch kein öffentliches Review.'}
             </div>
           )}
+          <FriendInstances rows={friendInstances} />
           <FriendReviews
             mediaId={id}
             rows={JSON.parse(JSON.stringify(friends))}
