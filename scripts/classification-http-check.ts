@@ -105,6 +105,59 @@ try {
   const [season] = await query("SELECT id FROM media WHERE kind='season' AND season=2");
   const detail = await (await fetch(base + '/title/' + season.id, { headers: { Cookie: cookie } })).text();
   assert.ok(detail.includes('Automatisch einordnen'));
+  const [show] = await query("SELECT id FROM media WHERE kind='show'");
+  const [episode] = await query("SELECT id FROM media WHERE kind='episode' AND season=2");
+  const page = async (id: string) =>
+    (await fetch(base + '/title/' + id, { headers: { Cookie: cookie } })).text();
+  await query('UPDATE media SET poster=$2 WHERE id=$1', [show.id, '/show-cover.svg']);
+  assert.ok((await page(show.id)).includes('Gesamte Serie'));
+  assert.match(await page(episode.id), new RegExp(`href="/title/${season.id}">Staffel (?:<!-- -->)?2</a>`));
+  const seasonPage = await page(season.id);
+  assert.ok(seasonPage.includes('HTTP Serie – Staffel 2'));
+  assert.ok(seasonPage.includes('/show-cover.svg'));
+  assert.ok(seasonPage.includes('Folge 2'));
+  assert.ok(!seasonPage.includes('Folge 1'));
+  await query('UPDATE media SET poster=$2 WHERE id=$1', [season.id, '/season-cover.svg']);
+  assert.ok((await page(season.id)).includes('/season-cover.svg'));
+  for (const body of [
+    { action: 'rating', id: season.id, rating: 8 },
+    {
+      action: 'review',
+      mediaId: season.id,
+      data: { body: 'Nur diese Staffel', spoiler: false, is_public: true },
+    },
+  ])
+    assert.equal(
+      (await fetch(base + '/api/admin', { method: 'POST', headers, body: JSON.stringify(body) })).status,
+      200,
+    );
+  assert.ok((await page(season.id)).includes('Nur diese Staffel'));
+  assert.ok(!(await page(show.id)).includes('Nur diese Staffel'));
+  assert.ok(!(await page(episode.id)).includes('Nur diese Staffel'));
+  assert.deepEqual(await query('SELECT media_id,rating FROM ratings'), [{ media_id: season.id, rating: 8 }]);
+  // Imported history can have only episodes: derive stable records, including specials.
+  await query(
+    "INSERT INTO media(kind,title,parent_id,season,episode) VALUES('episode','Special', $1,0,1),('episode','Zehnte Staffel',$1,10,1)",
+    [show.id],
+  );
+  await query('SELECT ensure_known_seasons($1)', [show.id]);
+  await query('SELECT ensure_known_seasons($1)', [show.id]);
+  assert.deepEqual(
+    (
+      await query("SELECT season FROM media WHERE kind='season' AND parent_id=$1 ORDER BY season", [show.id])
+    ).map((r) => r.season),
+    [0, 1, 2, 10],
+  );
+  const [special] = await query("SELECT id FROM media WHERE kind='season' AND season=0 AND parent_id=$1", [
+    show.id,
+  ]);
+  await query("UPDATE media SET parent_id=$1,season=NULL WHERE title='Special'", [special.id]);
+  assert.ok((await page(special.id)).includes('Special'));
+  const [specialEpisode] = await query("SELECT id FROM media WHERE title='Special'");
+  assert.match(
+    await page(specialEpisode.id),
+    new RegExp(`href="/title/${special.id}">Staffel (?:<!-- -->)?0</a>`),
+  );
   const excluded = await fetch(base + '/api/admin', {
     method: 'POST',
     headers,
@@ -116,6 +169,20 @@ try {
   zip.addFile(
     'watchlist.json',
     Buffer.from(JSON.stringify([{ movie: { title: 'HTTP Wunsch', ids: { trakt: 991100 } } }])),
+  );
+  zip.addFile(
+    'watched-history-episodes.json',
+    Buffer.from(
+      JSON.stringify([
+        {
+          id: 991201,
+          type: 'episode',
+          watched_at: '2026-09-01T20:00:00Z',
+          show: { title: 'Nur Trakt', ids: { trakt: 991202 } },
+          episode: { title: 'Importierte Folge', season: 3, number: 1, ids: { trakt: 991203 } },
+        },
+      ]),
+    ),
   );
   const form = new FormData();
   form.set('file', new File([new Uint8Array(zip.toBuffer())], 'trakt.zip'));
@@ -137,6 +204,11 @@ try {
   assert.equal(imported.status, 200);
   assert.equal((await imported.json()).report.plexFollowup, 'queued');
   assert.equal((await query('SELECT bucketlist FROM media WHERE trakt_id=991100'))[0].bucketlist, true);
+  const [traktSeason] = await query(
+    "SELECT s.id FROM media s JOIN media p ON p.id=s.parent_id WHERE p.trakt_id=991202 AND s.kind='season' AND s.season=3",
+  );
+  assert.ok(traktSeason);
+  assert.ok((await page(traktSeason.id)).includes('Importierte Folge'));
   console.log(
     'HTTP checks passed: authenticated admin, preview rollback, season bucketlist, manual exclusion, ZIP preview/import and Plex follow-up.',
   );

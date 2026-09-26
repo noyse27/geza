@@ -252,6 +252,7 @@ export async function importTrakt(
         "SELECT kind,ids->>'plex' AS plex,count(*)::int AS count FROM media WHERE ids ? 'plex' GROUP BY kind,ids->>'plex' HAVING count(*)>1",
       )
     ).rows;
+    await client.query('SELECT ensure_known_seasons()');
     await client.query('SELECT rumpel_refresh(NULL)');
     const rumpel = (
       await client.query("SELECT count(*)::int AS n FROM media WHERE rumpel AND kind IN ('movie','show')")

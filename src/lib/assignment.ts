@@ -19,5 +19,6 @@ export async function correctAssignment(input: unknown) {
      RETURNING m.id`,
     [data.id, data.parentId, data.season, data.episode],
   );
+  if (rows.length) await query('SELECT ensure_known_seasons($1)', [data.parentId]);
   return rows.length > 0;
 }

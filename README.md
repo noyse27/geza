@@ -8,6 +8,8 @@ Film- und Serienportal mit öffentlichen Bewertungen und Reviews sowie einem pri
 
 **Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
+Auf Serien- und Staffelseiten wechselt die Auswahl unter dem Cover zwischen der gesamten Serie und ihren bekannten Staffeln. Der Staffellink einer Episode öffnet direkt die zugehörige Staffel. Jede Staffel hat eigene Bewertungen und Reviews sowie darunter ihre Episodenliste. Fehlt ein Staffelcover, erscheint das Seriencover. Migration 020 ergänzt fehlende Staffeldatensätze aus vorhandenen Episoden; neue Trakt-Importe benötigen dafür keine Plex-Anbindung.
+
 **Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
 
 ## Demomodus
