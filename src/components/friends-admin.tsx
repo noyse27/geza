@@ -60,7 +60,7 @@ export function FriendsAdmin({
       )}
       {enabled && (
         <form
-          className="form-grid"
+          className="friend-request"
           onSubmit={async (e) => {
             e.preventDefault();
             const form = e.currentTarget;

@@ -1378,6 +1378,16 @@ nav .active:after {
   gap: 20px;
   margin: 25px 0;
 }
+.friend-request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 25px 0;
+}
+.friend-request label {
+  flex: 1 1 320px;
+}
 .secret-input {
   display: flex;
   align-items: stretch;
