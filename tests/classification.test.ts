@@ -28,7 +28,8 @@ test('classification: seasons, provenance, preview, retries, disappearance and i
   const originalFetch = globalThis.fetch;
   let watched = false,
     missing = false,
-    broken = false;
+    broken = false,
+    incomplete = false;
   const movie = { type: 'movie', title: 'Plex Film', Guid: [{ id: 'tmdb://991001' }] };
   const show = { type: 'show', title: 'Plex Serie', ratingKey: 'show1', Guid: [{ id: 'tvdb://991002' }] };
   globalThis.fetch = (async (input) => {
@@ -49,7 +50,7 @@ test('classification: seasons, provenance, preview, retries, disappearance and i
       value = {
         Metadata: [
           { type: 'episode', title: 'E1', parentIndex: 1, index: 1, viewCount: watched ? 1 : 0 },
-          { type: 'episode', title: 'E2', parentIndex: 2, index: 1, viewCount: 0 },
+          { type: 'episode', title: 'E2', parentIndex: incomplete ? null : 2, index: 1, viewCount: 0 },
         ],
         totalSize: 2,
       };
@@ -124,6 +125,22 @@ test('classification: seasons, provenance, preview, retries, disappearance and i
     const seasons = await query("SELECT * FROM media WHERE kind='season' ORDER BY season");
     assert.equal(seasons[0].bucketlist, false);
     assert.equal(seasons[1].bucketlist, true);
+    const preserved = await state(seasons[1].id);
+    incomplete = true;
+    missing = true;
+    const partial = await processPlexScan({ manual: true });
+    assert.equal(partial!.incompleteSeries, 1);
+    assert.equal((await state(film.id)).bucketlist, false, 'valid unrelated titles are still reconciled');
+    const deferred = await state(seasons[1].id);
+    assert.equal(deferred.bucketlist, preserved.bucketlist);
+    assert.deepEqual(
+      deferred.plex_checked_at,
+      preserved.plex_checked_at,
+      'unknown series is not stamped as checked',
+    );
+    assert.deepEqual(deferred.plex_libraries, preserved.plex_libraries);
+    incomplete = false;
+    missing = false;
     await query("UPDATE media SET bucket_preference='exclude' WHERE id=$1", [series.id]);
     assert.equal(
       (await state(seasons[1].id)).bucketlist,

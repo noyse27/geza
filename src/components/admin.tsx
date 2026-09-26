@@ -43,6 +43,7 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
     [scanHour, setScanHour] = useState(Number(values.PLEX_SCAN_HOUR || '3')),
     [scanPreview, setScanPreview] = useState<{
       changed: number;
+      incompleteSeries?: number;
       changes: {
         id: string;
         title: string;
@@ -473,6 +474,13 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
           {scanPreview && (
             <div>
               <h3>Vorschau: {scanPreview.changed} Änderungen</h3>
+              {!!scanPreview.incompleteSeries && (
+                <p>
+                  {scanPreview.incompleteSeries} Serien können wegen unklarer Episodendaten nicht neu
+                  einsortiert werden. Bestehende Zuordnungen bleiben erhalten; Details stehen im
+                  Ereignisprotokoll.
+                </p>
+              )}
               <p>
                 Bis zu 200 Änderungen werden angezeigt. „Jetzt scannen“ prüft den dann aktuellen Bestand
                 erneut.
