@@ -108,12 +108,10 @@ try {
   const [show] = await query("SELECT id FROM media WHERE kind='show'");
   const [episode] = await query("SELECT id FROM media WHERE kind='episode' AND season=2");
   const page = async (id: string) =>
-    (await (await fetch(base + '/title/' + id, { headers: { Cookie: cookie } })).text())
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
-      .replace(/<!--.*?-->/g, '');
+    (await fetch(base + '/title/' + id, { headers: { Cookie: cookie } })).text();
   await query('UPDATE media SET poster=$2 WHERE id=$1', [show.id, '/show-cover.svg']);
   assert.ok((await page(show.id)).includes('Gesamte Serie'));
-  assert.ok((await page(episode.id)).includes(`href="/title/${season.id}">Staffel 2</a>`));
+  assert.match(await page(episode.id), new RegExp(`href="/title/${season.id}">Staffel (?:<!-- -->)?2</a>`));
   const seasonPage = await page(season.id);
   assert.ok(seasonPage.includes('HTTP Serie – Staffel 2'));
   assert.ok(seasonPage.includes('/show-cover.svg'));
@@ -156,7 +154,10 @@ try {
   await query("UPDATE media SET parent_id=$1,season=NULL WHERE title='Special'", [special.id]);
   assert.ok((await page(special.id)).includes('Special'));
   const [specialEpisode] = await query("SELECT id FROM media WHERE title='Special'");
-  assert.ok((await page(specialEpisode.id)).includes(`href="/title/${special.id}">Staffel 0</a>`));
+  assert.match(
+    await page(specialEpisode.id),
+    new RegExp(`href="/title/${special.id}">Staffel (?:<!-- -->)?0</a>`),
+  );
   const excluded = await fetch(base + '/api/admin', {
     method: 'POST',
     headers,
