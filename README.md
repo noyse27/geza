@@ -2,15 +2,50 @@
 
 [![CI](https://github.com/noyse27/geza/actions/workflows/ci.yml/badge.svg)](https://github.com/noyse27/geza/actions/workflows/ci.yml)
 
-Film- und Serienportal mit öffentlichen Bewertungen und Reviews sowie einem privaten Anschautagebuch. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
+Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-## Sichtbarkeit
+**Aktuelle Version: v1.4.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
-**Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen und Reviews. Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
+## Funktionen im Überblick
 
-Auf Serien- und Staffelseiten wechselt die Auswahl unter dem Cover zwischen der gesamten Serie und ihren bekannten Staffeln. Der Staffellink einer Episode öffnet direkt die zugehörige Staffel. Jede Staffel hat eigene Bewertungen und Reviews sowie darunter ihre Episodenliste. Fehlt ein Staffelcover, erscheint das Seriencover. Migration 020 ergänzt fehlende Staffeldatensätze aus vorhandenen Episoden; neue Trakt-Importe benötigen dafür keine Plex-Anbindung.
+| Bereich                    | Was Geza kann                                                                                                                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Katalog**                | Suche, Detailseiten, [Sammlungen](#sammlungen-und-filmreihen) (Filmreihen, Genres, FSK, Länder, Jahre, Bewertungen, Regie, Besetzung), [Serien mit Staffeln und vollständigem Episodenkatalog](#serien-staffeln-und-serienkatalog) |
+| **Bewerten und schreiben** | Zehnerbewertung und Reviews je Film, Serie und Staffel; Entwürfe bleiben privat                                                                                                                                                    |
+| **Teilen**                 | [Link-Vorschau](#link-vorschau) mit Cover, Bewertung und Review-Teaser; [RSS-Feed „ABO“](#rss-feed-abo) für neue Bewertungen und Reviews                                                                                           |
+| **Friends of Geza**        | [Befreundete Instanzen](#friends-of-geza) zeigen sich gegenseitig Bewertung und „Review vorhanden“                                                                                                                                 |
+| **Tagebuch**               | Anschauereignisse, History, Statistik, [Trakt-Import](#trakt-import), Plex-Webhook und [Now Playing](#metadaten-und-plex)                                                                                                          |
+| **Ordnung**                | [Bucketliste](#metadaten-und-plex) für Ungesehenes, [Rumpelkammer](#rumpelkammer) für Titel ohne Aktivität                                                                                                                         |
+| **Andere Perspektiven**    | [Externe Reviews und Anbieterbewertungen](#externe-reviews-und-anbieterbewertungen) (TMDB, IMDb via Plex, Filmdienst, wortvogel.de, eigene Quellen)                                                                                |
+| **Betrieb**                | [Demomodus](#demomodus), [Serverumzug und Sicherung](#sicherung-und-updates), [Hosting mit Sitemap](#hosting-und-google)                                                                                                           |
 
-**Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
+## Inhalt
+
+[Lokal starten](#lokal-starten) · [Demomodus](#demomodus) · [Sichtbarkeit](#sichtbarkeit) · [Sammlungen](#sammlungen-und-filmreihen) · [Serien und Staffeln](#serien-staffeln-und-serienkatalog) · [Link-Vorschau](#link-vorschau) · [RSS-Feed](#rss-feed-abo) · [Friends of Geza](#friends-of-geza) · [Rumpelkammer](#rumpelkammer) · [Trakt-Import](#trakt-import) · [Metadaten und Plex](#metadaten-und-plex) · [Externe Reviews](#externe-reviews-und-anbieterbewertungen) · [Hosting](#hosting-und-google) · [Sicherung](#sicherung-und-updates) · [Prüfungen](#prüfungen) · [Changelog](#changelog)
+
+## Lokal starten
+
+Voraussetzung: Docker mit Compose. Kein separates Node.js oder PostgreSQL erforderlich.
+
+```powershell
+# Windows, im Projektordner
+./setup.ps1
+```
+
+```sh
+# Linux / macOS
+sh setup.sh
+```
+
+Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten und bauen das Image. Vorhandene Einstellungen
+bleiben erhalten. Ohne vorhandenes Admin-Konto zeigt Geza beim ersten Start automatisch die Auswahl
+„Neu einrichten“ oder „Geza wiederherstellen“. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
+
+- Anwendung: <http://localhost:3080>
+- Erster Admin und Anmeldung: <http://localhost:3080/login>
+- Provider-Zugänge: nach Anmeldung unter **Admin**
+
+Die lokale App ist nur an `127.0.0.1` gebunden. Der Datenbankport ist im normalen Betrieb geschlossen; `compose.dev.yaml` stellt bei Bedarf PostgreSQL auf `127.0.0.1:5439` bereit.
 
 ## Demomodus
 
@@ -41,29 +76,11 @@ Die Demo verwendet eine eigene Datenbank und zwölf Medieneinträge mit lokalen 
 
 Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` in `.env.demo` setzen; iframe-Einbettung lässt sich mit `DEMO_FRAME_ANCESTORS` auf die eigene Domain beschränken. Details zu Hosting, Reset, Uploadlimits und Tests stehen in [Installation und Website-Einbindung](docs/demo.md).
 
-## Lokal starten
+## Sichtbarkeit
 
-Voraussetzung: Docker mit Compose. Kein separates Node.js oder PostgreSQL erforderlich.
+**Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen, Reviews, RSS-Feed und die Bewertungsauskunft für befreundete Instanzen (ohne Review-Text). Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
-```powershell
-# Windows, im Projektordner
-./setup.ps1
-```
-
-```sh
-# Linux / macOS
-sh setup.sh
-```
-
-Die Skripte erzeugen `.env` mit zufälligen Zugangsdaten und bauen das Image. Vorhandene Einstellungen
-bleiben erhalten. Ohne vorhandenes Admin-Konto zeigt Geza beim ersten Start automatisch die Auswahl
-„Neu einrichten“ oder „Geza wiederherstellen“. Danach ist diese Einrichtung gesperrt und `/login` ist die normale Anmeldung.
-
-- Anwendung: <http://localhost:3080>
-- Erster Admin und Anmeldung: <http://localhost:3080/login>
-- Provider-Zugänge: nach Anmeldung unter **Admin**
-
-Die lokale App ist nur an `127.0.0.1` gebunden. Der Datenbankport ist im normalen Betrieb geschlossen; `compose.dev.yaml` stellt bei Bedarf PostgreSQL auf `127.0.0.1:5439` bereit.
+**Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
 
 ## Sammlungen und Filmreihen
 
@@ -74,6 +91,18 @@ Die Listen zeigen **50 Filme pro Seite**. Mit „Weitere 50“ und „Vorherige 
 Ein Film aus einer Sammlung öffnet seine vollständigen Details **im Modal**, einschließlich Reviews und der nach Login verfügbaren Bearbeitung. Beim Schließen bleiben Suche, Sortierung und Scrollposition erhalten. „Vorheriger“ und „Nächster“ wechseln innerhalb der aktuellen Ergebnisseite. Ein Kategorienklick im Modal führt zur neuen Sammlung; Browser-Zurück führt zur vorherigen Liste. „Detailseite öffnen“ sowie ein direkt aufgerufener oder neu geladener Filmlink öffnen die normale Detailseite.
 
 Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbieter. Migration **011** ergänzt passende Indizes; vollständige Details werden erst beim Öffnen geladen. Änderungen im Modal aktualisieren anschließend die Liste und deren Anzahl. Technische Hinweise und Testmessungen stehen in [Sammlungen](docs/sammlungen.md).
+
+## Serien, Staffeln und Serienkatalog
+
+Auf Serien- und Staffelseiten wechselt die Auswahl unter dem Cover zwischen der gesamten Serie und ihren bekannten Staffeln, numerisch sortiert. Der Staffellink einer Episode öffnet direkt die zugehörige Staffel. Jede Staffel hat eigene Bewertungen und Reviews (sie bleiben an die Staffel gebunden) sowie darunter ihre Episodenliste; die Seite nennt Serienname und Staffelnummer. Fehlt ein Staffelcover, erscheint das Seriencover. Migration 020 ergänzt fehlende Staffeldatensätze aus vorhandenen Episoden; neue Trakt-Importe, Plex-Ereignisse und Zuordnungskorrekturen legen sie künftig selbst an. Bewertungen, Reviews und Plex-Verfügbarkeit werden dabei nie von der Serie übernommen.
+
+**Serienkatalog:** Ein TMDB-Abgleich ergänzt für Serien die vollständige Staffel- und Episodenstruktur, unabhängig von Plex-Verfügbarkeit und Gesehenstatus. Er wird atomar veröffentlicht und schützt manuelle Zuordnungen. Ohne TMDB-Zugang gilt alles nur für lokal bekannte Folgen; ein Abruffehler bricht ab, statt einen unvollständigen Katalog zu speichern.
+
+**Gesamtsichtungen:** Beim Anlegen einer manuellen Serien- oder Staffelsichtung ist die Übertragung auf noch unbelegte Folgen vorausgewählt. Später erscheinende Folgen und bestehende Sichtungen bleiben ausgenommen. Folgen lassen sich direkt in der Staffelliste nachtragen; vorhandene Ereignisse können nachträglich auf fehlende Folgen angewendet werden. Gemeinsam ergänzte Sichtungen folgen Datumsänderungen und Löschungen ihres Ursprungsereignisses; individuell korrigierte Folgen lösen sich davon. Bewertungen und Reviews werden nicht vererbt. Migration 021 merkt bestehende Serien für den Worker vor; sie führt selbst keinen Netzwerkzugriff aus. Details: [Refactoring-Plan](docs/refactoring-import-plex.md).
+
+## Link-Vorschau
+
+Detailseiten liefern Open-Graph- und Twitter-Karten für das Teilen: Titel mit Jahr, die Geza-Bewertung als Sterne und als Beschreibung ein Teaser der eigenen öffentlichen Review (160 Zeichen). Spoiler-Reviews werden nie angeteasert; ohne Review dient die Inhaltsangabe als Ersatz. Das Bild ist das Cover im Hochformat ohne eingebrannten Text. Voraussetzung ist eine gesetzte `PUBLIC_URL`, damit Bild und Kanonisierung absolute Adressen erhalten.
 
 ## RSS-Feed (ABO)
 
@@ -151,6 +180,14 @@ Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und
 **Plex-Bibliotheks-Scan und Bucketliste:** Standardmäßig täglich um 03:00 Uhr (Europe/Berlin); Automatik und Stunde sind im Admin einstellbar. Gespeicherte frühere Einstellungen bleiben erhalten. Ungesehene vorhandene Filme und vollständig ungesehene Serien kommen auf die Bucketliste. Bei begonnenen Serien erscheinen nur vorhandene Staffeln ohne gesehene Episode, einschließlich Specials (Staffel 0). Teilweise vorhandene Staffeln zählen als vorhanden, leere Staffeln nicht. Trakt-/Geza-Sichtungen zählen mit; Bewertungen allein gelten nicht als gesehene Episode. Die Bibliotheksauswahl begrenzt automatische Wünsche, die Verfügbarkeit wird weiterhin überall geprüft. Manuelle Wünsche bleiben bei Wegfall aus Plex erhalten; rein automatische Einträge werden nach vollständigem Abgleich neu zugeordnet, niemals gelöscht. Abschalten des täglichen Scans führt selbst keine Umsortierung aus.
 
 „Änderungen vorab prüfen“ zeigt bis zu 200 Vorher-/Nachher-Zuordnungen und rollt die Vorschau zurück. „Jetzt scannen“ verarbeitet den dann aktuellen Bestand. Bestehende manuelle Bucketlisteneinträge werden durch Migration 019 geschützt; alte automatische Einträge bleiben bis zum nächsten vollständigen Scan erhalten. Auf der Bucketliste können weiterhin per TMDB-Suche manuelle Wünsche ergänzt werden. Weitere technische Entscheidungen und Abnahmekriterien stehen im [Refactoring-Plan](docs/refactoring-import-plex.md).
+
+## Externe Reviews und Anbieterbewertungen
+
+Unter den eigenen Reviews stehen öffentliche Blöcke „Reviews bei Freunden“. Als Admin lassen sich mit „＋ Neu“ weitere Quellen mit Name, HTTPS-Link und optionaler Bewertung samt Skala anlegen. Zum Entfernen den Link leeren. Für eigene Quellen gibt es keine automatischen Abrufe; manuelle Angaben bleiben bei Hintergrundläufen erhalten.
+
+Filmdienst und wortvogel.de werden für aufgerufene Filme im Hintergrund gesucht. Geza speichert nur Link und Sterne, keine fremden Review-Texte; wortvogel.de liefert keine Sternebewertung, nur den Link. Titel und Produktionsjahr beziehungsweise eine passende IMDb-ID dienen zur Zuordnung. Bei wortvogel.de wird nach `<Filmtitel> "kino kritik"` gesucht und nur ein Artikel übernommen, dessen Titel „Kino Kritik: <Filmtitel>“ eindeutig zu Titel und Produktionsjahr passt. Höchstens drei Kandidaten werden geprüft; unsichere oder mehrdeutige Treffer werden nicht veröffentlicht. Zwischen Abrufen liegen je Anbieter mindestens zehn Sekunden. Treffer bleiben gespeichert, fehlende Treffer werden frühestens nach 30 Tagen, Fehler nach einem Tag erneut geprüft. Geänderte robots.txt-Sperren stoppen die automatische Suche. Die vorhandenen Plex-Aufgaben laufen davon unabhängig.
+
+Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
 
 ## Hosting und Google
 
@@ -263,7 +300,7 @@ Migrationen laufen vor App und Worker. Das benannte Datenbankvolume überlebt Co
 
 ## Prüfungen
 
-Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run test:rumpel`, `npm run build`. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
+Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run test:rumpel`, `npm run build`. Zusätzlich prüfen `npm run test:feed` (RSS-Feed, Karenzzeit) und – nach dem Build – `npm run test:federation` (zwei echte Instanzen: Freundschaft, Fälschungsschutz, Abfrage) die neuen Funktionen; beide legen eigene temporäre Datenbanken an. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
 
 Die GitHub-CI folgt `adolar-songster` und `bloeki`: Typprüfung, Tests, Build, Trivy, Gitleaks, CodeQL und Image-Scan. Dependabot prüft npm, Docker und GitHub Actions montags in Europe/Berlin mit gruppierten Minor-/Patch-Updates. Entwicklungscompiler und Paketmanager werden nicht im Laufzeitimage ausgeliefert.
 
@@ -275,24 +312,20 @@ docker compose exec -T app node --import tsx scripts/scale-check.ts
 
 Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt und entfernt ausschließlich seine eigene temporäre Testdatenbank. Siehe [Abnahmehinweise](docs/ABNAHME.md).
 
-### Externe Reviews und Anbieterbewertungen
-
-Unter den eigenen Reviews stehen öffentliche Blöcke „Reviews bei Freunden“. Als Admin lassen sich mit „＋ Neu“ weitere Quellen mit Name, HTTPS-Link und optionaler Bewertung samt Skala anlegen. Zum Entfernen den Link leeren. Für eigene Quellen gibt es keine automatischen Abrufe; manuelle Angaben bleiben bei Hintergrundläufen erhalten.
-
-Filmdienst und wortvogel.de werden für aufgerufene Filme im Hintergrund gesucht. Geza speichert nur Link und Sterne, keine fremden Review-Texte; wortvogel.de liefert keine Sternebewertung, nur den Link. Titel und Produktionsjahr beziehungsweise eine passende IMDb-ID dienen zur Zuordnung. Bei wortvogel.de wird nach `<Filmtitel> "kino kritik"` gesucht und nur ein Artikel übernommen, dessen Titel „Kino Kritik: <Filmtitel>“ eindeutig zu Titel und Produktionsjahr passt. Höchstens drei Kandidaten werden geprüft; unsichere oder mehrdeutige Treffer werden nicht veröffentlicht. Zwischen Abrufen liegen je Anbieter mindestens zehn Sekunden. Treffer bleiben gespeichert, fehlende Treffer werden frühestens nach 30 Tagen, Fehler nach einem Tag erneut geprüft. Geänderte robots.txt-Sperren stoppen die automatische Suche. Die vorhandenen Plex-Aufgaben laufen davon unabhängig.
-
-Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb gekennzeichnete Plex-Bewertungen mit Quellenlink. Diese Werte werden lokal gespeichert; aufgerufene Titel werden frühestens nach sieben Tagen erneut zur Metadatenanreicherung vorgemerkt. TVDBs API-score ist ein Popularitätswert und wird nicht als Sternebewertung ausgegeben. Fehlende Anbieterwerte werden entsprechend bezeichnet. Externe Reviews und Anbieterbewertungen sind im Admin-JSON-Export und Datenbank-Backup enthalten.
+Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
 
-### Unveröffentlicht
+### v1.4.0
 
-- Neu: **Friends of Geza** – befreundete Instanzen zeigen Bewertung und „Review vorhanden“ zu einem Titel samt Link; Freundschaftsanfragen im Admin, Instanz-Nickname (Einstellung und optional bei der Ersteinrichtung). Migration 023.
 - Neuer öffentlicher **RSS-Feed** (`/feed.xml`, Tab „ABO“) für neue Bewertungen und Reviews mit einstellbarer Karenzzeit gegen Wankelmut; Änderungen erscheinen als „Aktualisiert“. Migration 022.
-- Neue **Rumpelkammer** (Admin → Rumpelkammer): Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag – bislang meist Plex-Bibliothekseinträge aus dem Trakt-Collection-Export – erscheinen nur noch dort und lassen sich einzeln oder gesammelt bearbeiten, bewerten, in die Bucketliste verschieben oder löschen. Gelöschte Titel merkt sich Geza (`rumpel_deleted`, Teil des Serverumzugs), damit Trakt-Import und Plex-Scan sie nicht erneut anlegen.
-- Bucketliste und Rumpelkammer schließen sich per Datenbank-Constraint aus; aus der Rumpelkammer verschobene Titel sind vor dem Plex-Scan geschützt.
-- Plex-Abgleich der Rumpelkammer (manuell und nachts) merkt sich pro Titel die Plex-Bibliothek(en); Migration 018. Filter nach Plex-Stand und Bibliothek.
-- Migration 017 ordnet den Bestand einmalig ein. Der Trakt-Importer legt Collection-only-Einträge nur noch als Rumpel an.
+- Neu: **Friends of Geza** – befreundete Instanzen zeigen Bewertung und „Review vorhanden“ zu einem Titel samt Link; Freundschaftsanfragen im Admin, Instanz-Nickname (Einstellung und optional bei der Ersteinrichtung). Migration 023.
+- **Staffeln direkt auswählen**, bewerten und mit Episoden anzeigen; Migration 020 ergänzt fehlende Staffeldatensätze.
+- **Serienkatalog** per TMDB und gemeinsame Sichtungen für Serien und Staffeln; Migration 021.
+- **Einheitliche Einordnung** von Trakt- und Plex-Beständen mit Bucketlisten für ungesehene Staffeln, Import-/Scan-Vorschau und dauerhaften Ausschlüssen; Migration 019. Der Plex-Scan übersteht unvollständige Episodennummern.
+- Neue **Rumpelkammer** (Admin → Rumpelkammer) für Titel ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag; Plex-Abgleich mit Bibliotheksangabe; Migrationen 017 und 018.
+- **Link-Vorschau** für Detailseiten mit Cover, Bewertung und Review-Teaser.
+- Das Demo-Reset leert auch die neuen Feed- und Friends-Tabellen.
 
 ### v1.3.0
 
@@ -329,7 +362,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 - Serientreffer bei der Scrobble-Zuordnung zeigen die Anzahl ihrer bereits zugeordneten Katalogepisoden.
 - Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; automatische Aktualisierung alle 15 Sekunden.
 
-### v1.1.1 (current)
+### v1.1.1
 
 - Migrationen laufen nicht mehr in den 8s-Statement-Timeout der App; verhinderte auf größeren Produktivbeständen den Abschluss von Migration 013
 
@@ -362,5 +395,3 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 - Externe Reviews und Anbieterbewertungen über pluggable Provider-Module (TMDB, TVDB, Filmdienst, Wortvogel, eigene Quellen)
 - History-Filter im Adminmodus: nach Typ, Monat und (neu) „Nur mit Review"
 - Docker-Compose-Setup mit Sicherung/Wiederherstellung, Erstadmin-Einrichtung und CI mit Typprüfung, Tests, Trivy, Gitleaks, CodeQL und Image-Scan
-
-Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
