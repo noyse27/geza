@@ -65,7 +65,9 @@ try {
   assert.equal(results.items[0].id, show.id);
   assert.ok(results.items.every((item) => item.kind === 'show'));
   assert.equal(
-    (await query("SELECT count(*)::int AS n FROM media WHERE kind='show' AND title='Lidia Test' AND rumpel"))[0].n,
+    (
+      await query("SELECT count(*)::int AS n FROM media WHERE kind='show' AND title='Lidia Test' AND rumpel")
+    )[0].n,
     1,
   );
   assert.ok((await deleteMedia({ id: show.id, title: 'Lidia Test' })).error);
@@ -84,6 +86,13 @@ try {
     assert.equal((await query(`SELECT 1 FROM ${table} WHERE media_id=$1`, [episode.id])).length, 0);
   assert.equal((await query('SELECT 1 FROM media WHERE id=$1', [episode.id])).length, 0);
   assert.equal((await query("SELECT 1 FROM jobs WHERE payload->>'mediaId'=$1", [episode.id])).length, 0);
+  const [season] = await query("SELECT id,title FROM media WHERE parent_id=$1 AND kind='season'", [show.id]);
+  assert.ok(
+    season,
+    'A derived season remains available for its own reviews after the last episode is deleted',
+  );
+  assert.ok((await deleteMedia({ id: show.id, title: 'Lidia Test' })).error);
+  assert.equal((await deleteMedia({ id: season.id, title: season.title })).ok, true);
   assert.equal((await deleteMedia({ id: show.id, title: 'Lidia Test' })).ok, true);
   assert.ok((await deleteMedia({ id: episode.id, title: episode.title })).error);
   console.log(
