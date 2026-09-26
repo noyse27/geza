@@ -14,10 +14,17 @@ import type { Media } from '@/lib/types';
 import { FriendReviews } from '@/components/friend-reviews';
 import { BucketPreference } from './bucket-preference';
 import { originLabel } from '@/lib/media-origin';
+import { seasonNavigation } from '@/lib/seasons';
+import { SeasonSelector } from './season-selector';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
   const admin = await isAdmin();
   const m = await getMedia(id, admin);
   if (!m) notFound();
+  const navigation = ['show', 'season', 'episode'].includes(m.kind) ? await seasonNavigation(m, admin) : null;
+  const poster = m.poster || (m.kind === 'season' ? navigation?.show.poster : null);
+  const seasonNumber = navigation?.season?.season ?? m.season;
+  const displayTitle =
+    m.kind === 'season' && navigation ? `${navigation.show.title} – Staffel ${m.season}` : m.title;
   const seriesOptions = admin ? await listFilmSeries() : [];
   if (['movie', 'show', 'episode'].includes(m.kind))
     await query(
@@ -44,8 +51,9 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
     m.kind === 'show' || m.kind === 'season'
       ? await query<Media>(
           `SELECT ${publicColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE
-           (m.parent_id=$1 OR ($2::text='season' AND m.parent_id=$3 AND m.kind='episode' AND m.season=$4))
-           AND ($5 OR NOT m.rumpel) ORDER BY m.season,m.episode,m.id LIMIT 500`,
+           (($2::text='show' AND m.parent_id=$1 AND m.kind='season') OR
+            ($2::text='season' AND m.kind='episode' AND (m.parent_id=$1 OR (m.parent_id=$3 AND m.season=$4))))
+           AND ($5 OR NOT m.rumpel) ORDER BY m.season,m.episode,m.id`,
           [id, m.kind, m.parent_id, m.season, admin],
         )
       : [];
@@ -59,10 +67,10 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
           : m.kind === 'season'
             ? 'TVSeason'
             : 'TVSeries',
-    name: m.title,
+    name: displayTitle,
     alternateName: m.original_title || undefined,
     description: m.summary || undefined,
-    image: m.poster || undefined,
+    image: poster || undefined,
     datePublished: m.year ? String(m.year) : undefined,
     genre: m.genres,
     review: reviews
@@ -88,7 +96,10 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
       )}
       <div className="detail-top">
         <div className="detail-poster">
-          <Poster item={m} large />
+          <Poster item={{ ...m, poster: poster || null }} large />
+          {navigation && ['show', 'season'].includes(m.kind) && (
+            <SeasonSelector showId={navigation.show.id} currentId={id} seasons={navigation.seasons} />
+          )}
           {m.series_title && (
             <Link className="series-badge" replace={modal} href={collectionHref('series', m.series_id!)}>
               {m.series_title}
@@ -98,7 +109,19 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
         <div className="detail-intro">
           <span className="eyebrow accent">
             {kindLabel(m.kind)}
-            {m.season !== null ? ` · Staffel ${m.season}` : ''}
+            {seasonNumber !== null &&
+              m.kind !== 'season' &&
+              (m.kind === 'episode' && navigation?.season ? (
+                <>
+                  {' '}
+                  ·{' '}
+                  <Link className="season-link" href={`/title/${navigation.season.id}`}>
+                    Staffel {seasonNumber}
+                  </Link>
+                </>
+              ) : (
+                ` · Staffel ${seasonNumber}`
+              ))}
             {m.episode !== null ? ` · Episode ${m.episode}` : ''}
           </span>
           {m.parent_title && (
@@ -107,7 +130,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
             </Link>
           )}
           <h1>
-            {m.title}
+            {displayTitle}
             <span className="accent">.</span>
           </h1>
           {m.original_title && m.original_title !== m.title && (
@@ -312,7 +335,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
       {children.length > 0 && (
         <section className="episodes">
           <div className="section-heading">
-            <h2>Staffeln & Episoden</h2>
+            <h2>{m.kind === 'season' ? 'Episoden' : 'Staffeln'}</h2>
             <span className="muted">{children.length} Einträge</span>
           </div>
           {children.map((c) => (

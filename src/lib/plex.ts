@@ -178,6 +178,7 @@ export async function processPlex(payload: {
     if (p?.MediaContainer?.Metadata?.[0]) parent = await ensurePlexMedia(p.MediaContainer.Metadata[0]);
   }
   const id = await ensurePlexMedia(m, parent);
+  if (parent && m.type === 'episode') await query('SELECT ensure_known_seasons($1)', [parent]);
   const { savePlexRatings } = await import('./provider-ratings');
   await savePlexRatings(id, m, plexIds(m));
   const { mergeMetadata, fromPlex } = await import('./providers');

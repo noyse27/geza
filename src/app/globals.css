@@ -1124,6 +1124,20 @@ nav .active:after {
   width: 100%;
   box-shadow: 0 20px 50px #0004;
 }
+.season-selector {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+  color: var(--muted);
+}
+.season-selector select {
+  width: 100%;
+  min-width: 0;
+}
+.season-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .poster-large .poster-placeholder {
   padding: 35px;
 }

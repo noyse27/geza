@@ -12,7 +12,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       [id],
     )
   )[0];
-  const title = `${m.title}${m.year ? ` (${m.year})` : ''}`;
+  const name = m.kind === 'season' && m.parent_title ? `${m.parent_title} – Staffel ${m.season}` : m.title;
+  const title = `${name}${m.year ? ` (${m.year})` : ''}`;
   const stars = rating != null ? '★'.repeat(rating) + '☆'.repeat(10 - rating) + ` (${rating}/10) — ` : '';
   const teaser =
     review && !review.spoiler
