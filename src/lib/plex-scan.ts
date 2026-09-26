@@ -5,9 +5,16 @@ import { getSetting } from './settings';
 import { plexRequest, ensurePlexMedia, plexIds } from './plex';
 import { loadTombstones, forgetTombstones } from './rumpel';
 import { mergeMetadata, fromPlex } from './providers';
+import { resolvePlexEpisodes } from './plex-episodes';
 
 type Metadata = Record<string, any>;
-type Entry = { item: Metadata; library: string; automatic: boolean; episodes?: Metadata[] };
+type Entry = {
+  item: Metadata;
+  library: string;
+  automatic: boolean;
+  episodes?: Metadata[];
+  incomplete?: boolean;
+};
 
 export async function plexList(path: string): Promise<Metadata[]> {
   const result: Metadata[] = [];
@@ -64,6 +71,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
   const sections = data.MediaContainer.Directory.filter((s: Metadata) => ['movie', 'show'].includes(s.type));
   if (!sections.length) throw Error('Keine Film- oder Serienbibliotheken; Bestand bleibt unverändert.');
   const entries: Entry[] = [];
+  const incompleteSeries: { title: string; library: string; ratingKey: string; issues: Metadata[] }[] = [];
   for (const section of sections) {
     const selected = !filter.length || filter.includes(String(section.key));
     for (const item of await plexList(
@@ -71,23 +79,39 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     )) {
       if (!['movie', 'show'].includes(item.type)) throw Error('Unerwarteter Plex-Medientyp');
       let episodes: Metadata[] | undefined;
+      let incomplete = false;
       if (item.type === 'show') {
         if (!item.ratingKey) throw Error('Plex-Serie ohne Bibliotheksschlüssel');
-        episodes = await plexList(
+        const leaves = await plexList(
           `/library/metadata/${encodeURIComponent(item.ratingKey)}/allLeaves?includeGuids=1`,
         );
-        for (const e of episodes) {
-          if (
-            e.type !== 'episode' ||
-            !Number.isInteger(e.parentIndex) ||
-            e.parentIndex < 0 ||
-            !Number.isInteger(e.index)
-          )
-            throw Error('Unvollständige Plex-Episodenzuordnung');
-          seen(e);
+        const resolved = await resolvePlexEpisodes(item, leaves);
+        episodes = resolved.episodes;
+        incomplete = resolved.issues.length > 0;
+        if (incomplete) {
+          const detail = {
+            title: String(item.title),
+            library: String(section.title),
+            ratingKey: String(item.ratingKey),
+            issues: resolved.issues.slice(0, 20),
+          };
+          incompleteSeries.push(detail);
+          await logEvent(
+            'warn',
+            'plex-scan',
+            'Serie wegen unklarer Episodenzuordnung nicht neu einsortiert',
+            detail,
+          );
         }
+        for (const e of episodes) seen(e);
       } else seen(item);
-      entries.push({ item, library: String(section.title), automatic: automatic && selected, episodes });
+      entries.push({
+        item,
+        library: String(section.title),
+        automatic: automatic && selected,
+        episodes,
+        incomplete,
+      });
     }
   }
   const client = await pool.connect();
@@ -101,6 +125,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     const tombstones = await loadTombstones(client);
     const matches = new Map<string, { libraries: Set<string>; watched: boolean; automatic: boolean }>();
     let skipped = 0;
+    const protectedRoots = new Set<string>();
     const remember = (id: string, library: string, watched: boolean, auto: boolean) => {
       const prior = matches.get(id);
       matches.set(id, {
@@ -109,16 +134,20 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         automatic: auto || !!prior?.automatic,
       });
     };
-    for (const { item, library, automatic: auto, episodes } of entries) {
+    for (const { item, library, automatic: auto, episodes, incomplete } of entries) {
       const watched = episodes ? episodes.some(seen) || Number(item.viewedLeafCount) > 0 : seen(item);
       const deleted = tombstones.matches(item.type, plexIds(item));
-      if (deleted.length && !watched) {
+      if (deleted.length && (!watched || incomplete)) {
         skipped++;
         continue;
       }
       await forgetTombstones(deleted, client);
       const id = await ensurePlexMedia(item, undefined, client);
       await mergeMetadata(id, fromPlex(item), 'plex', client);
+      if (incomplete) {
+        protectedRoots.add(id);
+        continue;
+      }
       if (!episodes || episodes.length) remember(id, library, watched, auto);
       if (episodes) {
         const seasons = new Map<number, Metadata[]>();
@@ -139,14 +168,28 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       }
     }
     // Absence is not an unwatched event: retain known seen evidence for missing items.
-    await client.query(`UPDATE media SET plex_libraries='{}',plex_checked_at=now(),plex_automatic=false,
-      origins=array_remove(origins,'legacy-bucket') WHERE kind IN ('movie','show','season','episode')`);
+    const protectedIds = new Set<string>(
+      (
+        await client.query(
+          `WITH RECURSIVE t AS (
+      SELECT id FROM media WHERE id=ANY($1::bigint[]) UNION ALL SELECT m.id FROM media m JOIN t ON m.parent_id=t.id
+      ) SELECT id FROM t`,
+          [[...protectedRoots]],
+        )
+      ).rows.map((r) => r.id),
+    );
+    await client.query(
+      `UPDATE media SET plex_libraries='{}',plex_checked_at=now(),plex_automatic=false,
+      origins=array_remove(origins,'legacy-bucket') WHERE kind IN ('movie','show','season','episode') AND NOT(id=ANY($1::bigint[]))`,
+      [[...protectedIds]],
+    );
     for (const [id, match] of matches)
-      await client.query(
-        `UPDATE media SET plex_libraries=$2,plex_watched=$3,plex_automatic=$4,
+      if (!protectedIds.has(id))
+        await client.query(
+          `UPDATE media SET plex_libraries=$2,plex_watched=$3,plex_automatic=$4,
       origins=ARRAY(SELECT DISTINCT unnest(origins||ARRAY['plex'])) WHERE id=$1`,
-        [id, [...match.libraries].sort(), match.watched, match.automatic],
-      );
+          [id, [...match.libraries].sort(), match.watched, match.automatic],
+        );
     await client.query('SELECT rumpel_refresh(NULL)');
     const old = new Map(before.map((r) => [r.id, r]));
     const after = (
@@ -175,6 +218,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       changed: changes.length,
       changes: changes.slice(0, 200),
       preview: !!payload.preview,
+      incompleteSeries: incompleteSeries.length,
     };
     if (payload.preview) await client.query('ROLLBACK');
     else {
@@ -184,7 +228,12 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         [[...matches.keys()]],
       );
       await client.query('COMMIT');
-      await logEvent('info', 'plex-scan', 'Plex-Bestand und Einordnung abgeglichen', report);
+      await logEvent(
+        incompleteSeries.length ? 'warn' : 'info',
+        'plex-scan',
+        'Plex-Bestand und Einordnung abgeglichen',
+        report,
+      );
     }
     return report;
   } catch (error) {

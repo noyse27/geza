@@ -100,10 +100,12 @@ export default async function Page() {
           <h2>Verarbeitung</h2>
           {lastScan && (
             <p>
-              Letzter vollständiger Plex-Abgleich:{' '}
+              Letzter Plex-Abgleich:{' '}
               {new Date(lastScan.created_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} ·{' '}
               {lastScan.context.titles} Medienobjekte · {lastScan.context.changed} Änderungen ·{' '}
               {lastScan.context.skippedDeleted} gelöschte Titel übersprungen.
+              {lastScan.context.incompleteSeries > 0 &&
+                ` ${lastScan.context.incompleteSeries} Serien wegen unklarer Episodendaten nicht neu einsortiert; Details im Ereignisprotokoll.`}
             </p>
           )}
           {nextScan && settings.PLEX_SCAN_ENABLED !== '0' && (

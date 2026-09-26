@@ -101,7 +101,7 @@ while (running) {
               'error',
               job.kind,
               job.attempts >= 3
-                ? 'Verarbeitung endgï¿½ltig fehlgeschlagen'
+                ? 'Verarbeitung endgültig fehlgeschlagen'
                 : 'Verarbeitung fehlgeschlagen; erneuter Versuch geplant',
               { error: e, retryInSeconds: job.attempts >= 3 ? null : Math.min(300, job.attempts * 30) },
             );
@@ -124,7 +124,7 @@ while (running) {
     }
     await new Promise((r) => setTimeout(r, 250));
   } catch (error) {
-    await logEvent('error', 'worker', 'Hintergrundprozess gestï¿½rt; neuer Versuch in 5 Sekunden', { error });
+    await logEvent('error', 'worker', 'Hintergrundprozess gestört; neuer Versuch in 5 Sekunden', { error });
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
