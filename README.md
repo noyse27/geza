@@ -75,6 +75,12 @@ Ein Film aus einer Sammlung öffnet seine vollständigen Details **im Modal**, e
 
 Ergebnisse stammen aus der lokalen Datenbank und warten nicht auf externe Anbieter. Migration **011** ergänzt passende Indizes; vollständige Details werden erst beim Öffnen geladen. Änderungen im Modal aktualisieren anschließend die Liste und deren Anzahl. Technische Hinweise und Testmessungen stehen in [Sammlungen](docs/sammlungen.md).
 
+## RSS-Feed (ABO)
+
+Öffentlich unter `/feed.xml` (Tab „ABO“ neben „Sammlungen“; nur mit gesetzter `PUBLIC_URL`, im Demomodus abgeschaltet). Der Feed nennt neue Bewertungen und Reviews live gepflegter Titel mit Cover, Sternen und vollständigem Review-Text samt Link zum Geza-Datensatz; Spoiler-Reviews sind gekennzeichnet. Aufgenommen werden Änderungen über die Admin-Oberfläche und den Plex-Webhook, nicht Trakt-Import, Rumpelkammer-Sammelaktionen, Entwürfe oder Bucketlisten-/Rumpel-Titel.
+
+Eine **Karenzzeit** (Admin → Verbindungen → Feed-Karenzzeit, Standard 30 Minuten, 0 = sofort) fasst Änderungen zusammen: Wer eine Bewertung mehrfach ändert, erzeugt erst nach Ablauf der Karenz einen einzigen Eintrag mit dem letzten Stand; kehrt sie zum veröffentlichten Wert zurück, erscheint nichts. Änderungen an bereits veröffentlichten Titeln erscheinen als „Aktualisiert: …“ (bei Bewertungen mit „vorher n/10“). Die Feed-Tabelle `feed_entries` gehört nicht zum Serverumzug; nach einer Wiederherstellung beginnt der Feed leer.
+
 ## Rumpelkammer
 
 Die gemeinsame Einordnung trennt Herkunft, Sichtungsbelege, ausdrückliche Wünsche und aktuelle Plex-Verfügbarkeit. Ohne Aktivität oder Wunsch bleibt ein Titel in der **Rumpelkammer**. Sichtungen, Bewertungen, Reviews, manuelle Friend-Reviews und Filmreihen begründen das **Archiv**; ungesehene Wünsche erscheinen auf der **Bucketliste**. Eine Serie kann im Archiv stehen und ihre ungesehene nächste Staffel auf der Bucketliste. Datenbank-Trigger berechnen die Zuordnung auch nach Sichtungskorrekturen neu. Rumpel-Titel sind öffentlich nicht erreichbar; als Admin bleiben sie bearbeitbar.
@@ -271,6 +277,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 
 ### Unveröffentlicht
 
+- Neuer öffentlicher **RSS-Feed** (`/feed.xml`, Tab „ABO“) für neue Bewertungen und Reviews mit einstellbarer Karenzzeit gegen Wankelmut; Änderungen erscheinen als „Aktualisiert“. Migration 022.
 - Neue **Rumpelkammer** (Admin → Rumpelkammer): Filme und Serien ohne Sichtung, Bewertung, Review und Bucketlisten-Eintrag – bislang meist Plex-Bibliothekseinträge aus dem Trakt-Collection-Export – erscheinen nur noch dort und lassen sich einzeln oder gesammelt bearbeiten, bewerten, in die Bucketliste verschieben oder löschen. Gelöschte Titel merkt sich Geza (`rumpel_deleted`, Teil des Serverumzugs), damit Trakt-Import und Plex-Scan sie nicht erneut anlegen.
 - Bucketliste und Rumpelkammer schließen sich per Datenbank-Constraint aus; aus der Rumpelkammer verschobene Titel sind vor dem Plex-Scan geschützt.
 - Plex-Abgleich der Rumpelkammer (manuell und nachts) merkt sich pro Titel die Plex-Bibliothek(en); Migration 018. Filter nach Plex-Stand und Bibliothek.

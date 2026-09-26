@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: 'Filme, Serien und persönliche Perspektiven.',
   robots: !isDemo() && process.env.PUBLIC_URL ? undefined : { index: false, follow: false },
   icons: { icon: '/icon.svg' },
+  alternates:
+    !isDemo() && process.env.PUBLIC_URL ? { types: { 'application/rss+xml': '/feed.xml' } } : undefined,
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const admin = await isAdmin();
@@ -32,7 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               geza<span className="brand-dot">.</span>
             </span>
           </Link>
-          <Navigation admin={admin} />
+          <Navigation admin={admin} feed={!isDemo() && !!process.env.PUBLIC_URL} />
           <div className="account">
             {admin ? (
               <>

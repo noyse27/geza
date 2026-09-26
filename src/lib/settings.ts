@@ -14,6 +14,7 @@ export const settingKeys = [
   'PLEX_SCAN_ENABLED',
   'PLEX_SCAN_SECTIONS',
   'PLEX_SCAN_HOUR',
+  'FEED_GRACE_MINUTES',
 ] as const;
 export async function getSetting(key: string) {
   if (isDemo())

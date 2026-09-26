@@ -29,6 +29,7 @@ const fields = [
   ['PLEX_ACCOUNT_ID', 'Plex Account-ID'],
   ['PLEX_SERVER_ID', 'Plex Server-UUID'],
   ['PLEX_WEBHOOK_SECRET', 'Webhook-Geheimnis'],
+  ['FEED_GRACE_MINUTES', 'Feed-Karenzzeit in Minuten (Standard 30, 0 = sofort)'],
 ] as const;
 const sensitive = new Set(['TMDB_TOKEN', 'TVDB_API_KEY', 'TVDB_PIN', 'PLEX_TOKEN', 'PLEX_WEBHOOK_SECRET']);
 export function AdminControls({ configured, values, publicUrl, plexSections, demo = false }: Props) {

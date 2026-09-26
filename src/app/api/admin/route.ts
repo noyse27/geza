@@ -17,6 +17,7 @@ import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
 import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
 import { createManualWatch } from '@/lib/manual-watches';
+import { recordFeedEntrySafely } from '@/lib/feed';
 export const maxDuration = 300;
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
@@ -163,18 +164,20 @@ export async function POST(req: Request) {
       const data = z
         .object({ body: z.string().min(1).max(30000), spoiler: z.boolean(), is_public: z.boolean() })
         .parse(body.data);
+      let reviewMediaId: string | undefined = body.mediaId;
       if (body.id)
-        await query('UPDATE reviews SET body=$1,spoiler=$2,is_public=$3,updated_at=now() WHERE id=$4', [
-          data.body,
-          data.spoiler,
-          data.is_public,
-          body.id,
-        ]);
+        reviewMediaId = (
+          await query<{ media_id: string }>(
+            'UPDATE reviews SET body=$1,spoiler=$2,is_public=$3,updated_at=now() WHERE id=$4 RETURNING media_id',
+            [data.body, data.spoiler, data.is_public, body.id],
+          )
+        )[0]?.media_id;
       else
         await query(
           "INSERT INTO reviews(media_id,source,source_id,body,spoiler,is_public) VALUES($1,'geza',$2,$3,$4,$5)",
           [body.mediaId, crypto.randomUUID(), data.body, data.spoiler, data.is_public],
         );
+      if (reviewMediaId) await recordFeedEntrySafely(reviewMediaId);
     } else if (body.action === 'plex-review') {
       const [media] = await query<{ ids: Record<string, string> }>('SELECT ids FROM media WHERE id=$1', [
         body.mediaId,
@@ -255,6 +258,7 @@ export async function POST(req: Request) {
           "INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,$2,now(),'geza') ON CONFLICT(media_id) DO UPDATE SET rating=excluded.rating,rated_at=now(),source='geza'",
           [body.id, rating],
         );
+      await recordFeedEntrySafely(body.id);
     } else if (body.action === 'settings') {
       const previousPlex = (await getSetting('PLEX_URL')) + ':' + (await getSetting('PLEX_TOKEN'));
       for (const key of settingKeys)
