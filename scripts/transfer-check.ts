@@ -36,6 +36,8 @@ try {
     'login_attempts',
     'event_logs',
     'feed_entries',
+    'friend_instances',
+    'friend_instance_cache',
     'migrations',
     'setup_restore',
   ]);
@@ -73,7 +75,9 @@ try {
     `INSERT INTO jobs(kind,status,payload) VALUES('plex','pending','{"event":"media.scrobble","eventId":"5fbaac04-c234-4d7b-9140-1a7108dfb830","metadata":{"title":"Unresolved"}}')`,
   );
   await query(`INSERT INTO import_runs(report) VALUES('{"files":1,"media":3}')`);
-  await query(`INSERT INTO rumpel_deleted(kind,title,year,ids) VALUES('movie','Gelöscht',2001,'{"imdb":"tt1"}')`);
+  await query(
+    `INSERT INTO rumpel_deleted(kind,title,year,ids) VALUES('movie','Gelöscht',2001,'{"imdb":"tt1"}')`,
+  );
   await query(`INSERT INTO settings VALUES('TMDB_TOKEN',$1),('PLEX_WEBHOOK_SECRET',$2)`, [
     encrypt('source-tmdb-token'),
     encrypt('old-webhook-secret'),

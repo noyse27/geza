@@ -29,7 +29,7 @@ export async function maintainDemo() {
       }
     }
     await client.query(
-      `TRUNCATE ${[...dataTables, 'admin_account', 'settings', 'setup_restore', 'sessions', 'login_attempts', 'event_logs', 'feed_entries'].join(',')} RESTART IDENTITY`,
+      `TRUNCATE ${[...dataTables, 'admin_account', 'settings', 'setup_restore', 'sessions', 'login_attempts', 'event_logs', 'feed_entries', 'friend_instances', 'friend_instance_cache'].join(',')} RESTART IDENTITY`,
     );
     await client.query("SET LOCAL geza.skip_rumpel='on'");
     for (const table of dataTables) {

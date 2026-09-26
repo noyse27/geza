@@ -8,6 +8,8 @@ import { plexRequest } from '@/lib/plex';
 import { AdminControls } from '@/components/admin';
 import { TransferExport } from '@/components/transfer';
 import { rumpelCounts } from '@/lib/rumpel';
+import { FriendsAdmin } from '@/components/friends-admin';
+import { federationEnabled, instanceNickname, listFriends } from '@/lib/federation';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -33,6 +35,12 @@ export default async function Page() {
       plexSections = [];
     }
   }
+  const friends = (await listFriends()).map(({ id, url, nickname, status }) => ({
+    id,
+    url,
+    nickname,
+    status,
+  }));
   const [jobs, imports, errors, rumpel] = await Promise.all([
     query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
@@ -60,6 +68,12 @@ export default async function Page() {
           modules={reviewModules.map(({ id, name }) => ({ id, name }))}
         />
       </div>
+      <FriendsAdmin
+        friends={friends}
+        enabled={federationEnabled()}
+        nickname={await instanceNickname()}
+        demo={isDemo()}
+      />
       <AdminControls
         demo={isDemo()}
         configured={configured}

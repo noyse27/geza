@@ -18,6 +18,7 @@ import { redact } from '@/lib/logging';
 import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
 import { createManualWatch } from '@/lib/manual-watches';
 import { recordFeedEntrySafely } from '@/lib/feed';
+import { acceptFriendship, removeFriend, requestFriendship } from '@/lib/federation';
 export const maxDuration = 300;
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
@@ -259,6 +260,12 @@ export async function POST(req: Request) {
           [body.id, rating],
         );
       await recordFeedEntrySafely(body.id);
+    } else if (body.action === 'friend-request') {
+      await requestFriendship(z.string().min(1).max(300).parse(body.url));
+    } else if (body.action === 'friend-accept') {
+      await acceptFriendship(z.string().regex(/^\d+$/).parse(String(body.id)));
+    } else if (body.action === 'friend-remove') {
+      await removeFriend(z.string().regex(/^\d+$/).parse(String(body.id)));
     } else if (body.action === 'settings') {
       const previousPlex = (await getSetting('PLEX_URL')) + ':' + (await getSetting('PLEX_TOKEN'));
       for (const key of settingKeys)
@@ -395,7 +402,9 @@ export async function POST(req: Request) {
         error:
           e instanceof z.ZodError
             ? 'Bitte Eingaben prüfen.'
-            : ['series-catalog', 'watch-create', 'watch-expand'].includes(requestedAction)
+            : ['series-catalog', 'watch-create', 'watch-expand', 'friend-request', 'friend-accept'].includes(
+                  requestedAction,
+                )
               ? String(redact((e as Error).message))
               : requestedAction === 'plex-scan-preview'
                 ? `Plex-Vorschau abgebrochen: ${String(redact((e as Error).message))}`
