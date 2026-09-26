@@ -23,6 +23,10 @@ export type Media = {
   poster: string | null;
   rating?: number;
   watched_at?: string;
+  has_watch?: boolean;
+  plex_watched?: boolean;
+  seen_evidence?: boolean;
+  catalog_checked_at?: string;
   watch_id?: string;
   updated_at: string;
   locked_fields: string[];

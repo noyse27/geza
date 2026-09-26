@@ -10,6 +10,7 @@ import { processPlexPresence } from '../src/lib/plex-presence';
 import { nextPlexRun, scheduleNextScan } from '../src/lib/plex-jobs';
 import { getSetting } from '../src/lib/settings';
 import { installationReady } from '../src/lib/setup';
+import { processSeriesCatalog } from '../src/lib/manual-watches';
 let running = true;
 process.on('SIGTERM', () => {
   running = false;
@@ -19,6 +20,7 @@ process.on('SIGINT', () => {
 });
 console.log('Geza worker ready');
 let lastCleanup = 0;
+let lastCatalogSeed = 0;
 let plexScanSeeded = false;
 const friendsLoop = (async () => {
   while (running) {
@@ -44,6 +46,13 @@ while (running) {
     if (Date.now() - lastCleanup > 3600000) {
       await query("DELETE FROM event_logs WHERE created_at < now() - interval '14 days'");
       lastCleanup = Date.now();
+    }
+    if (Date.now() - lastCatalogSeed > 60000 && (await getSetting('TMDB_TOKEN'))) {
+      await query(`INSERT INTO jobs(kind,dedupe_key,payload)
+        SELECT 'series-catalog','series-catalog:'||id,jsonb_build_object('mediaId',id::text)
+        FROM media WHERE kind='show' AND catalog_backfill_before IS NOT NULL
+        ON CONFLICT(dedupe_key) DO NOTHING`);
+      lastCatalogSeed = Date.now();
     }
     if (!plexScanSeeded) {
       // Seeded here instead of a migration so fresh installs keep an empty jobs table (required by demo setup).
@@ -87,6 +96,7 @@ while (running) {
           await logEvent('info', job.kind, 'Verarbeitung gestartet');
           try {
             if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
+            else if (job.kind === 'series-catalog') await processSeriesCatalog(String(job.payload.mediaId));
             else if (job.kind === 'plex') await processPlex(job.payload);
             else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
             else if (job.kind === 'plex-scan') await processPlexScan(job.payload);

@@ -78,7 +78,7 @@ export async function getMedia(id: string, admin = false) {
   return (
     (
       await query<Media>(
-        `SELECT ${publicColumns},m.locked_fields,${admin ? 'm.assignment_reason,m.origins,m.bucket_preference,' : ''}fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1 AND ($2 OR NOT m.rumpel)`,
+        `SELECT ${publicColumns},m.catalog_checked_at,m.locked_fields,${admin ? 'm.assignment_reason,m.origins,m.bucket_preference,' : ''}fs.id AS series_id,fs.title AS series_title FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN film_series_members fsm ON fsm.media_id=m.id LEFT JOIN film_series fs ON fs.id=fsm.series_id WHERE m.id=$1 AND ($2 OR NOT m.rumpel)`,
         [id, admin],
       )
     )[0] || null

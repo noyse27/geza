@@ -87,10 +87,16 @@ async function tmdb(m: Raw): Promise<Raw | null> {
     id = (m.kind === 'movie' ? found.movie_results : found.tv_results)?.[0]?.id;
   }
   let path = m.kind === 'movie' ? `movie/${id}` : `tv/${id}`;
-  if (m.kind === 'episode') {
-    const parent = (await query('SELECT ids FROM media WHERE id=$1', [m.parent_id]))[0];
+  if (m.kind === 'episode' || m.kind === 'season') {
+    const parent = (
+      await query(
+        `SELECT s.ids,COALESCE($2::integer,p.season) AS season FROM media p JOIN media s ON
+      s.id=CASE WHEN p.kind='show' THEN p.id ELSE p.parent_id END WHERE p.id=$1 AND s.kind='show'`,
+        [m.parent_id, m.season],
+      )
+    )[0];
     if (!parent?.ids.tmdb) return null;
-    path = `tv/${parent.ids.tmdb}/season/${m.season}/episode/${m.episode}`;
+    path = `tv/${parent.ids.tmdb}/season/${parent.season}${m.kind === 'episode' ? '/episode/' + m.episode : ''}`;
   } else if (!id) return null;
   const d = await json(
     `https://api.themoviedb.org/3/${path}?language=de-DE&append_to_response=credits,release_dates,content_ratings,external_ids`,

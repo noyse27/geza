@@ -10,7 +10,7 @@ const name = `geza_test_http_${Date.now()}`;
 const url = new URL(process.env.DATABASE_URL!);
 url.pathname = '/' + name;
 let app: ChildProcess | undefined;
-let target: pg.Pool | undefined;
+let target: pg.Client | undefined;
 let appPool: pg.Pool | undefined;
 let output = '';
 const base = 'http://127.0.0.1:32119';
@@ -38,9 +38,12 @@ const plex = createServer((req, res) => {
 });
 try {
   await source.query(`CREATE DATABASE ${name}`);
-  target = new pg.Pool({ connectionString: url.toString() });
+  target = new pg.Client({ connectionString: url.toString() });
+  await target.connect();
   for (const file of (await readdir('migrations')).filter((f) => f.endsWith('.sql')).sort())
     await target.query(await readFile('migrations/' + file, 'utf8'));
+  await target.end();
+  target = undefined;
   process.env.DATABASE_URL = url.toString();
   process.env.SESSION_SECRET = 'classification-http-test-secret-long-enough';
   const { pool, query } = await import('../src/lib/db');
@@ -209,6 +212,61 @@ try {
   );
   assert.ok(traktSeason);
   assert.ok((await page(traktSeason.id)).includes('Importierte Folge'));
+  const create = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch-create',
+      mediaId: show.id,
+      includeChildren: true,
+      data: { watched_at: '2026-09-18T20:00' },
+    }),
+  });
+  assert.equal(create.status, 200);
+  const [wholeWatch] = await query("SELECT id FROM watches WHERE media_id=$1 AND source='geza'", [show.id]);
+  const cascades = await query("SELECT id,media_id FROM watches WHERE source='geza' AND source_id LIKE $1", [
+    'cascade:' + wholeWatch.id + ':%',
+  ]);
+  assert.ok(cascades.length > 0);
+  const revise = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch',
+      id: wholeWatch.id,
+      mediaId: show.id,
+      data: { watched_at: '2026-09-19T20:00' },
+    }),
+  });
+  assert.equal(revise.status, 200);
+  assert.equal(
+    (await query('SELECT watched_at FROM watches WHERE id=$1', [cascades[0].id]))[0].watched_at.toISOString(),
+    '2026-09-19T18:00:00.000Z',
+  );
+  // Individually corrected descendants detach from the whole-series action.
+  const editChild = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch',
+      id: cascades[0].id,
+      mediaId: cascades[0].media_id,
+      data: { watched_at: '2026-09-17T20:00' },
+    }),
+  });
+  assert.equal(editChild.status, 200);
+  const remove = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action: 'watch-delete', id: wholeWatch.id, mediaId: show.id }),
+  });
+  assert.equal(remove.status, 200);
+  assert.equal((await query('SELECT 1 FROM watches WHERE id=$1', [cascades[0].id])).length, 1);
+  assert.equal(
+    (await query('SELECT 1 FROM watches WHERE source_id LIKE $1', ['cascade:' + wholeWatch.id + ':%']))
+      .length,
+    0,
+  );
   console.log(
     'HTTP checks passed: authenticated admin, preview rollback, season bucketlist, manual exclusion, ZIP preview/import and Plex follow-up.',
   );
@@ -216,14 +274,18 @@ try {
   console.error(output);
   throw error;
 } finally {
-  if (app?.pid && app.exitCode === null) {
+  if (app?.pid && app.exitCode === null && app.signalCode === null) {
+    const exited = new Promise<void>((resolve) => app!.once('exit', () => resolve()));
+    const forceExit = setTimeout(() => app?.kill('SIGKILL'), 10000);
     if (process.platform === 'win32')
       spawnSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
     else app.kill('SIGTERM');
+    await exited;
+    clearTimeout(forceExit);
   }
   plex.close();
   await appPool?.end();
   await target?.end();
-  await source.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await source.query(`DROP DATABASE IF EXISTS ${name}`);
   await source.end();
 }

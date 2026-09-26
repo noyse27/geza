@@ -16,6 +16,9 @@ import { BucketPreference } from './bucket-preference';
 import { originLabel } from '@/lib/media-origin';
 import { seasonNavigation } from '@/lib/seasons';
 import { SeasonSelector } from './season-selector';
+import { SeriesCatalog } from './series-catalog';
+import { ExpandWatch } from './editor';
+import { queueSeriesCatalog } from '@/lib/series-catalog';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
   const admin = await isAdmin();
   const m = await getMedia(id, admin);
@@ -23,6 +26,10 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
   const navigation = ['show', 'season', 'episode'].includes(m.kind) ? await seasonNavigation(m, admin) : null;
   const poster = m.poster || (m.kind === 'season' ? navigation?.show.poster : null);
   const seasonNumber = navigation?.season?.season ?? m.season;
+  const catalogConfigured =
+    admin && navigation && ['show', 'season'].includes(m.kind)
+      ? await queueSeriesCatalog(navigation.show.id)
+      : false;
   const displayTitle =
     m.kind === 'season' && navigation ? `${navigation.show.title} – Staffel ${m.season}` : m.title;
   const seriesOptions = admin ? await listFilmSeries() : [];
@@ -50,7 +57,10 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
   const children =
     m.kind === 'show' || m.kind === 'season'
       ? await query<Media>(
-          `SELECT ${publicColumns} FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE
+          `SELECT ${publicColumns},m.plex_watched,cardinality(m.seen_sources)>0 AS seen_evidence,
+           (SELECT max(watched_at) FROM watches WHERE media_id=m.id) AS watched_at,
+           EXISTS(SELECT 1 FROM watches WHERE media_id=m.id) AS has_watch
+           FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE
            (($2::text='show' AND m.parent_id=$1 AND m.kind='season') OR
             ($2::text='season' AND m.kind='episode' AND (m.parent_id=$1 OR (m.parent_id=$3 AND m.season=$4))))
            AND ($5 OR NOT m.rumpel) ORDER BY m.season,m.episode,m.id`,
@@ -99,6 +109,13 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
           <Poster item={{ ...m, poster: poster || null }} large />
           {navigation && ['show', 'season'].includes(m.kind) && (
             <SeasonSelector showId={navigation.show.id} currentId={id} seasons={navigation.seasons} />
+          )}
+          {admin && navigation && ['show', 'season'].includes(m.kind) && (
+            <SeriesCatalog
+              mediaId={navigation.show.id}
+              checked={!!navigation.show.catalog_checked_at}
+              configured={catalogConfigured}
+            />
           )}
           {m.series_title && (
             <Link className="series-badge" replace={modal} href={collectionHref('series', m.series_id!)}>
@@ -322,13 +339,22 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
                 {watches.map((w) => (
                   <li key={w.id}>
                     <WatchEditor mediaId={id} watch={JSON.parse(JSON.stringify(w))} />
+                    {['show', 'season'].includes(m.kind) && w.watched_at && (
+                      <ExpandWatch mediaId={id} watchId={w.id} />
+                    )}
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="muted">Keine Anschauereignisse für diesen Titel.</p>
             )}
-            <WatchCreator mediaId={id} />
+            <WatchCreator mediaId={id} kind={m.kind} />
+            {['show', 'season'].includes(m.kind) && (
+              <p className="muted small">
+                Ändern oder Löschen eines gemeinsamen Anschauzeitpunkts gilt auch für die damit ergänzten
+                Sichtungen. Einzeln bearbeitete Folgen bleiben davon ausgenommen.
+              </p>
+            )}
           </aside>
         )}
       </div>
@@ -339,7 +365,19 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
             <span className="muted">{children.length} Einträge</span>
           </div>
           {children.map((c) => (
-            <MediaRow key={c.id} item={c} />
+            <div key={c.id}>
+              <MediaRow item={c} />
+              {admin && c.kind === 'episode' && (
+                <div className="episode-watch">
+                  <span className="muted small">
+                    {c.has_watch || c.plex_watched || c.seen_evidence
+                      ? `Gesehen${c.watched_at ? ' · ' + new Date(c.watched_at).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' }) : ' · Datum unbekannt'}`
+                      : 'Noch keine Sichtung erfasst'}
+                  </span>
+                  <WatchCreator mediaId={c.id} kind="episode" />
+                </div>
+              )}
+            </div>
           ))}
         </section>
       )}
