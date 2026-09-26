@@ -413,11 +413,13 @@ export function WatchEditor({ mediaId, watch }: { mediaId: string; watch: Watch 
     </form>
   );
 }
-export function WatchCreator({ mediaId }: { mediaId: string }) {
+export function WatchCreator({ mediaId, kind }: { mediaId: string; kind?: string }) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [includeChildren, setIncludeChildren] = useState(true);
+  const hierarchy = kind === 'show' || kind === 'season';
   const router = useRouter();
   if (!open)
     return (
@@ -436,6 +438,7 @@ export function WatchCreator({ mediaId }: { mediaId: string }) {
           await post({
             action: 'watch-create',
             mediaId,
+            includeChildren: hierarchy && includeChildren,
             data: { watched_at: inputRef.current?.value || null },
           });
           invalidateHistoryCache();
@@ -449,6 +452,23 @@ export function WatchCreator({ mediaId }: { mediaId: string }) {
       }}
     >
       <input ref={inputRef} type="datetime-local" aria-label="Anschauzeitpunkt" />
+      {hierarchy && (
+        <label>
+          <input
+            type="checkbox"
+            checked={includeChildren}
+            onChange={(e) => setIncludeChildren(e.target.checked)}
+          />{' '}
+          Datum auch auf noch ungesehene, bis dahin erschienene Folgen{kind === 'show' ? ' und Staffeln' : ''}{' '}
+          anwenden
+        </label>
+      )}
+      {hierarchy && (
+        <p className="muted small">
+          Vorhandene Sichtungen bleiben erhalten. Neue Folgen werden später nicht automatisch als gesehen
+          markiert. Ohne TMDB werden nur bereits bekannte Folgen berücksichtigt.
+        </p>
+      )}
       <button disabled={busy} className="button primary">
         <Save size={14} />
         {busy ? 'Speichert …' : 'Hinzufügen'}
@@ -458,5 +478,35 @@ export function WatchCreator({ mediaId }: { mediaId: string }) {
       </button>
       {error && <p className="error">{error}</p>}
     </form>
+  );
+}
+
+export function ExpandWatch({ mediaId, watchId }: { mediaId: string; watchId: string }) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const router = useRouter();
+  return (
+    <>
+      <button
+        className="text-link"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError('');
+          try {
+            await post({ action: 'watch-expand', mediaId, id: watchId });
+            invalidateHistoryCache();
+            router.refresh();
+          } catch (error) {
+            setError((error as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? 'Wird angewendet …' : 'Datum auf fehlende Sichtungen der Folgen anwenden'}
+      </button>
+      {error && <p className="error">{error}</p>}
+    </>
   );
 }

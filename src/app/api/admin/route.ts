@@ -15,6 +15,8 @@ import { normalizeCertification } from '@/lib/certification';
 import { fetchTmdbDetails } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
+import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
+import { createManualWatch } from '@/lib/manual-watches';
 export const maxDuration = 300;
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
@@ -206,16 +208,31 @@ export async function POST(req: Request) {
         })
         .parse(body.data);
       const updated = await query(
-        `UPDATE watches SET watched_at=CASE WHEN $2::text IS NULL THEN NULL ELSE ($2::timestamp AT TIME ZONE 'Europe/Berlin') END,time_estimated=false WHERE id=$1 AND media_id=$3 RETURNING id`,
+        `WITH root AS (SELECT id FROM watches WHERE id=$1 AND media_id=$3 FOR UPDATE)
+         UPDATE watches SET watched_at=CASE WHEN $2::text IS NULL THEN NULL ELSE ($2::timestamp AT TIME ZONE 'Europe/Berlin') END,time_estimated=false,
+         source_id=CASE WHEN id=$1 AND source='geza' AND source_id LIKE 'cascade:%' THEN gen_random_uuid()::text ELSE source_id END
+         WHERE EXISTS(SELECT 1 FROM root) AND (id=$1 OR (source='geza' AND source_id LIKE 'cascade:'||$1::text||':%')) RETURNING id`,
         [body.id, data.watched_at, body.mediaId],
       );
       if (!updated.length) throw Error('Anschauereignis nicht gefunden');
     } else if (body.action === 'watch-delete') {
-      const deleted = await query('DELETE FROM watches WHERE id=$1 AND media_id=$2 RETURNING id', [
-        body.id,
-        body.mediaId,
-      ]);
+      const deleted = await query(
+        `WITH root AS (SELECT id FROM watches WHERE id=$1 AND media_id=$2 FOR UPDATE)
+        DELETE FROM watches WHERE EXISTS(SELECT 1 FROM root) AND (id=$1 OR (source='geza' AND source_id LIKE 'cascade:'||$1::text||':%')) RETURNING id`,
+        [body.id, body.mediaId],
+      );
       if (!deleted.length) throw Error('Anschauereignis nicht gefunden');
+    } else if (body.action === 'series-catalog') {
+      return Response.json(await syncSeriesCatalog(z.string().regex(/^\d+$/).parse(body.mediaId)));
+    } else if (body.action === 'watch-expand') {
+      return Response.json(
+        await createManualWatch(
+          z.string().regex(/^\d+$/).parse(body.mediaId),
+          null,
+          true,
+          z.string().regex(/^\d+$/).parse(body.id),
+        ),
+      );
     } else if (body.action === 'watch-create') {
       const data = z
         .object({
@@ -225,9 +242,10 @@ export async function POST(req: Request) {
             .nullable(),
         })
         .parse(body.data);
-      await query(
-        `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'geza',$2,CASE WHEN $3::text IS NULL THEN NULL ELSE ($3::timestamp AT TIME ZONE 'Europe/Berlin') END,false)`,
-        [body.mediaId, crypto.randomUUID(), data.watched_at],
+      await createManualWatch(
+        z.string().regex(/^\d+$/).parse(body.mediaId),
+        data.watched_at,
+        z.boolean().optional().parse(body.includeChildren) ?? false,
       );
     } else if (body.action === 'rating') {
       const rating = z.number().int().min(1).max(10).nullable().parse(body.rating);
@@ -363,6 +381,7 @@ export async function POST(req: Request) {
         "UPDATE media SET origins=ARRAY(SELECT DISTINCT unnest(origins||ARRAY['manual'])) WHERE id=$1",
         [id],
       );
+      if (data.kind === 'show') await queueSeriesCatalog(id);
       return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
@@ -372,9 +391,11 @@ export async function POST(req: Request) {
         error:
           e instanceof z.ZodError
             ? 'Bitte Eingaben prüfen.'
-            : requestedAction === 'plex-scan-preview'
-              ? `Plex-Vorschau abgebrochen: ${String(redact((e as Error).message))}`
-              : 'Speichern fehlgeschlagen.',
+            : ['series-catalog', 'watch-create', 'watch-expand'].includes(requestedAction)
+              ? String(redact((e as Error).message))
+              : requestedAction === 'plex-scan-preview'
+                ? `Plex-Vorschau abgebrochen: ${String(redact((e as Error).message))}`
+                : 'Speichern fehlgeschlagen.',
       },
       { status: 400 },
     );

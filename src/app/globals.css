@@ -1138,6 +1138,12 @@ nav .active:after {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.season-catalog { margin-top: 16px; }
+.episode-watch { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 0 18px 76px; }
+.watch-edit-form > label { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; width: 100%; }
+.watch-edit-form input[type='checkbox'] { width: auto; margin-top: 4px; flex-shrink: 0; }
+.watch-dates li { flex-wrap: wrap; }
+.watch-dates li > .text-link { width: 100%; text-align: left; }
 .poster-large .poster-placeholder {
   padding: 35px;
 }

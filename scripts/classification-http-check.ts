@@ -209,6 +209,61 @@ try {
   );
   assert.ok(traktSeason);
   assert.ok((await page(traktSeason.id)).includes('Importierte Folge'));
+  const create = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch-create',
+      mediaId: show.id,
+      includeChildren: true,
+      data: { watched_at: '2026-09-18T20:00' },
+    }),
+  });
+  assert.equal(create.status, 200);
+  const [wholeWatch] = await query("SELECT id FROM watches WHERE media_id=$1 AND source='geza'", [show.id]);
+  const cascades = await query("SELECT id,media_id FROM watches WHERE source='geza' AND source_id LIKE $1", [
+    'cascade:' + wholeWatch.id + ':%',
+  ]);
+  assert.ok(cascades.length > 0);
+  const revise = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch',
+      id: wholeWatch.id,
+      mediaId: show.id,
+      data: { watched_at: '2026-09-19T20:00' },
+    }),
+  });
+  assert.equal(revise.status, 200);
+  assert.equal(
+    (await query('SELECT watched_at FROM watches WHERE id=$1', [cascades[0].id]))[0].watched_at.toISOString(),
+    '2026-09-19T18:00:00.000Z',
+  );
+  // Individually corrected descendants detach from the whole-series action.
+  const editChild = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'watch',
+      id: cascades[0].id,
+      mediaId: cascades[0].media_id,
+      data: { watched_at: '2026-09-17T20:00' },
+    }),
+  });
+  assert.equal(editChild.status, 200);
+  const remove = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action: 'watch-delete', id: wholeWatch.id, mediaId: show.id }),
+  });
+  assert.equal(remove.status, 200);
+  assert.equal((await query('SELECT 1 FROM watches WHERE id=$1', [cascades[0].id])).length, 1);
+  assert.equal(
+    (await query('SELECT 1 FROM watches WHERE source_id LIKE $1', ['cascade:' + wholeWatch.id + ':%']))
+      .length,
+    0,
+  );
   console.log(
     'HTTP checks passed: authenticated admin, preview rollback, season bucketlist, manual exclusion, ZIP preview/import and Plex follow-up.',
   );
