@@ -12,6 +12,7 @@
     "start": "next start --hostname 0.0.0.0 --port 3080",
     "lint": "tsc --noEmit",
     "test:unit": "tsx --test tests/unit.test.ts tests/transfer.test.ts tests/demo.test.ts tests/setup.test.ts tests/plex-episodes.test.ts",
+    "test:feed": "tsx scripts/feed-check.ts",
     "test:transfer": "tsx scripts/transfer-check.ts",
     "test:transfer:http": "tsx scripts/transfer-http-check.ts",
     "test:integration": "tsx --test tests/integration.test.ts",

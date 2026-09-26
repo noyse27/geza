@@ -3,6 +3,7 @@ import { loggedFetch, logEvent } from './logging';
 import { query } from './db';
 import { getSetting } from './settings';
 import { watchedTime } from './security';
+import { recordFeedEntrySafely } from './feed';
 import type { PoolClient } from 'pg';
 type PlexMetadata = Record<string, any>;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
@@ -209,6 +210,7 @@ export async function processPlex(payload: {
         error: e,
       }),
     );
+    await recordFeedEntrySafely(id);
   }
   await query(
     `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,

@@ -35,6 +35,7 @@ try {
     'sessions',
     'login_attempts',
     'event_logs',
+    'feed_entries',
     'migrations',
     'setup_restore',
   ]);

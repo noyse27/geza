@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { LogOut, ArrowLeft } from 'lucide-react';
-export function Navigation({ admin }: { admin: boolean }) {
+import { LogOut, ArrowLeft, Rss } from 'lucide-react';
+export function Navigation({ admin, feed = false }: { admin: boolean; feed?: boolean }) {
   const path = usePathname();
   const links = admin
     ? [
@@ -35,6 +35,11 @@ export function Navigation({ admin }: { admin: boolean }) {
           {label}
         </Link>
       ))}
+      {!admin && feed && (
+        <a href="/feed.xml" target="_blank" rel="noopener" title="RSS-Feed abonnieren">
+          <Rss size={15} aria-hidden="true" /> ABO
+        </a>
+      )}
     </nav>
   );
 }

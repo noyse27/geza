@@ -389,6 +389,7 @@ nav {
 nav a {
   display: flex;
   align-items: center;
+  gap: 5px;
   color: var(--muted);
   font-size: 14px;
   position: relative;
