@@ -26,6 +26,7 @@
     "worker": "tsx scripts/worker.ts",
     "benchmark": "tsx scripts/benchmark.ts",
     "reviews:dedupe": "tsx scripts/dedupe-reviews.ts",
+    "facets:normalize": "tsx scripts/normalize-facets.ts",
     "test:demo:http": "tsx scripts/demo-http-check.ts",
     "test:demo:safety": "tsx scripts/demo-safety-check.ts"
   },

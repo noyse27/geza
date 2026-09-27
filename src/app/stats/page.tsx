@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { countryLabel } from '@/lib/countries';
 export const metadata = { title: 'Statistik', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -26,6 +27,7 @@ export default async function Page() {
   ]);
   const t = totals[0],
     max = Math.max(1, ...monthly.map((r) => r.count));
+  for (const r of countries) r.name = countryLabel(r.name);
   return (
     <div className="page">
       <div className="page-heading">

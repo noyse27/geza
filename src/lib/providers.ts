@@ -5,6 +5,7 @@ import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
 import { normalizeCertification } from './certification';
+import { normalizeFacetArray } from './facets';
 import type { PoolClient } from 'pg';
 type Raw = Record<string, any>;
 const fields = [
@@ -21,7 +22,10 @@ const fields = [
   'poster',
 ] as const;
 const tags = (items: Raw[] | undefined) =>
-  items?.map((x) => String(x.tag || x.name || '')).filter(Boolean) || [];
+  items
+    ?.flatMap((x) => String(x.tag || x.name || '').split(';'))
+    .map((x) => x.trim())
+    .filter(Boolean) || [];
 export function fromPlex(m: Raw): Raw {
   return {
     title: m.title,
@@ -42,6 +46,8 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex', clie
   const run = client
     ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
     : query;
+  if (data.countries) data.countries = await normalizeFacetArray('country', data.countries);
+  if (data.genres) data.genres = await normalizeFacetArray('genre', data.genres);
   const current = (await run('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!current) return;
   const priority: Record<string, number> = { plex: 3, tvdb: 2, tmdb: 1 };
@@ -180,8 +186,11 @@ export async function fetchTmdbDetails(kind: 'movie' | 'show', tmdbId: number) {
     original_title: d.original_title || d.original_name || '',
     year: Number((d.release_date || d.first_air_date || '').slice(0, 4)) || null,
     summary: overview || '',
-    countries: d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country || [],
-    genres: tags(d.genres),
+    countries: await normalizeFacetArray(
+      'country',
+      d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country || [],
+    ),
+    genres: await normalizeFacetArray('genre', tags(d.genres)),
     directors: d.credits?.crew?.filter((x: Raw) => x.job === 'Director').map((x: Raw) => x.name) || [],
     actors: d.credits?.cast?.slice(0, 10).map((x: Raw) => x.name) || [],
     certification: normalizeCertification(de) ?? null,

@@ -1,4 +1,5 @@
 import { collectionHref } from '@/lib/collection-links';
+import { countryLabel } from '@/lib/countries';
 import { configuredFriendReviews } from '@/lib/friend-reviews';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -181,7 +182,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
                 replace={modal}
                 href={collectionHref('country', country)}
               >
-                {country}
+                {countryLabel(country)}
               </Link>
             ))}
           </div>

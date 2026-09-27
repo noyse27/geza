@@ -1139,12 +1139,35 @@ nav .active:after {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.season-catalog { margin-top: 16px; }
-.episode-watch { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 0 18px 76px; }
-.watch-edit-form > label { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; width: 100%; }
-.watch-edit-form input[type='checkbox'] { width: auto; margin-top: 4px; flex-shrink: 0; }
-.watch-dates li { flex-wrap: wrap; }
-.watch-dates li > .text-link { width: 100%; text-align: left; }
+.season-catalog {
+  margin-top: 16px;
+}
+.episode-watch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 18px 76px;
+}
+.watch-edit-form > label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.watch-edit-form input[type='checkbox'] {
+  width: auto;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.watch-dates li {
+  flex-wrap: wrap;
+}
+.watch-dates li > .text-link {
+  width: 100%;
+  text-align: left;
+}
 .poster-large .poster-placeholder {
   padding: 35px;
 }
@@ -2276,8 +2299,16 @@ footer > a:nth-of-type(2) {
   }
 }
 
-.demo-banner { padding: 14px 24px; background: #322b12; color: #fff4c2; text-align: center; font-size: 14px; }
-.demo-banner a { text-decoration: underline; }
+.demo-banner {
+  padding: 14px 24px;
+  background: #322b12;
+  color: #fff4c2;
+  text-align: center;
+  font-size: 14px;
+}
+.demo-banner a {
+  text-decoration: underline;
+}
 
 .rumpel-filter {
   justify-content: flex-start;
@@ -2381,4 +2412,31 @@ footer > a:nth-of-type(2) {
     width: 100%;
     justify-content: flex-start;
   }
+}
+.facet-merge-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+.facet-merge-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 8px;
+  cursor: pointer;
+}
+.facet-merge-row.selected {
+  background: var(--surface);
+}
+.facet-merge-label {
+  flex: 1;
+}
+.facet-merge-canonical {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
 }

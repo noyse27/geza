@@ -5,6 +5,7 @@ import { Pencil, Save, X, Globe, Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
+import { countryLabel } from '@/lib/countries';
 async function post(body: unknown) {
   const r = await fetch('/api/admin', {
     method: 'POST',
@@ -100,7 +101,9 @@ export function MediaEditor({
                       type={['year', 'runtime'].includes(key) ? 'number' : 'text'}
                       defaultValue={
                         Array.isArray(item[key as keyof Media])
-                          ? (item[key as keyof Media] as string[]).join(', ')
+                          ? (item[key as keyof Media] as string[])
+                              .map((v) => (key === 'countries' ? countryLabel(v) : v))
+                              .join(', ')
                           : String(item[key as keyof Media] ?? '')
                       }
                     />
