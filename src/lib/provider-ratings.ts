@@ -31,6 +31,8 @@ export function plexImdbRating(m: Raw) {
   return null;
 }
 export async function savePlexRatings(id: string, m: Raw, ids: Raw) {
+  const guids = [m.guid, ...(m.Guid || []).map((g: Raw) => g.id)];
+  if (!guids.some((guid) => String(guid).split('?')[0] === `imdb://${ids.imdb}`)) return;
   const rating = plexImdbRating(m);
   if (rating !== null && /^tt\d+$/.test(String(ids.imdb)))
     await saveProviderRating(id, 'imdb', rating, `https://www.imdb.com/title/${ids.imdb}/ratings/`);

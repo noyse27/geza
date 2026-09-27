@@ -1,6 +1,6 @@
 import { isDemo, demoBlocked } from '@/lib/demo-mode';
 import { isAdmin, validOrigin } from '@/lib/auth';
-import { query } from '@/lib/db';
+import { query, pool } from '@/lib/db';
 import { getSetting, setSetting, settingKeys } from '@/lib/settings';
 import { requestPlexScan, scheduleNextScan } from '@/lib/plex-jobs';
 import { processPlexScan } from '@/lib/plex-scan';
@@ -12,7 +12,7 @@ import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
 import { normalizeCertification } from '@/lib/certification';
-import { fetchTmdbDetails } from '@/lib/providers';
+import { fetchTmdbDetails, refreshProviderRatings } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
 import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
@@ -126,14 +126,66 @@ export async function POST(req: Request) {
         [body.id, data.provider, url, url ? data.rating : null],
       );
     } else if (body.action === 'media') {
+      const ids = z
+        .object({
+          imdb: z
+            .string()
+            .trim()
+            .regex(/^(?:tt\d+)?$/),
+          tmdb: z
+            .string()
+            .trim()
+            .regex(/^(?:[1-9]\d*)?$/),
+          tvdb: z
+            .string()
+            .trim()
+            .regex(/^(?:[1-9]\d*)?$/),
+        })
+        .optional()
+        .parse(body.data?.ids);
       const data = mediaSchema.parse(body.data);
       data.certification = normalizeCertification(data.certification) ?? null;
       const fields = Object.keys(data);
       const values = Object.values(data);
-      await query(
-        `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,
-        [...values, fields, body.id],
-      );
+      const changed: string[] = [];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const {
+          rows: [current],
+        } = await client.query('SELECT ids FROM media WHERE id=$1 FOR UPDATE', [body.id]);
+        if (!current) throw Error('Titel nicht gefunden');
+        await client.query(
+          `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,
+          [...values, fields, body.id],
+        );
+        if (ids) {
+          const merged = { ...current.ids };
+          for (const [provider, value] of Object.entries(ids)) {
+            if (String(merged[provider] ?? '') === value) continue;
+            changed.push(provider);
+            if (value) merged[provider] = value;
+            else delete merged[provider];
+          }
+          if (changed.length) {
+            await client.query('UPDATE media SET ids=$2::jsonb WHERE id=$1', [
+              body.id,
+              JSON.stringify(merged),
+            ]);
+            await client.query(
+              'DELETE FROM provider_ratings WHERE media_id=$1 AND provider=ANY($2::text[])',
+              [body.id, changed],
+            );
+          }
+        }
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      if (changed.length) await refreshProviderRatings(body.id, changed);
       const series = z.string().max(300).optional().parse(body.data?.series)?.trim();
       if (!series) await query('DELETE FROM film_series_members WHERE media_id=$1', [body.id]);
       else {

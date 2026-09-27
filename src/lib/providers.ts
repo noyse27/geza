@@ -102,6 +102,7 @@ async function tmdb(m: Raw): Promise<Raw | null> {
     `https://api.themoviedb.org/3/${path}?language=de-DE&append_to_response=credits,release_dates,content_ratings,external_ids`,
     headers,
   );
+  if (m.ids.tmdb && String(d.id) !== String(m.ids.tmdb)) return null;
   if (Number(d.vote_count) > 0)
     await saveProviderRating(
       String(m.id),
@@ -192,6 +193,28 @@ export async function fetchTmdbDetails(kind: 'movie' | 'show', tmdbId: number) {
   };
 }
 let tvdbSession: { key: string; token: string; expires: number } | null = null;
+export async function refreshProviderRatings(id: string, providers: string[]) {
+  if (isDemo()) return;
+  const [m] = await query('SELECT * FROM media WHERE id=$1', [id]);
+  if (!m) return;
+  for (const provider of providers) {
+    if (!m.ids[provider]) continue;
+    try {
+      if (provider === 'tmdb') await tmdb(m);
+      if (provider === 'imdb') {
+        const p = await findPlex(m.ids, m.kind);
+        if (p) await savePlexRatings(id, p, m.ids);
+      }
+      // TVDB has no supported rating source; the detail view links to its ID.
+    } catch (error) {
+      await logEvent('warn', 'enrich', 'Anbieterbewertung konnte nicht aktualisiert werden', {
+        mediaId: id,
+        provider,
+        error,
+      });
+    }
+  }
+}
 async function tvdb(m: Raw): Promise<Raw | null> {
   const key = await getSetting('TVDB_API_KEY');
   if (!key || !m.ids.tvdb) return null;

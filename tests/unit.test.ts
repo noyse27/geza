@@ -11,10 +11,27 @@ import {
 } from '../src/lib/security';
 import { plexIds } from '../src/lib/plex';
 import { friendUrl, parseFilmdienst, parseWortvogel } from '../src/lib/friend-reviews';
-import { plexImdbRating } from '../src/lib/provider-ratings';
+import { plexImdbRating, savePlexRatings } from '../src/lib/provider-ratings';
 import { playbackItem } from '../src/lib/now-playing';
 import { nowPlayingCatalog } from '../src/lib/now-playing-catalog';
 import { plexCoverFallback, validPlexCoverPath } from '../src/lib/plex-cover';
+import { pool } from '../src/lib/db';
+
+test('IMDb rating refresh rejects stale Plex identities and accepts the corrected identity', async (t) => {
+  const writes: unknown[][] = [];
+  t.mock.method(pool, 'query', async (...args: unknown[]) => {
+    writes.push(args);
+    return { rows: [] };
+  });
+  const rating = { rating: 7.5, ratingImage: 'imdb://image.rating' };
+  await savePlexRatings('1', { ...rating, Guid: [{ id: 'imdb://tt123' }] }, { imdb: 'tt456' });
+  await savePlexRatings('1', rating, { imdb: 'tt456' });
+  await savePlexRatings('1', { ...rating, Guid: [{ id: 'imdb://tt123' }] }, {});
+  assert.equal(writes.length, 0);
+  await savePlexRatings('1', { ...rating, Guid: [{ id: 'imdb://tt456' }] }, { imdb: 'tt456' });
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0][1], ['1', 'imdb', 7.5, 'https://www.imdb.com/title/tt456/ratings/', null]);
+});
 
 test('Plex cover fallback supports film and series thumbnails without exposing server or token', () => {
   const thumb = '/library/metadata/123/thumb/456';

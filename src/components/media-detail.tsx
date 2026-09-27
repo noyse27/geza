@@ -242,6 +242,14 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
               );
             })}
           </div>
+          <div className="detail-facts" aria-label="Anbieter-IDs">
+            {['imdb', 'tmdb', 'tvdb'].map((provider) => (
+              <span key={provider}>
+                {provider === 'imdb' ? 'IMDb' : provider.toUpperCase()}-ID:{' '}
+                {m.ids[provider] || 'Nicht hinterlegt'}
+              </span>
+            ))}
+          </div>
           <div className="detail-credits">
             <div>
               <span className="eyebrow">REGIE</span>
