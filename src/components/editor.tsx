@@ -63,6 +63,12 @@ export function MediaEditor({
                     .map((x) => x.trim())
                     .filter(Boolean);
                 data.series = String(form.get('series') || '').trim();
+                data.ids = Object.fromEntries(
+                  ['imdb', 'tmdb', 'tvdb'].map((provider) => [
+                    provider,
+                    String(form.get(provider) || '').trim(),
+                  ]),
+                );
                 try {
                   await post({ action: 'media', id: item.id, data });
                   setOpen(false);
@@ -115,6 +121,17 @@ export function MediaEditor({
                     ))}
                   </datalist>
                 </label>
+                {['imdb', 'tmdb', 'tvdb'].map((provider) => (
+                  <label key={provider}>
+                    {provider === 'imdb' ? 'IMDb' : provider.toUpperCase()}-ID
+                    <input
+                      name={provider}
+                      defaultValue={item.ids[provider] ?? ''}
+                      pattern={provider === 'imdb' ? 'tt[0-9]+' : '[1-9][0-9]*'}
+                      placeholder={provider === 'imdb' ? 'tt1234567' : '12345'}
+                    />
+                  </label>
+                ))}
               </div>
               <label>
                 Zusammenfassung
