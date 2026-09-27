@@ -8,6 +8,8 @@ type Props = {
   values: Record<string, string>;
   publicUrl: string;
   plexSections: { key: string; title: string; type: string }[];
+  lastScan?: { createdAt: string; context: Record<string, number> } | null;
+  nextScan?: { availableAt: string; updatedAt: string; error: string | null } | null;
 };
 type ImportReport = {
   dryRun?: boolean;
@@ -33,7 +35,15 @@ const fields = [
   ['FEED_GRACE_MINUTES', 'Feed-Karenzzeit in Minuten (Standard 30, 0 = sofort)'],
 ] as const;
 const sensitive = new Set(['TMDB_TOKEN', 'TVDB_API_KEY', 'TVDB_PIN', 'PLEX_TOKEN', 'PLEX_WEBHOOK_SECRET']);
-export function AdminControls({ configured, values, publicUrl, plexSections, demo = false }: Props) {
+export function AdminControls({
+  configured,
+  values,
+  publicUrl,
+  plexSections,
+  lastScan,
+  nextScan,
+  demo = false,
+}: Props) {
   const [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
     [importing, setImporting] = useState(false),
@@ -131,8 +141,48 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
       setImporting(false);
     }
   }
+  const lastRunAt = nextScan?.updatedAt || lastScan?.createdAt;
+  const scanStatus = !lastRunAt
+    ? 'Noch keine Ausführung.'
+    : nextScan?.error
+      ? `Fehlgeschlagen: ${nextScan.error}`
+      : 'Erfolgreich.';
   return (
     <>
+      <div className="panel">
+        <h2>Automatische Jobs</h2>
+        <div className="job-row">
+          <div>
+            <strong>Plex-Bibliotheks-Scan</strong>
+            <p className="muted small">
+              Gleicht die Plex-Bibliothek täglich mit Geza ab: neue Titel, Sichtungen und gelöschte Titel.
+            </p>
+          </div>
+          <div className="job-meta">
+            <span>
+              Startzeit: {String(scanHour).padStart(2, '0')}:00 Uhr (Berlin)
+            </span>
+            <span>
+              Letzte Ausführung:{' '}
+              {lastRunAt
+                ? new Date(lastRunAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
+                : '–'}
+            </span>
+            <span className={nextScan?.error ? 'error' : ''}>Status: {scanStatus}</span>
+          </div>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={scanEnabled}
+              disabled={busy}
+              onChange={(e) =>
+                void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
+              }
+            />
+            Aktiv
+          </label>
+        </div>
+      </div>
       <form
         className="panel"
         onSubmit={(e) => {
@@ -380,17 +430,9 @@ export function AdminControls({ configured, values, publicUrl, plexSections, dem
             />
             Ungesehenen Plex-Bestand automatisch in die Bucketliste übernehmen
           </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={scanEnabled}
-              disabled={busy}
-              onChange={(e) =>
-                void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
-              }
-            />
-            Plex-Abgleich täglich automatisch ausführen
-          </label>
+          <p className="muted small">
+            Ein- und Ausschalten dieses automatischen Jobs findest du oben unter „Automatische Jobs“.
+          </p>
           <label>
             Uhrzeit (Europe/Berlin)
             <select

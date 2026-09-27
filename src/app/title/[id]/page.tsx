@@ -13,7 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     )
   )[0];
   const name = m.kind === 'season' && m.parent_title ? `${m.parent_title} – Staffel ${m.season}` : m.title;
-  const title = `${name}${m.year ? ` (${m.year})` : ''}`;
+  const facts = [m.runtime ? `${m.runtime} Min.` : null, m.certification || null].filter(Boolean);
+  const title = `${name}${m.year ? ` (${m.year})` : ''}${facts.length ? ` · ${facts.join(' · ')}` : ''}`;
   const stars = rating != null ? '★'.repeat(rating) + '☆'.repeat(10 - rating) + ` (${rating}/10) — ` : '';
   const teaser =
     review && !review.spoiler
