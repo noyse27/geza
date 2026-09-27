@@ -51,7 +51,7 @@ export default async function Page() {
     "SELECT created_at,context FROM event_logs WHERE source='plex-scan' AND message='Plex-Bestand und Einordnung abgeglichen' ORDER BY id DESC LIMIT 1",
   );
   const [nextScan] = await query(
-    "SELECT available_at,status,error FROM jobs WHERE dedupe_key='plex-scan-daily'",
+    "SELECT available_at,updated_at,status,error FROM jobs WHERE dedupe_key='plex-scan-daily'",
   );
   return (
     <div className="page">
@@ -80,6 +80,16 @@ export default async function Page() {
         values={settings}
         publicUrl={process.env.PUBLIC_URL || ''}
         plexSections={plexSections}
+        lastScan={lastScan ? { createdAt: lastScan.created_at, context: lastScan.context } : null}
+        nextScan={
+          nextScan
+            ? {
+                availableAt: nextScan.available_at,
+                updatedAt: nextScan.updated_at,
+                error: nextScan.error,
+              }
+            : null
+        }
       />
       {isDemo() ? (
         <section className="panel">
@@ -112,23 +122,6 @@ export default async function Page() {
       <div className="stats-columns">
         <section className="panel">
           <h2>Verarbeitung</h2>
-          {lastScan && (
-            <p>
-              Letzter Plex-Abgleich:{' '}
-              {new Date(lastScan.created_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} ·{' '}
-              {lastScan.context.titles} Medienobjekte · {lastScan.context.changed} Änderungen ·{' '}
-              {lastScan.context.skippedDeleted} gelöschte Titel übersprungen.
-              {lastScan.context.incompleteSeries > 0 &&
-                ` ${lastScan.context.incompleteSeries} Serien wegen unklarer Episodendaten nicht neu einsortiert; Details im Ereignisprotokoll.`}
-            </p>
-          )}
-          {nextScan && settings.PLEX_SCAN_ENABLED !== '0' && (
-            <p>
-              Nächster täglicher Plex-Abgleich:{' '}
-              {new Date(nextScan.available_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}{' '}
-              (Berlin). {nextScan.error && `Letzter Fehler: ${nextScan.error}`}
-            </p>
-          )}
           {jobs.length ? (
             jobs.map((j, i) => (
               <p key={i} className="status-row">

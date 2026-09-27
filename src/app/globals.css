@@ -1566,6 +1566,21 @@ nav .active:after {
   border-bottom: 1px solid var(--line);
   padding: 10px 0;
 }
+.job-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 0;
+}
+.job-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .prose {
   max-width: 850px;
   padding-top: 60px;
