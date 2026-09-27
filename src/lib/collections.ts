@@ -1,5 +1,6 @@
 import { query } from './db';
 import { cardColumns } from './catalog';
+import { countryLabel } from './countries';
 import type { Media } from './types';
 import type { CollectionCategory } from './collection-links';
 
@@ -25,13 +26,14 @@ export async function collectionGroups(category: CollectionCategory) {
     year: 'm.year::text',
     rating: 'r.rating::text',
   };
-  return query<{ value: string; label: string; count: number }>(
+  const groups = await query<{ value: string; label: string; count: number }>(
     `SELECT value,value AS label,count(DISTINCT id)::int AS count FROM (
       SELECT m.id,${expressions[category]} AS value FROM media m
       ${category === 'rating' ? 'JOIN ratings r ON r.media_id=m.id' : ''} WHERE m.kind='movie' AND NOT m.rumpel
     ) groups WHERE value IS NOT NULL AND trim(value)<>'' GROUP BY value
     ORDER BY ${category === 'year' || category === 'rating' ? 'value::integer DESC' : 'value'}`,
   );
+  return category === 'country' ? groups.map((g) => ({ ...g, label: countryLabel(g.value) })) : groups;
 }
 
 export async function collectionItems(category: CollectionCategory, value: string, params: URLSearchParams) {

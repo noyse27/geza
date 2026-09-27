@@ -110,6 +110,11 @@ export default async function Page() {
         </a>
       </p>
       <p>
+        <a className="button" href="/admin/facetten">
+          Länder und Genres: doppelte Schreibweisen zusammenführen
+        </a>
+      </p>
+      <p>
         <a className="button" href="/admin/logs">
           Ereignisprotokoll: Webhooks und Fehler ansehen
         </a>

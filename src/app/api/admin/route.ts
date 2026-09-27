@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
 import { normalizeCertification } from '@/lib/certification';
+import { mergeFacetAlias, normalizeFacetArray, type FacetCategory } from '@/lib/facets';
 import { fetchTmdbDetails, refreshProviderRatings } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
@@ -145,6 +146,8 @@ export async function POST(req: Request) {
         .parse(body.data?.ids);
       const data = mediaSchema.parse(body.data);
       data.certification = normalizeCertification(data.certification) ?? null;
+      data.countries = (await normalizeFacetArray('country', data.countries)) ?? [];
+      data.genres = (await normalizeFacetArray('genre', data.genres)) ?? [];
       const fields = Object.keys(data);
       const values = Object.values(data);
       const changed: string[] = [];
@@ -446,6 +449,16 @@ export async function POST(req: Request) {
       );
       if (data.kind === 'show') await queueSeriesCatalog(id);
       return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
+    } else if (body.action === 'merge-facet') {
+      const data = z
+        .object({
+          category: z.enum(['country', 'genre']),
+          aliases: z.array(z.string().min(1).max(100)).min(1).max(100),
+          canonical: z.string().min(1).max(100),
+        })
+        .parse(body.data);
+      const result = await mergeFacetAlias(data.category as FacetCategory, data.aliases, data.canonical);
+      return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {

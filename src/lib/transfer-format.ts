@@ -14,6 +14,7 @@ export const dataTables = [
   'film_series',
   'film_series_members',
   'review_boxes',
+  'facet_aliases',
   'jobs',
   'import_runs',
   'rumpel_deleted',
