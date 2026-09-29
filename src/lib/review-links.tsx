@@ -1,13 +1,36 @@
 import Link from 'next/link';
 import { query } from './db';
+import { decodeMentions } from './mentions';
+import { PersonMention } from '@/components/person-mention';
 const TITLE_LINK_RE = /https?:\/\/\S+?\/title\/(\d+)\b/g;
 export async function renderReviewBody(body: string) {
+  const decoded = decodeMentions(body);
+  if (decoded.mentions.length) {
+    const parts: React.ReactNode[] = [];
+    let last = 0;
+    for (const mention of decoded.mentions) {
+      parts.push(await renderReviewBody(decoded.text.slice(last, mention.start)));
+      parts.push(
+        mention.kind === 'm' ? (
+          <Link key={mention.start} className="review-title-link" href={`/title/${mention.id}`}>
+            {mention.label}
+          </Link>
+        ) : (
+          <PersonMention key={mention.start} kind={mention.kind} name={mention.id} label={mention.label} />
+        ),
+      );
+      last = mention.end;
+    }
+    parts.push(await renderReviewBody(decoded.text.slice(last)));
+    return parts;
+  }
   const matches = [...body.matchAll(TITLE_LINK_RE)];
   if (!matches.length) return body;
   const ids = [...new Set(matches.map((m) => m[1]))];
-  const rows = await query<{ id: string; title: string }>('SELECT id,title FROM media WHERE id=ANY($1::bigint[])', [
-    ids,
-  ]);
+  const rows = await query<{ id: string; title: string }>(
+    'SELECT id,title FROM media WHERE id=ANY($1::bigint[])',
+    [ids],
+  );
   const titles = new Map(rows.map((r) => [r.id, r.title]));
   const parts: React.ReactNode[] = [];
   let last = 0;

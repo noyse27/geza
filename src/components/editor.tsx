@@ -6,6 +6,7 @@ import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
 import { countryLabel } from '@/lib/countries';
+import { MentionEditor } from './mention-editor';
 async function post(body: unknown) {
   const r = await fetch('/api/admin', {
     method: 'POST',
@@ -169,8 +170,12 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [loadingPlexReview, setLoadingPlexReview] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null),
-    spoilerRef = useRef<HTMLInputElement>(null);
+  const [loadedBody, setLoadedBody] = useState(review?.body || '');
+  const [bodyVersion, setBodyVersion] = useState(0);
+  useEffect(() => {
+    setLoadedBody(review?.body || '');
+  }, [review?.body]);
+  const spoilerRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   return (
     <>
@@ -210,16 +215,7 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
             }
           }}
         >
-          <textarea
-            ref={bodyRef}
-            name="body"
-            rows={7}
-            required
-            maxLength={30000}
-            defaultValue={review?.body}
-            aria-label="Dein Review"
-            placeholder="Was bleibt von diesem Film?"
-          />
+          <MentionEditor key={bodyVersion} initialBody={loadedBody} />
           <button
             type="button"
             className="text-link"
@@ -235,7 +231,8 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
                 });
                 const data = await r.json();
                 if (!r.ok) throw Error(data.error || 'Laden fehlgeschlagen');
-                if (bodyRef.current) bodyRef.current.value = data.body;
+                setLoadedBody(data.body);
+                setBodyVersion((v) => v + 1);
                 if (spoilerRef.current) spoilerRef.current.checked = data.spoiler;
                 if (typeof data.rating === 'number')
                   window.dispatchEvent(
