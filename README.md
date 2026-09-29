@@ -21,6 +21,8 @@ Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertun
 
 ## Inhalt
 
+[Review-Anleitung](docs/reviews.md) · [Film- und Personenverweise in Reviews](#film--und-personenverweise-in-reviews)
+
 [Lokal starten](#lokal-starten) · [Demomodus](#demomodus) · [Sichtbarkeit](#sichtbarkeit) · [Sammlungen](#sammlungen-und-filmreihen) · [Serien und Staffeln](#serien-staffeln-und-serienkatalog) · [Link-Vorschau](#link-vorschau) · [RSS-Feed](#rss-feed-abo) · [Friends of Geza](#friends-of-geza) · [Rumpelkammer](#rumpelkammer) · [Trakt-Import](#trakt-import) · [Metadaten und Plex](#metadaten-und-plex) · [Externe Reviews](#externe-reviews-und-anbieterbewertungen) · [Hosting](#hosting-und-google) · [Sicherung](#sicherung-und-updates) · [Prüfungen](#prüfungen) · [Changelog](#changelog)
 
 ## Lokal starten
@@ -81,6 +83,22 @@ Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` i
 **Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen, Reviews, RSS-Feed und die Bewertungsauskunft für befreundete Instanzen (ohne Review-Text). Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
 **Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
+
+## Film- und Personenverweise in Reviews
+
+Beim Schreiben eines Reviews lassen sich Filme, Regisseure und Darsteller aus dem eigenen Geza-Katalog auswählen:
+
+| Eingabe | Sucht nach | Im gespeicherten Review |
+| --- | --- | --- |
+| `@mHellraiser` | Filmtitel und Originaltitel | Anklickbarer Titel zur Geza-Filmseite |
+| `@rTony Randel` | Regisseuren | Unterstrichener Name mit Filmvorschau |
+| `@aSophie Marceau` | Darstellern | Unterstrichener Name mit Filmvorschau |
+
+Ab zwei Suchzeichen hinter dem Kürzel erscheinen bis zu sechs Treffer am Cursor. Mit Pfeiltasten und Enter oder per Klick auswählen; Escape schließt die Liste. Nach der Auswahl bleibt nur der lesbare Titel oder Name im Text. Beim Darüberfahren über einen Personenverweis, auf dem Handy per Tippen, erscheinen bis zu fünf Filme der Person in der ausgewählten Rolle, nach Geza-Bewertung sortiert.
+
+Die Suche verwendet ausschließlich den lokalen Katalog, startet nach einer kurzen Tipppause und speichert Ergebnisse zwischen. Migration **025** ergänzt Suchindizes für Filmtitel. Personen werden über die vorhandenen Namen in Regie und Besetzung zugeordnet, Filme über ihre Datensatz-ID.
+
+Die [Review-Anleitung](docs/reviews.md) beschreibt das Schreiben, Verknüpfen und Bearbeiten Schritt für Schritt.
 
 ## Sammlungen und Filmreihen
 
