@@ -10,6 +10,92 @@
   --danger: #f0a59a;
   color-scheme: dark;
 }
+.mention-editor {
+  position: relative;
+  min-width: 0;
+}
+.section-heading:has(> .review-form) {
+  flex-wrap: wrap;
+}
+.section-heading > .review-form {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+.mention-editor textarea {
+  width: 100%;
+}
+.mention-results,
+.mention-preview {
+  z-index: 30;
+  width: 300px;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px #0006;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.mention-results {
+  position: absolute;
+}
+.mention-results button {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+}
+.mention-results button[aria-selected='true'],
+.mention-results button:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.person-mention {
+  position: relative;
+  display: inline;
+}
+.person-mention > button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mention-preview {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  max-width: min(300px, 80vw);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mention-preview a {
+  display: block;
+  padding: 4px;
+  color: var(--accent);
+}
+@media (max-width: 600px) {
+  .mention-preview {
+    position: fixed;
+    left: 5vw;
+    top: auto;
+    bottom: 24px;
+    width: 90vw;
+    max-width: 90vw;
+  }
+}
 .now-playing {
   margin: 24px 0;
   display: grid;
