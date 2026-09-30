@@ -186,7 +186,7 @@ Danach **Fehlende Metadaten laden** wählen. Priorität je Feld: manuelle Korrek
 Für Webhooks müssen zusätzlich Account-ID, Server-UUID und ein zufälliges Webhook-Geheimnis gesetzt sein:
 
 ```text
-https://geza.schwarzesherz.info:777/api/plex/DEIN-WEBHOOK-GEHEIMNIS
+https://<url>[:<port>]/api/plex/DEIN-WEBHOOK-GEHEIMNIS
 ```
 
 Unterstützt sind `media.scrobble` und `media.rate`. `userRating` wird als 0–10 interpretiert; 0 entfernt die Bewertung. Ohne verlässlichen Ereigniszeitpunkt wird die Empfangszeit als geschätzt gekennzeichnet. Die tatsächlichen Payloads des eigenen Plex-Servers müssen bei der Einrichtung geprüft werden.
@@ -212,7 +212,7 @@ Detailseiten zeigen TMDB-Durchschnittsbewertungen sowie ausdrücklich als IMDb g
 Auf dem Zielserver in `.env` setzen:
 
 ```text
-PUBLIC_URL=https://geza.schwarzesherz.info:777
+PUBLIC_URL=https://<url>[:<port>]
 ```
 
 **Pflicht bei jedem Zugriff über einen Domainnamen** (eigener Reverse-Proxy, Plesk, Caddy, etc.), nicht nur
@@ -320,7 +320,7 @@ Migrationen laufen vor App und Worker. Das benannte Datenbankvolume überlebt Co
 
 Mit lokalem Node.js: `npm ci`, `npm run lint`, `npm run test:unit`, `npm run db:migrate`, `npm run test:integration`, `npm run test:collections`, `npm run test:rumpel`, `npm run build`. Zusätzlich prüfen `npm run test:feed` (RSS-Feed, Karenzzeit) und – nach dem Build – `npm run test:federation` (zwei echte Instanzen: Freundschaft, Fälschungsschutz, Abfrage) die neuen Funktionen; beide legen eigene temporäre Datenbanken an. Datenbankbefehle benötigen `DATABASE_URL` für eine Testdatenbank. Der Sammlungstest prüft unter anderem exakte Filter, Duplikatfreiheit, Paging mit mehr als 50 Filmen und die Reihenfolge vorhandener Filmreihen.
 
-Die GitHub-CI folgt `adolar-songster` und `bloeki`: Typprüfung, Tests, Build, Trivy, Gitleaks, CodeQL und Image-Scan. Dependabot prüft npm, Docker und GitHub Actions montags in Europe/Berlin mit gruppierten Minor-/Patch-Updates. Entwicklungscompiler und Paketmanager werden nicht im Laufzeitimage ausgeliefert.
+Die GitHub-CI : Typprüfung, Tests, Build, Trivy, Gitleaks, CodeQL und Image-Scan. Dependabot prüft npm, Docker und GitHub Actions montags in Europe/Berlin mit gruppierten Minor-/Patch-Updates. Entwicklungscompiler und Paketmanager werden nicht im Laufzeitimage ausgeliefert.
 
 ```sh
 node --import tsx scripts/http-check.ts
