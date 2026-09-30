@@ -4,7 +4,7 @@
 
 Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-**Aktuelle Version: v1.4.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
+**Aktuelle Version: v1.5.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
 ## Funktionen im Überblick
 
@@ -333,6 +333,15 @@ Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt u
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
+
+### v1.5.0
+
+- Neu: **Film- und Personenverweise in Reviews** – per `@m`, `@r` und `@a` Filme, Regisseure und Darsteller aus dem eigenen Katalog verlinken; Personenverweise zeigen eine Filmvorschau. Migration 025. Siehe [Review-Anleitung](docs/reviews.md).
+- **Länder und Genres** aus Plex, TMDb und TVDb werden normalisiert; Dubletten lassen sich im Admin (`/admin/facetten`) zusammenführen. Plex-Tags mit Semikolon werden in einzelne Genres aufgeteilt. Migration 024.
+- **Anbieter-IDs** (TMDB, IMDb usw.) sind in den Mediendetails bearbeitbar; Anbieterbewertungen lassen sich direkt aktualisieren.
+- Neue Admin-Kategorie **Automatische Jobs** (Plex-Scan mit Startzeit, letztem Lauf und Ein/Aus-Schalter); Social-Share-Titel zeigen zusätzlich Laufzeit und FSK.
+- Friends of Geza: Button „Freundschaft beantragen“ nicht mehr überdehnt.
+- Laufzeitumgebung auf **Node.js 26** angehoben (CI, Docker, `engines`); GitHub Actions auf v7.
 
 ### v1.4.0
 
