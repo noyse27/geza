@@ -7,7 +7,7 @@ import { processPlexScan } from '@/lib/plex-scan';
 import { z } from 'zod';
 import { reviewModule } from '@/lib/review-modules';
 import { friendUrl } from '@/lib/friend-reviews';
-import { fetchPlexReview } from '@/lib/plex';
+import { fetchPlexReview, findPlex } from '@/lib/plex';
 import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
@@ -257,6 +257,28 @@ export async function POST(req: Request) {
           { status: 502 },
         );
       }
+    } else if (body.action === 'plex-watch') {
+      const mediaId = z.string().regex(/^\d+$/).parse(body.mediaId);
+      if (!(await getSetting('PLEX_URL')) || !(await getSetting('PLEX_TOKEN')))
+        throw Error('Plex ist nicht konfiguriert.');
+      const [media] = await query('SELECT ids,kind FROM media WHERE id=$1', [mediaId]);
+      if (!media) throw Error('Titel nicht gefunden.');
+      if (!media.ids?.plex) throw Error('Kein Plex-Verweis für diesen Titel vorhanden.');
+      const metadata = await findPlex(media.ids, media.kind);
+      if (!metadata) throw Error('Titel in Plex nicht gefunden.');
+      const timestamp = Number(metadata.lastViewedAt);
+      const date = new Date(timestamp * 1000);
+      if (!Number.isFinite(timestamp) || timestamp <= 0 || !Number.isFinite(date.getTime()))
+        throw Error('Kein Anschauzeitpunkt in Plex gefunden.');
+      const at = date.toISOString();
+      const added = await query(
+        `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated)
+         SELECT $1,'plex',$2,$3,false
+         WHERE NOT EXISTS(SELECT 1 FROM watches WHERE media_id=$1 AND watched_at=$3::timestamptz)
+         ON CONFLICT(source,source_id) DO NOTHING RETURNING id`,
+        [mediaId, `manual-sync:${mediaId}:${timestamp}`, at],
+      );
+      return Response.json({ added: added.length > 0 }, { headers: { 'Cache-Control': 'no-store' } });
     } else if (body.action === 'watch') {
       const data = z
         .object({
@@ -467,7 +489,7 @@ export async function POST(req: Request) {
         error:
           e instanceof z.ZodError
             ? 'Bitte Eingaben prüfen.'
-            : ['series-catalog', 'watch-create', 'watch-expand', 'friend-request', 'friend-accept'].includes(
+            : ['series-catalog', 'watch-create', 'watch-expand', 'plex-watch', 'friend-request', 'friend-accept'].includes(
                   requestedAction,
                 )
               ? String(redact((e as Error).message))
