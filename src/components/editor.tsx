@@ -498,6 +498,49 @@ export function WatchCreator({ mediaId, kind }: { mediaId: string; kind?: string
   );
 }
 
+export function PlexWatchLoader({ mediaId }: { mediaId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const router = useRouter();
+  return (
+    <div>
+      <button
+        type="button"
+        className="text-link"
+        disabled={busy}
+        title="Letzten Anschauzeitpunkt aus Plex übernehmen"
+        onClick={async () => {
+          setBusy(true);
+          setError('');
+          setMessage('');
+          try {
+            const response = await fetch('/api/admin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'plex-watch', mediaId }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw Error(data.error || 'Laden fehlgeschlagen');
+            setMessage(data.added ? 'Letzten Anschauzeitpunkt aus Plex übernommen.' : 'Der Plex-Anschauzeitpunkt ist bereits vorhanden.');
+            invalidateHistoryCache();
+            window.dispatchEvent(new Event('geza:catalog-changed'));
+            router.refresh();
+          } catch (error) {
+            setError((error as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? 'Lädt …' : 'Von Plex laden'}
+      </button>
+      {message && <p role="status" className="muted small">{message}</p>}
+      {error && <p role="alert" className="error">{error}</p>}
+    </div>
+  );
+}
+
 export function ExpandWatch({ mediaId, watchId }: { mediaId: string; watchId: string }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');

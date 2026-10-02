@@ -22,8 +22,12 @@ import { SeasonSelector } from './season-selector';
 import { SeriesCatalog } from './series-catalog';
 import { ExpandWatch } from './editor';
 import { queueSeriesCatalog } from '@/lib/series-catalog';
+import { getSetting } from '@/lib/settings';
+import { isDemo } from '@/lib/demo-mode';
+import { PlexWatchLoader } from './editor';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
   const admin = await isAdmin();
+  const plexConfigured = admin && !isDemo() && !!(await getSetting('PLEX_URL')) && !!(await getSetting('PLEX_TOKEN'));
   const m = await getMedia(id, admin);
   if (!m) notFound();
   const navigation = ['show', 'season', 'episode'].includes(m.kind) ? await seasonNavigation(m, admin) : null;
@@ -362,6 +366,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
               <p className="muted">Keine Anschauereignisse für diesen Titel.</p>
             )}
             <WatchCreator mediaId={id} kind={m.kind} />
+            {plexConfigured && <PlexWatchLoader mediaId={id} />}
             {['show', 'season'].includes(m.kind) && (
               <p className="muted small">
                 Ändern oder Löschen eines gemeinsamen Anschauzeitpunkts gilt auch für die damit ergänzten
