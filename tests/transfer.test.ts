@@ -65,6 +65,15 @@ test('transfer rejects truncated, altered, incomplete and unsupported archives',
     assert.throws(() => decodeArchive(gzipSync(JSON.stringify(value))));
   }
 });
+
+test('transfer retains remembered facet targets and detached terms', () => {
+  const value = fixture();
+  value.tables.facet_terms = [
+    { category: 'genre', value: 'Test Z', is_target: true },
+    { category: 'genre', value: 'Test A', is_target: false },
+  ];
+  assert.deepEqual(decodeArchive(encodeArchive(value)).tables.facet_terms, value.tables.facet_terms);
+});
 test('credential authentication detects changes even if the archive checksum is recomputed', () => {
   const value = fixture();
   value.credentials.tag = '0'.repeat(32);

@@ -18,6 +18,7 @@ export const dataTables = [
   'jobs',
   'import_runs',
   'rumpel_deleted',
+  'facet_terms',
 ] as const;
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
 export const MAX_JSON_BYTES = 512 * 1024 * 1024;
@@ -29,6 +30,7 @@ const tablesSchema = z
       z.ZodArray<typeof row>
     >,
   )
+  .extend({ facet_terms: z.array(row).optional() })
   .strict();
 const sealedSchema = z
   .object({
@@ -49,7 +51,9 @@ const archiveSchema = z
     checksum: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
-export type Archive = z.infer<typeof archiveSchema>;
+export type Archive = Omit<z.infer<typeof archiveSchema>, 'tables'> & {
+  tables: z.infer<typeof tablesSchema> & { facet_terms: Record<string, unknown>[] };
+};
 export const credentialsSchema = z
   .object({
     accounts: z
@@ -102,7 +106,7 @@ export function openCredentials(archive: Archive, key: string): Credentials {
     throw Error('Der Schlüssel passt nicht oder die verschlüsselten Zugangsdaten sind beschädigt.');
   }
 }
-function checksum(value: Omit<Archive, 'checksum'>) {
+function checksum(value: Omit<z.infer<typeof archiveSchema>, 'checksum'>) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 export function encodeArchive(value: Omit<Archive, 'checksum'>) {
@@ -121,7 +125,7 @@ export function decodeArchive(bytes: Buffer): Archive {
     );
     const { checksum: expected, ...content } = value;
     if (checksum(content) !== expected) throw Error('checksum');
-    return value;
+    return { ...value, tables: { ...value.tables, facet_terms: value.tables.facet_terms ?? [] } };
   } catch {
     throw Error('Keine vollständige, unbeschädigte Geza-Umzugsdatei der unterstützten Version.');
   }

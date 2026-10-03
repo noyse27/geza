@@ -1,75 +1,86 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-type Item = { value: string; label: string; count: number };
+type Item = { value: string; label: string; count: number; isTarget: boolean; aliases: string[] };
 export function FacetMergeList({ category, items }: { category: 'country' | 'genre'; items: Item[] }) {
   const router = useRouter();
-  const [q, setQ] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [canonical, setCanonical] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [sourceQuery, setSourceQuery] = useState('');
+  const [targetQuery, setTargetQuery] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [target, setTarget] = useState('');
+  const [aliasSelection, setAliasSelection] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [refreshing, startTransition] = useTransition();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const visible = useMemo(() => {
-    const term = q.trim().toLocaleLowerCase('de');
-    return term
-      ? items.filter(
-          (i) =>
-            i.label.toLocaleLowerCase('de').includes(term) || i.value.toLocaleLowerCase('de').includes(term),
-        )
-      : items;
-  }, [items, q]);
-  function toggle(value: string) {
-    setNotice('');
-    setSelected((s) => {
-      const n = new Set(s);
-      if (n.delete(value)) {
-        if (canonical === value) setCanonical([...n][0] ?? null);
-      } else {
-        n.add(value);
-        if (!canonical) setCanonical(value);
-      }
-      return n;
-    });
+  const busy = saving || refreshing;
+  const active = items.find((item) => item.value === target);
+  const sources = items.filter((item) => !item.isTarget && item.value !== target);
+  const chosen = selected.filter((value) => sources.some((item) => item.value === value));
+  const chosenAliases = aliasSelection.filter((value) => active?.aliases.includes(value));
+  const matches = (item: Item, query: string) =>
+    [item.value, item.label].some((value) =>
+      value.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de')),
+    );
+  const visibleSources = sources.filter((item) => matches(item, sourceQuery));
+  const visibleTargets = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          matches(item, targetQuery) ||
+          item.aliases.some((alias) =>
+            alias.toLocaleLowerCase('de').includes(targetQuery.trim().toLocaleLowerCase('de')),
+          ),
+      ),
+    [items, targetQuery],
+  );
+  const toggle = (values: string[], value: string) =>
+    values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
+  function chooseTarget(value: string) {
+    setTarget(value);
+    setAliasSelection([]);
+    setSelected((values) => values.filter((v) => v !== value));
   }
-  function reset() {
-    setSelected(new Set());
-    setCanonical(null);
-  }
-  async function merge() {
-    if (!canonical || selected.size < 2) return;
-    setBusy(true);
+  async function save(unmerge: boolean) {
+    if (!active || busy) return;
+    setSaving(true);
     setError('');
+    setNotice('');
     try {
-      const aliases = [...selected].filter((v) => v !== canonical);
-      const target = items.find((i) => i.value === canonical);
-      const r = await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'merge-facet', data: { category, aliases, canonical } }),
+        body: JSON.stringify({
+          action: unmerge ? 'unmerge-facet' : 'merge-facet',
+          data: { category, canonical: target, aliases: unmerge ? chosenAliases : chosen },
+        }),
       });
-      const data = await r.json();
-      if (!r.ok) throw Error(data.error || 'Zusammenführen fehlgeschlagen.');
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error || 'Zuordnung konnte nicht gespeichert werden.');
       setNotice(
-        `${data.affected} ${data.affected === 1 ? 'Titel' : 'Titel'} zusammengeführt in „${target?.label || canonical}“.`,
+        unmerge
+          ? `${data.affected} Alias-Zuordnung(en) gelöst. Bestehende Titel bleiben unverändert.`
+          : `${data.affected} Titel aktualisiert. Die Zuordnung zu „${active.label}“ gilt auch für künftige Importe.`,
       );
-      reset();
-      router.refresh();
+      setSelected([]);
+      setAliasSelection([]);
+      setExpanded((values) => [...new Set([...values, target])]);
+      startTransition(() => router.refresh());
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
+  const name = (item: Item) => (
+    <span className="facet-merge-label">
+      {item.label}
+      {item.label !== item.value && <small className="muted"> {item.value}</small>}
+    </span>
+  );
   return (
     <>
-      <input
-        type="search"
-        placeholder="Werte durchsuchen …"
-        aria-label="Werte durchsuchen"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
       {notice && (
         <p className="panel" role="status">
           {notice}
@@ -80,53 +91,156 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
           {error}
         </p>
       )}
-      <div className="facet-merge-list">
-        {visible.map((item) => (
-          <label key={item.value} className={`facet-merge-row${selected.has(item.value) ? ' selected' : ''}`}>
+      <div className="facet-manager" aria-busy={busy}>
+        <section className="facet-pane" aria-label="Offene Begriffe">
+          <header>
+            <span className="eyebrow accent">QUELLE</span>
+            <h2>
+              Offene Begriffe <small>{sources.length}</small>
+            </h2>
+            <p>Noch keinem Ziel zugeordnet und selbst noch kein Ziel.</p>
             <input
-              type="checkbox"
-              checked={selected.has(item.value)}
-              onChange={() => toggle(item.value)}
-              aria-label={`${item.label} auswählen`}
+              type="search"
+              aria-label="Offene Begriffe suchen"
+              placeholder="Begriff suchen …"
+              value={sourceQuery}
+              onChange={(e) => setSourceQuery(e.target.value)}
             />
-            <span className="facet-merge-label">
-              {item.label}
-              {item.label !== item.value && <span className="muted small"> ({item.value})</span>}
-            </span>
-            <span className="muted small">{item.count.toLocaleString('de-DE')}</span>
-            {selected.has(item.value) && (
-              <label className="facet-merge-canonical">
+          </header>
+          <div className="facet-scroll">
+            {visibleSources.map((item) => (
+              <label
+                key={item.value}
+                className={`facet-merge-row${chosen.includes(item.value) ? ' selected' : ''}`}
+              >
                 <input
-                  type="radio"
-                  name="canonical"
-                  checked={canonical === item.value}
-                  onChange={() => setCanonical(item.value)}
+                  type="checkbox"
+                  disabled={busy}
+                  checked={chosen.includes(item.value)}
+                  onChange={() => setSelected(toggle(selected, item.value))}
                 />
-                Ziel
+                {name(item)}
+                <span className="facet-count">{item.count.toLocaleString('de-DE')}</span>
               </label>
+            ))}
+            {!visibleSources.length && (
+              <p className="empty compact">
+                {sources.length ? 'Keine Treffer.' : 'Alle Begriffe sind zugeordnet.'}
+              </p>
             )}
-          </label>
-        ))}
-        {!visible.length && <p className="empty compact">Keine Treffer.</p>}
-      </div>
-      {selected.size > 0 && (
-        <div className="rumpel-bar" role="region" aria-label="Zusammenführen">
-          <strong>{selected.size} ausgewählt</strong>
-          <div className="button-row">
-            <button
-              type="button"
-              className="button primary"
-              disabled={busy || selected.size < 2 || !canonical}
-              onClick={merge}
-            >
-              {busy ? 'Einen Moment …' : 'Zusammenführen'}
-            </button>
-            <button type="button" className="button" onClick={reset} disabled={busy}>
-              Auswahl aufheben
-            </button>
           </div>
+          <footer>
+            {chosen.length} ausgewählt
+            {chosen.length > 0 && (
+              <button className="facet-text-button" disabled={busy} onClick={() => setSelected([])}>
+                Auswahl aufheben
+              </button>
+            )}
+          </footer>
+        </section>
+        <div className="facet-transfer">
+          <button
+            type="button"
+            className="button primary"
+            disabled={busy || !active || !chosen.length || chosen.length > 100}
+            onClick={() => save(false)}
+          >
+            Zuordnen →
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={busy || !chosenAliases.length || chosenAliases.length > 100}
+            onClick={() => save(true)}
+          >
+            ← Alias lösen
+          </button>
+          <p>{busy ? 'Wird gespeichert …' : active ? `Ziel: ${active.label}` : 'Rechts ein Ziel wählen.'}</p>
+          {(chosen.length > 100 || chosenAliases.length > 100) && (
+            <p>Bitte höchstens 100 Begriffe auf einmal wählen.</p>
+          )}
         </div>
-      )}
+        <section className="facet-pane" aria-label="Alle Begriffe und Aliase">
+          <header>
+            <span className="eyebrow accent">ZIEL</span>
+            <h2>Alle Begriffe & Aliase</h2>
+            <p>Ein Ziel wählen. Zugeordnete Aliase lassen sich aufklappen.</p>
+            <input
+              type="search"
+              aria-label="Ziele und Aliase suchen"
+              placeholder="Begriff oder Alias suchen …"
+              value={targetQuery}
+              onChange={(e) => setTargetQuery(e.target.value)}
+            />
+          </header>
+          <div className="facet-scroll">
+            {visibleTargets.map((item) => {
+              const open = expanded.includes(item.value) || !!targetQuery.trim();
+              return (
+                <div key={item.value}>
+                  <div className={`facet-target-row${target === item.value ? ' selected' : ''}`}>
+                    {item.aliases.length > 0 ? (
+                      <button
+                        type="button"
+                        className="facet-expand"
+                        aria-label={`Aliase von ${item.label}`}
+                        aria-expanded={open}
+                        onClick={() => setExpanded(toggle(expanded, item.value))}
+                      >
+                        {open ? '▾' : '▸'}
+                      </button>
+                    ) : (
+                      <span className="facet-expand" />
+                    )}
+                    <label className="facet-merge-row">
+                      <input
+                        type="radio"
+                        name={`target-${category}`}
+                        disabled={busy}
+                        checked={target === item.value}
+                        onChange={() => chooseTarget(item.value)}
+                      />
+                      {name(item)}
+                      {item.isTarget && <small className="facet-badge">Ziel</small>}
+                      <span className="facet-count">{item.count.toLocaleString('de-DE')}</span>
+                    </label>
+                  </div>
+                  {open &&
+                    item.aliases.map((alias) => (
+                      <label className="facet-alias-row" key={alias}>
+                        <span aria-hidden="true">↳</span>
+                        <input
+                          type="checkbox"
+                          disabled={busy}
+                          checked={target === item.value && chosenAliases.includes(alias)}
+                          onChange={() => {
+                            if (target !== item.value) {
+                              setTarget(item.value);
+                              setSelected((values) => values.filter((v) => v !== item.value));
+                              setAliasSelection([alias]);
+                            } else setAliasSelection(toggle(aliasSelection, alias));
+                          }}
+                        />
+                        <span>{alias}</span>
+                        <small className="muted">Alias</small>
+                      </label>
+                    ))}
+                </div>
+              );
+            })}
+            {!visibleTargets.length && <p className="empty compact">Keine Treffer.</p>}
+          </div>
+          <footer>
+            {active ? `Ziel: ${active.label}` : 'Kein Ziel gewählt'}
+            <span>{chosenAliases.length} Aliase ausgewählt</span>
+          </footer>
+        </section>
+      </div>
+      <p className="muted small facet-help">
+        Zuordnen aktualisiert bestehende Titel und merkt sich die Regel für künftige Importe. „Alias lösen“
+        entfernt nur diese Regel; bestehende Titel behalten ihren Begriff. Bekannte Ländercodes und
+        Genre-Schreibweisen werden weiterhin automatisch vereinheitlicht.
+      </p>
     </>
   );
 }
