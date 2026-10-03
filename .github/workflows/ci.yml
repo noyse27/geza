@@ -57,6 +57,9 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+      - name: Facet mapping regression tests
+        run: npm run test:facets
+
       - name: Collection regression tests
         run: npm run test:collections
 

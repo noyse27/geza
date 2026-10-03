@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
-import { rawFacetGroups, type FacetCategory } from '@/lib/facets';
+import { facetManagerItems, type FacetCategory } from '@/lib/facets';
 import { countryLabel } from '@/lib/countries';
 import { FacetMergeList } from '@/components/facet-admin';
 export const metadata = { title: 'Länder und Genres', robots: { index: false, follow: false } };
@@ -13,8 +13,9 @@ export default async function Page({
   const raw = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const category: FacetCategory = one(raw.category) === 'genre' ? 'genre' : 'country';
-  const groups = await rawFacetGroups(category);
+  const groups = await facetManagerItems(category);
   const items = groups.map((g) => ({
+    ...g,
     value: g.value,
     label: category === 'country' ? countryLabel(g.value) : g.value,
     count: g.count,
@@ -31,8 +32,8 @@ export default async function Page({
           Länder und Genres<span className="accent">.</span>
         </h1>
         <p>
-          Mehrere Werte auswählen, die dasselbe meinen, dann eine als „Ziel“ markieren und zusammenführen.
-          Betroffene Titel werden sofort umgeschrieben; die Entscheidung merkt sich Geza für künftige Importe.{' '}
+          Links offene Begriffe auswählen, rechts den gemeinsamen Zielbegriff festlegen. Betroffene Titel
+          werden sofort umgeschrieben; die Entscheidung merkt sich Geza für künftige Importe.{' '}
           <Link href="/admin">zurück zum Admin-Bereich</Link>
         </p>
       </div>
@@ -48,7 +49,7 @@ export default async function Page({
         ))}
       </nav>
       <p className="muted small">{items.length} unterschiedliche Werte.</p>
-      <FacetMergeList category={category} items={items} />
+      <FacetMergeList key={category} category={category} items={items} />
     </div>
   );
 }

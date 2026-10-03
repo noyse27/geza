@@ -12,7 +12,7 @@ import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
 import { normalizeCertification } from '@/lib/certification';
-import { mergeFacetAlias, normalizeFacetArray, type FacetCategory } from '@/lib/facets';
+import { mergeFacetAlias, unmergeFacetAliases, normalizeFacetArray, type FacetCategory } from '@/lib/facets';
 import { fetchTmdbDetails, refreshProviderRatings } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
@@ -471,7 +471,7 @@ export async function POST(req: Request) {
       );
       if (data.kind === 'show') await queueSeriesCatalog(id);
       return Response.json({ id }, { headers: { 'Cache-Control': 'no-store' } });
-    } else if (body.action === 'merge-facet') {
+    } else if (body.action === 'merge-facet' || body.action === 'unmerge-facet') {
       const data = z
         .object({
           category: z.enum(['country', 'genre']),
@@ -479,7 +479,8 @@ export async function POST(req: Request) {
           canonical: z.string().min(1).max(100),
         })
         .parse(body.data);
-      const result = await mergeFacetAlias(data.category as FacetCategory, data.aliases, data.canonical);
+      const operation = body.action === 'merge-facet' ? mergeFacetAlias : unmergeFacetAliases;
+      const result = await operation(data.category as FacetCategory, data.aliases, data.canonical);
       return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
     } else return Response.json({ error: 'Unbekannte Aktion' }, { status: 400 });
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
@@ -489,9 +490,14 @@ export async function POST(req: Request) {
         error:
           e instanceof z.ZodError
             ? 'Bitte Eingaben prüfen.'
-            : ['series-catalog', 'watch-create', 'watch-expand', 'plex-watch', 'friend-request', 'friend-accept'].includes(
-                  requestedAction,
-                )
+            : [
+                  'series-catalog',
+                  'watch-create',
+                  'watch-expand',
+                  'plex-watch',
+                  'friend-request',
+                  'friend-accept',
+                ].includes(requestedAction)
               ? String(redact((e as Error).message))
               : requestedAction === 'plex-scan-preview'
                 ? `Plex-Vorschau abgebrochen: ${String(redact((e as Error).message))}`

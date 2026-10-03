@@ -17,6 +17,7 @@
     "test:transfer": "tsx scripts/transfer-check.ts",
     "test:transfer:http": "tsx scripts/transfer-http-check.ts",
     "test:integration": "tsx --test tests/integration.test.ts",
+    "test:facets": "tsx --test tests/facets.test.ts",
     "test:collections": "tsx --test tests/collections.test.ts",
     "test:rumpel": "tsx --test tests/rumpel.test.ts",
     "test:classification": "tsx scripts/classification-check.ts",
