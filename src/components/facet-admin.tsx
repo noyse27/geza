@@ -42,8 +42,10 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
     setAliasSelection([]);
     setSelected((values) => values.filter((v) => v !== value));
   }
-  async function save(unmerge: boolean) {
+  async function save(operation: 'merge' | 'unmerge' | 'release') {
     if (!active || busy) return;
+    const unmerge = operation === 'unmerge';
+    const release = operation === 'release';
     setSaving(true);
     setError('');
     setNotice('');
@@ -52,19 +54,25 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: unmerge ? 'unmerge-facet' : 'merge-facet',
+          action: release ? 'release-facet-target' : unmerge ? 'unmerge-facet' : 'merge-facet',
           data: { category, canonical: target, aliases: unmerge ? chosenAliases : chosen },
         }),
       });
       const data = await response.json();
       if (!response.ok) throw Error(data.error || 'Zuordnung konnte nicht gespeichert werden.');
       setNotice(
-        unmerge
-          ? `${data.affected} Alias-Zuordnung(en) gelöst. Bestehende Titel bleiben unverändert.`
-          : `${data.affected} Titel aktualisiert. Die Zuordnung zu „${active.label}“ gilt auch für künftige Importe.`,
+        release
+          ? `„${active.label}“ ist wieder links als offener Begriff verfügbar. Bestehende Titel bleiben unverändert.`
+          : unmerge
+            ? `${data.affected} Alias-Zuordnung(en) gelöst. Bestehende Titel bleiben unverändert.`
+            : `${data.affected} Titel aktualisiert. Die Zuordnung zu „${active.label}“ gilt auch für künftige Importe.`,
       );
       setSelected([]);
       setAliasSelection([]);
+      if (release) {
+        setTarget('');
+        setSourceQuery(active.value);
+      }
       setExpanded((values) => [...new Set([...values, target])]);
       startTransition(() => router.refresh());
     } catch (e) {
@@ -98,7 +106,7 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
             <h2>
               Offene Begriffe <small>{sources.length}</small>
             </h2>
-            <p>Noch keinem Ziel zugeordnet und selbst noch kein Ziel.</p>
+            <p>Keinem Ziel zugeordnet und aktuell selbst kein Ziel.</p>
             <input
               type="search"
               aria-label="Offene Begriffe suchen"
@@ -143,7 +151,7 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
             type="button"
             className="button primary"
             disabled={busy || !active || !chosen.length || chosen.length > 100}
-            onClick={() => save(false)}
+            onClick={() => save('merge')}
           >
             Zuordnen →
           </button>
@@ -151,11 +159,19 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
             type="button"
             className="button"
             disabled={busy || !chosenAliases.length || chosenAliases.length > 100}
-            onClick={() => save(true)}
+            onClick={() => save('unmerge')}
           >
             ← Alias lösen
           </button>
           <p>{busy ? 'Wird gespeichert …' : active ? `Ziel: ${active.label}` : 'Rechts ein Ziel wählen.'}</p>
+          {active?.isTarget && active.aliases.length === 0 && (
+            <>
+              <button type="button" className="button" disabled={busy} onClick={() => save('release')}>
+                Ziel wieder freigeben
+              </button>
+              <p>Der Begriff wird links wieder auswählbar. Bestehende Titel bleiben unverändert.</p>
+            </>
+          )}
           {(chosen.length > 100 || chosenAliases.length > 100) && (
             <p>Bitte höchstens 100 Begriffe auf einmal wählen.</p>
           )}

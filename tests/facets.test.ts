@@ -18,8 +18,13 @@ test('facet mappings persist, flatten, import and detach without changing existi
     process.env.DATABASE_URL = url.toString();
     const { pool } = await import('../src/lib/db');
     testPool = pool;
-    const { mergeFacetAlias, unmergeFacetAliases, normalizeFacetArray, facetManagerItems } =
-      await import('../src/lib/facets');
+    const {
+      mergeFacetAlias,
+      unmergeFacetAliases,
+      normalizeFacetArray,
+      facetManagerItems,
+      releaseFacetTarget,
+    } = await import('../src/lib/facets');
     await pool.query('CREATE TABLE media(id serial PRIMARY KEY, countries text[], genres text[])');
     await pool.query(await readFile('migrations/024_facet_aliases.sql', 'utf8'));
     await pool.query(await readFile('migrations/026_facet_terms.sql', 'utf8'));
@@ -33,6 +38,8 @@ test('facet mappings persist, flatten, import and detach without changing existi
     assert.equal(items[0].isTarget, true);
     assert.equal(items[0].count, 3);
     assert.deepEqual(items[0].aliases.sort(), ['Test A', 'Test B']);
+    await assert.rejects(releaseFacetTarget('genre', 'Test Z'), /noch Aliase/);
+    await assert.rejects(releaseFacetTarget('genre', 'Test A'), /zugeordnet/);
     await mergeFacetAlias('genre', ['Test Z'], 'Test Final');
     assert.deepEqual(await normalizeFacetArray('genre', ['Test A', 'Test B', 'Test Z']), ['Test Final']);
     await assert.rejects(mergeFacetAlias('genre', ['Test Final'], 'Test A'), /inzwischen/);
@@ -50,6 +57,22 @@ test('facet mappings persist, flatten, import and detach without changing existi
     items = await facetManagerItems('genre');
     assert.equal(items.find((i) => i.value === 'Test Final')?.isTarget, true);
     assert.equal(items.find((i) => i.value === 'Test Z')?.isTarget, true);
+    await releaseFacetTarget('genre', 'Test Final');
+    assert.equal((await facetManagerItems('genre')).find((i) => i.value === 'Test Final')?.isTarget, false);
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS n FROM media WHERE genres=ARRAY['Test Final']")).rows[0].n,
+      3,
+    );
+    await assert.rejects(releaseFacetTarget('genre', 'Test Final'), /kein gespeichertes Ziel/);
+    await releaseFacetTarget('genre', 'Test Z');
+    assert.equal((await facetManagerItems('genre')).find((i) => i.value === 'Test Z')?.count, 0);
+    await mergeFacetAlias('genre', ['Test Final'], 'Test New Target');
+    assert.deepEqual(await normalizeFacetArray('genre', ['Test Final']), ['Test New Target']);
+    assert.equal(
+      (await pool.query("SELECT count(*)::int AS n FROM media WHERE genres=ARRAY['Test New Target']")).rows[0]
+        .n,
+      3,
+    );
     await mergeFacetAlias('country', ['US'], 'DE');
     assert.deepEqual(await normalizeFacetArray('country', ['USA', 'United States', 'DE']), ['DE']);
     await unmergeFacetAliases('country', ['US'], 'DE');
