@@ -31,20 +31,30 @@ export function resolveFacet(value: string, aliases: Record<string, string>): st
   return value;
 }
 
-// Wendet erst die statische Normalisierung (ISO-Codes/EN-DE-Dubletten) und dann die im
-// Adminbereich manuell festgelegten Zusammenführungen an; entfernt danach Dubletten im Array.
+// Explicit mappings and chosen target names take precedence over built-in spelling normalization.
 export async function normalizeFacetArray(
   category: FacetCategory,
   raw: string[] | null | undefined,
 ): Promise<string[] | undefined> {
   if (!raw) return raw ?? undefined;
   const aliases = await aliasMap(category);
+  const targets = new Set(
+    (
+      await query<{ value: string }>('SELECT value FROM facet_terms WHERE category=$1 AND is_target=true', [
+        category,
+      ])
+    ).map((row) => row.value),
+  );
   const normalize = staticNormalize[category];
   const seen = new Set<string>();
   const result: string[] = [];
   for (const item of raw) {
     if (typeof item !== 'string') continue;
-    const value = resolveFacet(normalize(item), aliases);
+    const rawValue = item.trim();
+    const value = resolveFacet(
+      Object.hasOwn(aliases, rawValue) || targets.has(rawValue) ? rawValue : normalize(rawValue),
+      aliases,
+    );
     if (value && !seen.has(value)) {
       seen.add(value);
       result.push(value);
@@ -93,10 +103,8 @@ export async function rawFacetGroups(category: FacetCategory) {
 
 export async function mergeFacetAlias(category: FacetCategory, aliases: string[], canonical: string) {
   const column = facetColumn[category];
-  const target = staticNormalize[category](canonical);
-  const sources = [
-    ...new Set(aliases.flatMap((a) => [a.trim(), staticNormalize[category](a)]).filter(Boolean)),
-  ].filter((a) => a !== target);
+  const target = canonical.trim();
+  const sources = [...new Set(aliases.map((a) => a.trim()).filter(Boolean))].filter((a) => a !== target);
   if (!target || !sources.length) return { affected: 0 };
   const client = await pool.connect();
   try {
