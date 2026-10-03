@@ -2694,3 +2694,38 @@ footer > a:nth-of-type(2) {
     min-height: 0;
   }
 }
+.facet-recovery-notice {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+  width: min(420px, calc(100vw - 32px));
+  max-height: 65vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 30px #0008;
+  font-size: 13px;
+}
+.facet-recovery-notice p,
+.facet-recovery-notice .button-row {
+  margin-top: 10px;
+}
+.facet-recovery-notice progress {
+  width: 100%;
+  accent-color: var(--accent);
+  margin-top: 10px;
+}
+.facet-recovery-notice summary {
+  cursor: pointer;
+  margin-top: 12px;
+}
+.facet-recovery-notice li {
+  margin: 10px 0;
+}
+.facet-recovery-notice small {
+  display: block;
+  color: var(--muted);
+}

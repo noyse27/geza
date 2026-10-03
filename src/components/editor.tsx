@@ -5,7 +5,6 @@ import { Pencil, Save, X, Globe, Trash2 } from 'lucide-react';
 import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
-import { countryLabel } from '@/lib/countries';
 import { MentionEditor } from './mention-editor';
 async function post(body: unknown) {
   const r = await fetch('/api/admin', {
@@ -47,7 +46,8 @@ export function MediaEditor({
               </button>
             </div>
             <p className="muted small">
-              Gespeicherte Felder bleiben bei automatischen Metadatenupdates erhalten.
+              Gespeicherte Felder bleiben bei automatischen Metadatenupdates erhalten. Länder und Genres
+              bearbeiten die Originalwerte; Alias-Regeln werden anschließend angewendet.
             </p>
             <form
               onSubmit={async (e) => {
@@ -89,8 +89,8 @@ export function MediaEditor({
                   ['year', 'Erscheinungsjahr'],
                   ['runtime', 'Laufzeit (Minuten)'],
                   ['certification', 'Altersfreigabe'],
-                  ['countries', 'Länder, mit Komma getrennt'],
-                  ['genres', 'Genres'],
+                  ['countries', 'Original-Länder, mit Komma getrennt'],
+                  ['genres', 'Original-Genres'],
                   ['directors', 'Regie'],
                   ['actors', 'Besetzung (maximal 10)'],
                 ].map(([key, label]) => (
@@ -101,11 +101,13 @@ export function MediaEditor({
                       name={key}
                       type={['year', 'runtime'].includes(key) ? 'number' : 'text'}
                       defaultValue={
-                        Array.isArray(item[key as keyof Media])
-                          ? (item[key as keyof Media] as string[])
-                              .map((v) => (key === 'countries' ? countryLabel(v) : v))
-                              .join(', ')
-                          : String(item[key as keyof Media] ?? '')
+                        key === 'countries'
+                          ? (item.original_countries ?? item.countries).join(', ')
+                          : key === 'genres'
+                            ? (item.original_genres ?? item.genres).join(', ')
+                            : Array.isArray(item[key as keyof Media])
+                              ? (item[key as keyof Media] as string[]).join(', ')
+                              : String(item[key as keyof Media] ?? '')
                       }
                     />
                   </label>
@@ -522,7 +524,11 @@ export function PlexWatchLoader({ mediaId }: { mediaId: string }) {
             });
             const data = await response.json();
             if (!response.ok) throw Error(data.error || 'Laden fehlgeschlagen');
-            setMessage(data.added ? 'Letzten Anschauzeitpunkt aus Plex übernommen.' : 'Der Plex-Anschauzeitpunkt ist bereits vorhanden.');
+            setMessage(
+              data.added
+                ? 'Letzten Anschauzeitpunkt aus Plex übernommen.'
+                : 'Der Plex-Anschauzeitpunkt ist bereits vorhanden.',
+            );
             invalidateHistoryCache();
             window.dispatchEvent(new Event('geza:catalog-changed'));
             router.refresh();
@@ -535,8 +541,16 @@ export function PlexWatchLoader({ mediaId }: { mediaId: string }) {
       >
         {busy ? 'Lädt …' : 'Von Plex laden'}
       </button>
-      {message && <p role="status" className="muted small">{message}</p>}
-      {error && <p role="alert" className="error">{error}</p>}
+      {message && (
+        <p role="status" className="muted small">
+          {message}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

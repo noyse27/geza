@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth';
 import { facetManagerItems, type FacetCategory } from '@/lib/facets';
 import { countryLabel } from '@/lib/countries';
 import { FacetMergeList } from '@/components/facet-admin';
+import { query } from '@/lib/db';
 export const metadata = { title: 'Länder und Genres', robots: { index: false, follow: false } };
 export default async function Page({
   searchParams,
@@ -14,6 +15,8 @@ export default async function Page({
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const category: FacetCategory = one(raw.category) === 'genre' ? 'genre' : 'country';
   const groups = await facetManagerItems(category);
+  const [recovery] = await query("SELECT status FROM jobs WHERE dedupe_key='facet-recovery-v1'");
+  const recoveryRunning = !!recovery && ['pending', 'running'].includes(recovery.status);
   const items = groups.map((g) => ({
     ...g,
     value: g.value,
@@ -49,7 +52,13 @@ export default async function Page({
         ))}
       </nav>
       <p className="muted small">{items.length} unterschiedliche Werte.</p>
-      <FacetMergeList key={category} category={category} items={items} />
+      <FacetMergeList
+        key={category}
+        category={category}
+        items={items}
+        recoveryRunning={recoveryRunning}
+        recoveryAvailable={!!recovery}
+      />
     </div>
   );
 }

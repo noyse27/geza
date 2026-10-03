@@ -12,6 +12,7 @@ import { isAdmin } from '@/lib/auth';
 import { pendingFriendCount } from '@/lib/federation';
 import { Navigation, Logout, RestoreScroll } from '@/components/navigation';
 import { ScrollTop } from '@/components/scroll-top';
+import { FacetRecoveryNotice } from '@/components/facet-recovery-notice';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   metadataBase: process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL) : undefined,
@@ -76,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </footer>
         <RestoreScroll />
         <ScrollTop />
+        {admin && !isDemo() && <FacetRecoveryNotice />}
       </body>
     </html>
   );

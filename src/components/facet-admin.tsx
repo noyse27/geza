@@ -2,7 +2,17 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 type Item = { value: string; label: string; count: number; isTarget: boolean; aliases: string[] };
-export function FacetMergeList({ category, items }: { category: 'country' | 'genre'; items: Item[] }) {
+export function FacetMergeList({
+  category,
+  items,
+  recoveryRunning = false,
+  recoveryAvailable = false,
+}: {
+  category: 'country' | 'genre';
+  items: Item[];
+  recoveryRunning?: boolean;
+  recoveryAvailable?: boolean;
+}) {
   const router = useRouter();
   const [sourceQuery, setSourceQuery] = useState('');
   const [targetQuery, setTargetQuery] = useState('');
@@ -14,7 +24,7 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
   const [refreshing, startTransition] = useTransition();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const busy = saving || refreshing;
+  const busy = saving || refreshing || recoveryRunning;
   const active = items.find((item) => item.value === target);
   const sources = items.filter((item) => !item.isTarget && item.value !== target);
   const chosen = selected.filter((value) => sources.some((item) => item.value === value));
@@ -64,7 +74,7 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
         release
           ? `„${active.label}“ ist wieder links als offener Begriff verfügbar. Bestehende Titel bleiben unverändert.`
           : unmerge
-            ? `${data.affected} Alias-Zuordnung(en) gelöst. Bestehende Titel bleiben unverändert.`
+            ? `${data.aliases} Alias-Zuordnung(en) gelöst. ${data.affected} Titel anhand ihrer Originalwerte neu zugeordnet.`
             : `${data.affected} Titel aktualisiert. Die Zuordnung zu „${active.label}“ gilt auch für künftige Importe.`,
       );
       setSelected([]);
@@ -89,6 +99,27 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
   );
   return (
     <>
+      {recoveryAvailable && (
+        <button
+          className="button"
+          type="button"
+          onClick={async () => {
+            try {
+              const response = await fetch('/api/admin/facet-recovery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'show' }),
+              });
+              if (!response.ok) throw Error('Status konnte nicht geöffnet werden.');
+              router.refresh();
+            } catch (error) {
+              setError((error as Error).message);
+            }
+          }}
+        >
+          Wiederherstellungsstatus anzeigen
+        </button>
+      )}
       {notice && (
         <p className="panel" role="status">
           {notice}
@@ -163,7 +194,15 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
           >
             ← Alias lösen
           </button>
-          <p>{busy ? 'Wird gespeichert …' : active ? `Ziel: ${active.label}` : 'Rechts ein Ziel wählen.'}</p>
+          <p>
+            {recoveryRunning
+              ? 'Originalwerte werden wiederhergestellt …'
+              : busy
+                ? 'Wird gespeichert …'
+                : active
+                  ? `Ziel: ${active.label}`
+                  : 'Rechts ein Ziel wählen.'}
+          </p>
           {active?.isTarget && active.aliases.length === 0 && (
             <>
               <button type="button" className="button" disabled={busy} onClick={() => save('release')}>
@@ -254,8 +293,8 @@ export function FacetMergeList({ category, items }: { category: 'country' | 'gen
       </div>
       <p className="muted small facet-help">
         Zuordnen aktualisiert bestehende Titel und merkt sich die Regel für künftige Importe. „Alias lösen“
-        entfernt nur diese Regel; bestehende Titel behalten ihren Begriff. Bekannte Ländercodes und
-        Genre-Schreibweisen werden weiterhin automatisch vereinheitlicht.
+        entfernt die Regel und ordnet bestehende Titel anhand ihrer gespeicherten Originalwerte neu zu.
+        Bekannte Ländercodes und Genre-Schreibweisen werden weiterhin automatisch vereinheitlicht.
       </p>
     </>
   );
