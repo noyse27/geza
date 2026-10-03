@@ -16,6 +16,8 @@ export type Media = {
   summary: string;
   countries: string[];
   genres: string[];
+  original_countries?: string[] | null;
+  original_genres?: string[] | null;
   directors: string[];
   actors: string[];
   certification: string | null;

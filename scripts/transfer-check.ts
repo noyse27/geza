@@ -49,6 +49,10 @@ try {
   await query(`INSERT INTO media(id,kind,title,parent_id,locked_fields,field_sources) VALUES
     (9007199254740993,'episode','Episode',9007199254740994,ARRAY['parent_id'],'{"title":"manual"}'),
     (9007199254740994,'show','Series',NULL,'{}','{}'),(100,'movie','Movie',NULL,'{}','{}')`);
+  // Preserve both verified source values and unknown pre-migration provenance through restore.
+  await query(
+    "UPDATE media SET countries=ARRAY['Display'],original_countries=ARRAY['Italy'],original_genres=NULL,facet_recovery_note='Genres need recovery' WHERE id=100",
+  );
   await query(
     `INSERT INTO watches(media_id,source,source_id,original_watched_at,time_estimated) VALUES(100,'trakt','watch-1','1970-01-01',true)`,
   );

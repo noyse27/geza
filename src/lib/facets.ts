@@ -1,6 +1,7 @@
 import { pool, query } from './db';
 import { normalizeCountryToken } from './countries';
 import { normalizeGenreToken } from './genres';
+import type { PoolClient } from 'pg';
 
 export type FacetCategory = 'country' | 'genre';
 export const facetColumn: Record<FacetCategory, 'countries' | 'genres'> = {
@@ -12,11 +13,13 @@ const staticNormalize: Record<FacetCategory, (raw: string) => string> = {
   genre: normalizeGenreToken,
 };
 
-async function aliasMap(category: FacetCategory): Promise<Record<string, string>> {
-  const rows = await query<{ alias: string; canonical: string }>(
-    'SELECT alias,canonical FROM facet_aliases WHERE category=$1',
-    [category],
-  );
+async function aliasMap(category: FacetCategory, client?: PoolClient): Promise<Record<string, string>> {
+  const rows = client
+    ? (await client.query('SELECT alias,canonical FROM facet_aliases WHERE category=$1', [category])).rows
+    : await query<{ alias: string; canonical: string }>(
+        'SELECT alias,canonical FROM facet_aliases WHERE category=$1',
+        [category],
+      );
   const map = Object.fromEntries(rows.map((r) => [r.alias, r.canonical]));
   return map;
 }
@@ -35,32 +38,101 @@ export function resolveFacet(value: string, aliases: Record<string, string>): st
 export async function normalizeFacetArray(
   category: FacetCategory,
   raw: string[] | null | undefined,
+  client?: PoolClient,
 ): Promise<string[] | undefined> {
   if (!raw) return raw ?? undefined;
-  const aliases = await aliasMap(category);
+  const project = await facetProjector(category, client);
+  return project(raw);
+}
+
+export async function facetProjector(category: FacetCategory, client?: PoolClient) {
+  const aliases = await aliasMap(category, client);
+  const run = client
+    ? async (sql: string, values: unknown[]) => (await client.query(sql, values)).rows
+    : query;
   const targets = new Set(
-    (
-      await query<{ value: string }>('SELECT value FROM facet_terms WHERE category=$1 AND is_target=true', [
-        category,
-      ])
-    ).map((row) => row.value),
+    (await run('SELECT value FROM facet_terms WHERE category=$1 AND is_target=true', [category])).map(
+      (row) => row.value,
+    ),
   );
   const normalize = staticNormalize[category];
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of raw) {
-    if (typeof item !== 'string') continue;
-    const rawValue = item.trim();
-    const value = resolveFacet(
-      Object.hasOwn(aliases, rawValue) || targets.has(rawValue) ? rawValue : normalize(rawValue),
-      aliases,
-    );
-    if (value && !seen.has(value)) {
-      seen.add(value);
-      result.push(value);
+  return (raw: string[]) => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const item of raw) {
+      if (typeof item !== 'string') continue;
+      const rawValue = item.trim();
+      const value = resolveFacet(
+        Object.hasOwn(aliases, rawValue) || targets.has(rawValue) ? rawValue : normalize(rawValue),
+        aliases,
+      );
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        result.push(value);
+      }
     }
+    return result;
+  };
+}
+
+export class FacetReleaseError extends Error {}
+
+export async function assertFacetRecoveryIdle(client: PoolClient) {
+  if (
+    (
+      await client.query(
+        "SELECT 1 FROM jobs WHERE dedupe_key='facet-recovery-v1' AND status IN ('pending','running')",
+      )
+    ).rowCount
+  )
+    throw new FacetReleaseError(
+      'Die Originalwerte werden gerade wiederhergestellt. Bitte den Abschluss abwarten.',
+    );
+}
+
+// Always derive the display from immutable source values, never from an earlier merge result.
+export async function reprojectFacets(client: PoolClient, category: FacetCategory) {
+  const column = facetColumn[category];
+  const project = await facetProjector(category, client);
+  await client.query("SET LOCAL geza.facet_projection='on'");
+  let cursor = '0',
+    affected = 0;
+  for (;;) {
+    const { rows } = await client.query(
+      `SELECT id::text,original_${column} AS original,${column} AS current FROM media
+      WHERE id>$1 AND original_${column} IS NOT NULL ORDER BY id LIMIT 500`,
+      [cursor],
+    );
+    if (!rows.length) break;
+    const updates = rows
+      .map((row) => ({ id: row.id, values: project(row.original), current: row.current }))
+      .filter((row) => JSON.stringify(row.values) !== JSON.stringify(row.current));
+    if (updates.length) {
+      const result = await client.query(
+        `UPDATE media m SET ${column}=x.values FROM
+        jsonb_to_recordset($1::jsonb) AS x(id bigint,values text[]) WHERE m.id=x.id`,
+        [JSON.stringify(updates)],
+      );
+      affected += result.rowCount || 0;
+    }
+    cursor = rows[rows.length - 1].id;
   }
-  return result;
+  return affected;
+}
+
+async function assertOriginalsKnown(client: PoolClient, category: FacetCategory, values: string[]) {
+  const column = facetColumn[category];
+  if (
+    (
+      await client.query(
+        `SELECT 1 FROM media WHERE original_${column} IS NULL AND ${column} && $1::text[] LIMIT 1`,
+        [values],
+      )
+    ).rowCount
+  )
+    throw new FacetReleaseError(
+      'Für betroffene Titel fehlen noch verlässliche Originalwerte. Bitte zuerst die Wiederherstellung abschließen oder deren Originalwerte im Titel bearbeiten.',
+    );
 }
 
 export async function facetManagerItems(category: FacetCategory) {
@@ -110,6 +182,7 @@ export async function mergeFacetAlias(category: FacetCategory, aliases: string[]
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(729383)');
+    await assertFacetRecoveryIdle(client);
     const map = Object.fromEntries(
       (
         await client.query('SELECT alias,canonical FROM facet_aliases WHERE category=$1', [category])
@@ -117,9 +190,7 @@ export async function mergeFacetAlias(category: FacetCategory, aliases: string[]
     );
     if (Object.hasOwn(map, target) || sources.some((source) => Object.hasOwn(map, source)))
       throw Error('Die Auswahl wurde inzwischen zugeordnet. Bitte Seite neu laden.');
-    for (const alias of Object.keys(map)) {
-      if (sources.includes(resolveFacet(alias, map))) sources.push(alias);
-    }
+    await assertOriginalsKnown(client, category, sources);
     await client.query(
       `INSERT INTO facet_terms(category,value,is_target) VALUES($1,$2,true)
       ON CONFLICT(category,value) DO UPDATE SET is_target=true`,
@@ -131,16 +202,9 @@ export async function mergeFacetAlias(category: FacetCategory, aliases: string[]
          ON CONFLICT (category,alias) DO UPDATE SET canonical=EXCLUDED.canonical`,
         [category, alias, target],
       );
-    const { rowCount } = await client.query(
-      `UPDATE media SET ${column} = (
-         SELECT array_agg(DISTINCT CASE WHEN v = ANY($1::text[]) THEN $2::text ELSE v END
-                           ORDER BY CASE WHEN v = ANY($1::text[]) THEN $2::text ELSE v END)
-         FROM unnest(${column}) AS v
-       ) WHERE ${column} && $1::text[]`,
-      [sources, target],
-    );
+    const affected = await reprojectFacets(client, category);
     await client.query('COMMIT');
-    return { affected: rowCount || 0 };
+    return { affected };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -149,13 +213,12 @@ export async function mergeFacetAlias(category: FacetCategory, aliases: string[]
   }
 }
 
-export class FacetReleaseError extends Error {}
-
 export async function releaseFacetTarget(category: FacetCategory, value: string) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(729383)');
+    await assertFacetRecoveryIdle(client);
     const linked = await client.query(
       'SELECT 1 FROM facet_aliases WHERE category=$1 AND (alias=$2 OR canonical=$2) LIMIT 1',
       [category, value],
@@ -187,6 +250,7 @@ export async function unmergeFacetAliases(category: FacetCategory, aliases: stri
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(729383)');
+    await assertFacetRecoveryIdle(client);
     const map = Object.fromEntries(
       (
         await client.query('SELECT alias,canonical FROM facet_aliases WHERE category=$1', [category])
@@ -195,13 +259,7 @@ export async function unmergeFacetAliases(category: FacetCategory, aliases: stri
     const selected = [...new Set(aliases)];
     if (selected.some((alias) => !Object.hasOwn(map, alias) || resolveFacet(alias, map) !== canonical))
       throw Error('Die Zuordnung wurde inzwischen geändert. Bitte Seite neu laden.');
-    // Flatten old chains first: detaching one alias must not detach its children.
-    for (const alias of Object.keys(map))
-      await client.query('UPDATE facet_aliases SET canonical=$3 WHERE category=$1 AND alias=$2', [
-        category,
-        alias,
-        resolveFacet(alias, map),
-      ]);
+    await assertOriginalsKnown(client, category, [canonical]);
     for (const alias of selected)
       await client.query('INSERT INTO facet_terms(category,value) VALUES($1,$2) ON CONFLICT DO NOTHING', [
         category,
@@ -211,8 +269,9 @@ export async function unmergeFacetAliases(category: FacetCategory, aliases: stri
       category,
       selected,
     ]);
+    const affected = await reprojectFacets(client, category);
     await client.query('COMMIT');
-    return { affected: selected.length };
+    return { affected, aliases: selected.length };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

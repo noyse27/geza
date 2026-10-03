@@ -153,18 +153,28 @@ export async function POST(req: Request) {
         .parse(body.data?.ids);
       const data = mediaSchema.parse(body.data);
       data.certification = normalizeCertification(data.certification) ?? null;
-      data.countries = (await normalizeFacetArray('country', data.countries)) ?? [];
-      data.genres = (await normalizeFacetArray('genre', data.genres)) ?? [];
-      const fields = Object.keys(data);
-      const values = Object.values(data);
       const changed: string[] = [];
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(729383)');
+        await client.query("SET LOCAL geza.facet_projection='on'");
         const {
           rows: [current],
-        } = await client.query('SELECT ids FROM media WHERE id=$1 FOR UPDATE', [body.id]);
+        } = await client.query(
+          'SELECT ids,countries,genres,original_countries,original_genres FROM media WHERE id=$1 FOR UPDATE',
+          [body.id],
+        );
         if (!current) throw Error('Titel nicht gefunden');
+        for (const [field, category] of [
+          ['countries', 'country'],
+          ['genres', 'genre'],
+        ] as const) {
+          await client.query(`UPDATE media SET original_${field}=$2 WHERE id=$1`, [body.id, data[field]]);
+          data[field] = (await normalizeFacetArray(category, data[field], client)) ?? [];
+        }
+        const fields = Object.keys(data);
+        const values = Object.values(data);
         await client.query(
           `UPDATE media SET ${fields.map((f, i) => `${f}=$${i + 1}`).join(',')},locked_fields=ARRAY(SELECT DISTINCT unnest(locked_fields || $${values.length + 1}::text[])),updated_at=now() WHERE id=$${values.length + 2}`,
           [...values, fields, body.id],
@@ -448,27 +458,46 @@ export async function POST(req: Request) {
           // Falls back to the lightweight search-result fields below; the background
           // enrich job (queued when the detail page loads) fills the rest later.
         }
-        id = (
-          await query<{ id: string }>(
-            `INSERT INTO media(kind,title,original_title,year,ids,summary,poster,countries,genres,directors,actors,certification,runtime,bucketlist,manual_entry)
-             VALUES($1,$2,$3,$4,jsonb_build_object('tmdb',$5::text),$6,$7,$8,$9,$10,$11,$12,$13,true,true) RETURNING id`,
-            [
-              data.kind,
-              details?.title || data.title,
-              details?.original_title ?? data.original_title,
-              details?.year ?? data.year,
-              data.tmdbId,
-              details?.summary || data.summary,
-              details?.poster || data.poster,
-              details?.countries || [],
-              details?.genres || [],
-              details?.directors || [],
-              details?.actors || [],
-              details?.certification ?? null,
-              details?.runtime ?? null,
-            ],
-          )
-        )[0].id;
+        const facetClient = await pool.connect();
+        try {
+          await facetClient.query('BEGIN');
+          await facetClient.query('SELECT pg_advisory_xact_lock(729383)');
+          const countries = await normalizeFacetArray(
+            'country',
+            details?.original_countries || [],
+            facetClient,
+          );
+          const genres = await normalizeFacetArray('genre', details?.original_genres || [], facetClient);
+          id = (
+            await facetClient.query<{ id: string }>(
+              `INSERT INTO media(kind,title,original_title,year,ids,summary,poster,countries,genres,directors,actors,certification,runtime,bucketlist,manual_entry,original_countries,original_genres)
+             VALUES($1,$2,$3,$4,jsonb_build_object('tmdb',$5::text),$6,$7,$8,$9,$10,$11,$12,$13,true,true,$14,$15) RETURNING id`,
+              [
+                data.kind,
+                details?.title || data.title,
+                details?.original_title ?? data.original_title,
+                details?.year ?? data.year,
+                data.tmdbId,
+                details?.summary || data.summary,
+                details?.poster || data.poster,
+                countries || [],
+                genres || [],
+                details?.directors || [],
+                details?.actors || [],
+                details?.certification ?? null,
+                details?.runtime ?? null,
+                details?.original_countries || [],
+                details?.original_genres || [],
+              ],
+            )
+          ).rows[0].id;
+          await facetClient.query('COMMIT');
+        } catch (error) {
+          await facetClient.query('ROLLBACK');
+          throw error;
+        } finally {
+          facetClient.release();
+        }
         if (details && details.voteCount > 0)
           await saveProviderRating(id, 'tmdb', details.voteAverage, details.url, details.voteCount);
       }

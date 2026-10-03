@@ -1,6 +1,6 @@
 import { isDemo } from './demo-mode';
 import { loggedFetch, logEvent, logContext } from './logging';
-import { query } from './db';
+import { query, pool } from './db';
 import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
@@ -43,11 +43,29 @@ export function fromPlex(m: Raw): Raw {
   };
 }
 export async function mergeMetadata(id: string, data: Raw, source = 'plex', client?: PoolClient) {
+  if (!client) {
+    const own = await pool.connect();
+    try {
+      await own.query('BEGIN');
+      await mergeMetadata(id, data, source, own);
+      await own.query('COMMIT');
+    } catch (error) {
+      await own.query('ROLLBACK');
+      throw error;
+    } finally {
+      own.release();
+    }
+    return;
+  }
+  await client.query('SELECT pg_advisory_xact_lock(729383)');
+  await client.query("SET LOCAL geza.facet_projection='on'");
+  data = { ...data };
+  const originals = { countries: data.countries, genres: data.genres };
   const run = client
     ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
     : query;
-  if (data.countries) data.countries = await normalizeFacetArray('country', data.countries);
-  if (data.genres) data.genres = await normalizeFacetArray('genre', data.genres);
+  if (data.countries) data.countries = await normalizeFacetArray('country', data.countries, client);
+  if (data.genres) data.genres = await normalizeFacetArray('genre', data.genres, client);
   const current = (await run('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!current) return;
   const priority: Record<string, number> = { plex: 3, tvdb: 2, tmdb: 1 };
@@ -61,9 +79,14 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex', clie
       (!Array.isArray(data[k]) || data[k].length) &&
       (!current[k] ||
         (Array.isArray(current[k]) && !current[k].length) ||
+        ((k === 'countries' || k === 'genres') && current.field_sources?.[k] === source) ||
         ((k === 'poster' ? coverPriority : priority)[source] || 0) >
           ((k === 'poster' ? coverPriority : priority)[current.field_sources?.[k]] || 0)),
   );
+  for (const field of ['countries', 'genres'] as const) {
+    if (keys.includes(field))
+      await run(`UPDATE media SET original_${field}=$2 WHERE id=$1`, [id, originals[field]]);
+  }
   if (keys.length)
     await run(
       `UPDATE media SET ${keys.map((k, i) => `${k}=$${i + 1}`).join(',')},field_sources=field_sources||$${keys.length + 1}::jsonb,updated_at=now() WHERE id=$${keys.length + 2}`,
@@ -191,6 +214,8 @@ export async function fetchTmdbDetails(kind: 'movie' | 'show', tmdbId: number) {
       d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country || [],
     ),
     genres: await normalizeFacetArray('genre', tags(d.genres)),
+    original_countries: d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country || [],
+    original_genres: tags(d.genres),
     directors: d.credits?.crew?.filter((x: Raw) => x.job === 'Director').map((x: Raw) => x.name) || [],
     actors: d.credits?.cast?.slice(0, 10).map((x: Raw) => x.name) || [],
     certification: normalizeCertification(de) ?? null,
@@ -267,6 +292,40 @@ async function tvdb(m: Raw): Promise<Raw | null> {
     poster: d.image,
   };
 }
+// Recovery only needs raw facets; do not normalize or rewrite unrelated metadata here.
+export async function fetchRecoveryFacets(
+  m: Raw,
+): Promise<{ countries?: string[]; genres?: string[]; source: string } | null> {
+  if ((await getSetting('TMDB_TOKEN')) && ['movie', 'show'].includes(m.kind)) {
+    const headers = { Authorization: `Bearer ${await getSetting('TMDB_TOKEN')}` };
+    let id = m.ids.tmdb;
+    if (!id && m.ids.imdb) {
+      const found = await json(
+        `https://api.themoviedb.org/3/find/${encodeURIComponent(m.ids.imdb)}?external_source=imdb_id`,
+        headers,
+      );
+      id = (m.kind === 'movie' ? found.movie_results : found.tv_results)?.[0]?.id;
+    }
+    if (id) {
+      const d = await json(
+        `https://api.themoviedb.org/3/${m.kind === 'movie' ? 'movie' : 'tv'}/${id}?language=de-DE`,
+        headers,
+      );
+      if (String(d.id) !== String(id)) throw Error('TMDB-Antwort passt nicht zur Titel-ID.');
+      return {
+        countries: d.production_countries?.map((x: Raw) => x.iso_3166_1) || d.origin_country,
+        genres: tags(d.genres),
+        source: 'tmdb',
+      };
+    }
+  }
+  if (m.kind !== 'movie' && (await getSetting('TVDB_API_KEY'))) {
+    const d = await tvdb(m);
+    if (d) return { countries: d.countries, genres: d.genres, source: 'tvdb' };
+  }
+  return null;
+}
+
 export async function enrichMedia(id: string) {
   if (isDemo()) return;
   const m = (await query('SELECT * FROM media WHERE id=$1', [id]))[0];

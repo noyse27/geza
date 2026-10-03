@@ -150,6 +150,7 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
     await validateTarget(client, archive);
     // Die Rumpelkammer-Zuordnung wird nach dem Einspielen einmal neu berechnet statt pro Zeile.
     await client.query("SET LOCAL geza.skip_rumpel='on'");
+    await client.query("SET LOCAL geza.facet_projection='on'");
     await client.query('DELETE FROM sessions');
     await client.query('DELETE FROM login_attempts');
     for (const table of dataTables) {

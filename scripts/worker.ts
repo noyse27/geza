@@ -11,6 +11,7 @@ import { nextPlexRun, scheduleNextScan } from '../src/lib/plex-jobs';
 import { getSetting } from '../src/lib/settings';
 import { installationReady } from '../src/lib/setup';
 import { processSeriesCatalog } from '../src/lib/manual-watches';
+import { processFacetRecovery, resumeFacetRecovery } from '../src/lib/facet-recovery';
 let running = true;
 process.on('SIGTERM', () => {
   running = false;
@@ -22,6 +23,7 @@ console.log('Geza worker ready');
 let lastCleanup = 0;
 let lastCatalogSeed = 0;
 let plexScanSeeded = false;
+let facetRecoveryResumed = false;
 const friendsLoop = (async () => {
   while (running) {
     try {
@@ -47,6 +49,10 @@ while (running) {
       await query("DELETE FROM event_logs WHERE created_at < now() - interval '14 days'");
       lastCleanup = Date.now();
     }
+    if (!facetRecoveryResumed) {
+      await resumeFacetRecovery();
+      facetRecoveryResumed = true;
+    }
     if (Date.now() - lastCatalogSeed > 60000 && (await getSetting('TMDB_TOKEN'))) {
       await query(`INSERT INTO jobs(kind,dedupe_key,payload)
         SELECT 'series-catalog','series-catalog:'||id,jsonb_build_object('mediaId',id::text)
@@ -69,7 +75,7 @@ while (running) {
       "UPDATE jobs SET status='pending',available_at=now() WHERE status='running' AND updated_at<now()-interval '10 minutes'",
     );
     const jobs = await query(
-      `UPDATE jobs SET status='running',attempts=attempts+1,updated_at=now() WHERE id=(SELECT id FROM jobs WHERE status='pending' AND available_at<=now() ORDER BY CASE WHEN kind='plex' THEN 0 ELSE 1 END,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`,
+      `UPDATE jobs SET status='running',attempts=attempts+1,updated_at=now() WHERE id=(SELECT id FROM jobs WHERE status='pending' AND available_at<=now() ORDER BY CASE WHEN kind='facet-recovery' THEN -1 WHEN kind='plex' THEN 0 ELSE 1 END,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`,
     );
     if (!jobs.length) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -95,7 +101,8 @@ while (running) {
         async () => {
           await logEvent('info', job.kind, 'Verarbeitung gestartet');
           try {
-            if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
+            if (job.kind === 'facet-recovery') await processFacetRecovery(String(job.id));
+            else if (job.kind === 'enrich') await enrichMedia(String(job.payload.mediaId));
             else if (job.kind === 'series-catalog') await processSeriesCatalog(String(job.payload.mediaId));
             else if (job.kind === 'plex') await processPlex(job.payload);
             else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
