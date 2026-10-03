@@ -149,6 +149,39 @@ export async function mergeFacetAlias(category: FacetCategory, aliases: string[]
   }
 }
 
+export class FacetReleaseError extends Error {}
+
+export async function releaseFacetTarget(category: FacetCategory, value: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(729383)');
+    const linked = await client.query(
+      'SELECT 1 FROM facet_aliases WHERE category=$1 AND (alias=$2 OR canonical=$2) LIMIT 1',
+      [category, value],
+    );
+    if (linked.rowCount)
+      throw new FacetReleaseError(
+        'Der Begriff hat noch Aliase oder wurde inzwischen zugeordnet. Bitte die Ansicht aktualisieren und zuerst seine Aliase lösen.',
+      );
+    const result = await client.query(
+      'UPDATE facet_terms SET is_target=false WHERE category=$1 AND value=$2 AND is_target=true',
+      [category, value],
+    );
+    if (!result.rowCount)
+      throw new FacetReleaseError(
+        'Der Begriff ist kein gespeichertes Ziel mehr. Bitte die Ansicht aktualisieren.',
+      );
+    await client.query('COMMIT');
+    return { affected: result.rowCount };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function unmergeFacetAliases(category: FacetCategory, aliases: string[], canonical: string) {
   const client = await pool.connect();
   try {
