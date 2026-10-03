@@ -55,6 +55,30 @@ test('facet mappings persist, flatten, import and detach without changing existi
     await unmergeFacetAliases('country', ['US'], 'DE');
     assert.deepEqual(await normalizeFacetArray('country', ['USA', 'DE']), ['US', 'DE']);
     assert.deepEqual(await normalizeFacetArray('genre', ['Comedy']), ['Komödie']);
+    // A human-readable existing target must not be replaced by its built-in ISO alias.
+    await pool.query(
+      "INSERT INTO facet_aliases VALUES('country','GB','Vereinigtes Königreich',now()),('country','United Kingdom','Vereinigtes Königreich',now())",
+    );
+    await pool.query("INSERT INTO media(countries) VALUES(ARRAY['gbr'])");
+    assert.equal((await mergeFacetAlias('country', ['gbr'], 'Vereinigtes Königreich')).affected, 1);
+    assert.deepEqual(
+      await normalizeFacetArray('country', ['gbr', 'GB', 'United Kingdom', 'Vereinigtes Königreich']),
+      ['Vereinigtes Königreich'],
+    );
+    assert.equal(
+      (await facetManagerItems('country'))
+        .find((i) => i.value === 'Vereinigtes Königreich')
+        ?.aliases.includes('gbr'),
+      true,
+    );
+    await unmergeFacetAliases('country', ['gbr'], 'Vereinigtes Königreich');
+    assert.deepEqual(await normalizeFacetArray('country', ['gbr', 'GB']), ['gbr', 'Vereinigtes Königreich']);
+    // Exact selected sources must not silently redirect another normalized term.
+    await mergeFacetAlias('country', ['United States'], 'Eigener Länderbegriff');
+    assert.deepEqual(await normalizeFacetArray('country', ['United States', 'US', 'Eigener Länderbegriff']), [
+      'Eigener Länderbegriff',
+      'US',
+    ]);
     // Existing chained mappings resolve and detaching a parent leaves its children at the old target.
     await pool.query(
       "INSERT INTO facet_aliases VALUES('genre','Legacy A','Legacy B',now()),('genre','Legacy B','Legacy C',now())",
