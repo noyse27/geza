@@ -1,6 +1,7 @@
 import { getMedia } from '@/lib/catalog';
 import { query } from '@/lib/db';
 import { MediaDetail } from '@/components/media-detail';
+import { shareDescription } from '@/lib/share-metadata';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params,
     m = await getMedia(id);
@@ -15,12 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const name = m.kind === 'season' && m.parent_title ? `${m.parent_title} – Staffel ${m.season}` : m.title;
   const facts = [m.runtime ? `${m.runtime} Min.` : null, m.certification || null].filter(Boolean);
   const title = `${name}${m.year ? ` (${m.year})` : ''}${facts.length ? ` · ${facts.join(' · ')}` : ''}`;
-  const stars = rating != null ? '★'.repeat(rating) + '☆'.repeat(10 - rating) + ` (${rating}/10) — ` : '';
-  const teaser =
-    review && !review.spoiler
-      ? review.body.slice(0, 160)
-      : m.summary.slice(0, 160) || `${m.title} — Informationen und Reviews auf Geza.`;
-  const description = stars + teaser;
+  const description = shareDescription(m.title, m.summary, rating, review);
   const url = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/title/${id}` : undefined;
   return {
     title,
