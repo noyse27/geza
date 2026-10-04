@@ -120,9 +120,9 @@ Auf Serien- und Staffelseiten wechselt die Auswahl unter dem Cover zwischen der 
 
 ## Link-Vorschau
 
-Film- und Personenverweise werden im Share-Text als lesbare Namen ausgegeben. Facebook-/Meta-Abrufe und Facebooks In-App-Browser erhalten die Metadaten vollständig im HTML-Kopf; die übrigen von Next.js unterstützten Vorschau-Bots bleiben berücksichtigt. Titel, Sterne und das Coverformat bleiben gleich. Welche Informationen Facebook in seiner App tatsächlich anzeigt und wie lange ältere Vorschauen zwischengespeichert bleiben, entscheidet weiterhin Facebook.
+Film- und Personenverweise werden im Share-Text als lesbare Namen ausgegeben. Facebook-/Meta-Abrufe und Facebooks In-App-Browser erhalten die Metadaten vollständig im HTML-Kopf; die übrigen von Next.js unterstützten Vorschau-Bots bleiben berücksichtigt. Welche Informationen Facebook in seiner App tatsächlich anzeigt und wie lange ältere Vorschauen zwischengespeichert bleiben, entscheidet weiterhin Facebook.
 
-Detailseiten liefern Open-Graph- und Twitter-Karten für das Teilen: Titel mit Jahr, die Geza-Bewertung als Sterne und als Beschreibung ein Teaser der eigenen öffentlichen Review (160 Zeichen). Spoiler-Reviews werden nie angeteasert; ohne Review dient die Inhaltsangabe als Ersatz. Das Bild ist das Cover im Hochformat ohne eingebrannten Text. Voraussetzung ist eine gesetzte `PUBLIC_URL`, damit Bild und Kanonisierung absolute Adressen erhalten.
+Detailseiten liefern Open-Graph- und Twitter-Karten für das Teilen: Der Share-Titel enthält Jahr, die vorhandene Geza-Bewertung als Punkte sowie Laufzeit und FSK. Die Beschreibung enthält weiterhin Sterne und einen Teaser des eigenen öffentlichen Reviews (160 Zeichen). Das Share-Bild im Format **1200 × 630** zeigt ein kleineres Cover sowie Titel, Filmdaten, Bewertung und einen Review-Auszug (bis zu 180 Zeichen) direkt im Bild. Dadurch bleiben die Informationen auch sichtbar, wenn eine App das Beschreibungsfeld ausblendet. Spoiler-Reviews und private Entwürfe werden nicht als Auszug verwendet; ersatzweise erscheint die Inhaltsangabe, als solche gekennzeichnet. Ohne Bewertung steht im Bild „Noch nicht bewertet“. Die Filmseite selbst bleibt unverändert. Voraussetzung ist eine gesetzte `PUBLIC_URL`, damit Bild und Kanonisierung absolute Adressen erhalten.
 
 ## RSS-Feed (ABO)
 

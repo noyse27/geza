@@ -1,8 +1,28 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { activeMention, decodeMentions, encodeMentions, updateMentions } from '../src/lib/mentions';
-import { shareDescription } from '../src/lib/share-metadata';
+import { shareDescription, shareTitle, shareExcerpt } from '../src/lib/share-metadata';
 import config from '../next.config';
+
+test('social titles prioritize actual ratings and omit missing facts', () => {
+  assert.equal(
+    shareTitle('The Furious', 2025, 8, ['114 Min.', 'FSK 18']),
+    'The Furious (2025) · 8/10 · 114 Min. · FSK 18',
+  );
+  assert.equal(shareTitle('Film', null, undefined, [null]), 'Film');
+});
+test('image excerpts decode mentions and never quote spoiler reviews', () => {
+  assert.deepEqual(shareExcerpt('Inhalt', { body: 'Von [[geza:r:Name:Name]]', spoiler: false }), {
+    label: 'Mein Review',
+    text: 'Von Name',
+  });
+  assert.deepEqual(shareExcerpt('Inhalt', { body: 'Geheimes Ende', spoiler: true }), {
+    label: 'Zum Film',
+    text: 'Inhalt',
+  });
+  assert.equal(shareExcerpt('', { body: 'x'.repeat(500), spoiler: false }).text.length, 178);
+  assert.deepEqual(shareExcerpt('Inhalt'), { label: 'Zum Film', text: 'Inhalt' });
+});
 
 test('share descriptions decode mentions before truncating and preserve rating and spoiler rules', () => {
   const body =
