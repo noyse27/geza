@@ -1,9 +1,31 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Film } from 'lucide-react';
 import type { MentionResult } from '@/lib/mentions';
 
 const cache = new Map<string, MentionResult[]>();
+function MentionCover({ item }: { item: MentionResult }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="mention-cover">
+      {item.poster && !failed ? (
+        <img
+          src={item.poster}
+          alt={`Cover: ${item.label}`}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className="mention-cover-missing">
+          <Film aria-hidden="true" size={28} />
+          <span>Kein Cover</span>
+        </span>
+      )}
+    </span>
+  );
+}
 export function PersonMention({ kind, name, label }: { kind: 'r' | 'a'; name: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<MentionResult[] | null>(null);
@@ -72,19 +94,24 @@ export function PersonMention({ kind, name, label }: { kind: 'r' | 'a'; name: st
         {label}
       </button>
       {open && (
-        <span className="mention-preview">
+        <span className={`mention-preview${kind === 'r' ? ' mention-preview-covers' : ''}`}>
           <strong>{name}</strong>
           {error ? (
             <span role="status">Filme konnten nicht geladen werden.</span>
           ) : items === null ? (
             <span role="status">Lädt …</span>
           ) : items.length ? (
-            items.map((item) => (
-              <Link key={item.id} href={`/title/${item.id}`}>
-                {item.label}
-                {item.year ? ` (${item.year})` : ''}
-              </Link>
-            ))
+            <span className={kind === 'r' ? 'mention-film-grid' : undefined}>
+              {items.map((item) => (
+                <Link key={item.id} href={`/title/${item.id}`} prefetch={false}>
+                  <span>
+                    {item.label}
+                    {item.year ? ` (${item.year})` : ''}
+                  </span>
+                  {kind === 'r' && <MentionCover item={item} />}
+                </Link>
+              ))}
+            </span>
           ) : (
             <span>Keine Filme vorhanden.</span>
           )}
