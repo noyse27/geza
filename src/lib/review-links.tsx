@@ -12,9 +12,7 @@ export async function renderReviewBody(body: string) {
       parts.push(await renderReviewBody(decoded.text.slice(last, mention.start)));
       parts.push(
         mention.kind === 'm' ? (
-          <Link key={mention.start} className="review-title-link" href={`/title/${mention.id}`}>
-            {mention.label}
-          </Link>
+          <PersonMention key={mention.start} kind="m" name={mention.id} label={mention.label} />
         ) : (
           <PersonMention key={mention.start} kind={mention.kind} name={mention.id} label={mention.label} />
         ),
