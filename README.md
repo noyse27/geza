@@ -120,6 +120,8 @@ Auf Serien- und Staffelseiten wechselt die Auswahl unter dem Cover zwischen der 
 
 ## Link-Vorschau
 
+Film- und Personenverweise werden im Share-Text als lesbare Namen ausgegeben. Facebook-/Meta-Abrufe und Facebooks In-App-Browser erhalten die Metadaten vollständig im HTML-Kopf; die übrigen von Next.js unterstützten Vorschau-Bots bleiben berücksichtigt. Titel, Sterne und das Coverformat bleiben gleich. Welche Informationen Facebook in seiner App tatsächlich anzeigt und wie lange ältere Vorschauen zwischengespeichert bleiben, entscheidet weiterhin Facebook.
+
 Detailseiten liefern Open-Graph- und Twitter-Karten für das Teilen: Titel mit Jahr, die Geza-Bewertung als Sterne und als Beschreibung ein Teaser der eigenen öffentlichen Review (160 Zeichen). Spoiler-Reviews werden nie angeteasert; ohne Review dient die Inhaltsangabe als Ersatz. Das Bild ist das Cover im Hochformat ohne eingebrannten Text. Voraussetzung ist eine gesetzte `PUBLIC_URL`, damit Bild und Kanonisierung absolute Adressen erhalten.
 
 ## RSS-Feed (ABO)
