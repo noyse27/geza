@@ -1,6 +1,6 @@
 export type MentionKind = 'm' | 'r' | 'a';
 export type Mention = { start: number; end: number; kind: MentionKind; id: string; label: string };
-export type MentionResult = { id: string; label: string; year?: number | null };
+export type MentionResult = { id: string; label: string; year?: number | null; poster?: string | null };
 const token = /\[\[geza:([mra]):([^\]\r\n]+):([^\]\r\n]+)\]\]/g;
 
 export function decodeMentions(body: string) {
