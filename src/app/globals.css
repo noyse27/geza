@@ -91,24 +91,20 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.mention-film-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 8px;
-}
-.mention-film-grid a {
+.mention-preview-covers a {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
-.mention-film-grid a:hover,
-.mention-film-grid a:focus-visible {
+.mention-preview-covers a:hover,
+.mention-preview-covers a:focus-visible {
   background: var(--surface-2);
 }
 .mention-cover {
   display: block;
   width: 100%;
+  max-width: 180px;
   aspect-ratio: 2 / 3;
   background: var(--surface-2);
   overflow: hidden;

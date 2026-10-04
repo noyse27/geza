@@ -21,7 +21,9 @@ Nach der Auswahl steht nur der Titel oder Name im Editor, beispielsweise „… 
 
 ## Verweise lesen
 
-Ein Filmverweis führt zur jeweiligen Geza-Filmseite. Ein Personenverweis erscheint unterstrichen. Beim Darüberfahren mit der Maus öffnet sich nach einer kurzen Verzögerung eine Filmvorschau; auf dem Handy öffnet sie sich durch Tippen auf den Namen. Mit der Tastatur lässt sich der Name fokussieren und per Enter oder Leertaste öffnen. Escape schließt die Vorschau.
+Ein Filmverweis (`@m`) führt zur jeweiligen Geza-Filmseite. Beim Darüberfahren mit der Maus oder Fokussieren mit der Tastatur zeigt er den Filmtitel mit Jahr und darunter das anklickbare Cover. Fehlt das Cover, erscheint ein Platzhalter. Ein Klick auf den Verweis, den Titel oder das Cover öffnet die Filmseite.
+
+Ein Personenverweis (`@r` oder `@a`) erscheint unterstrichen. Beim Darüberfahren mit der Maus öffnet sich nach einer kurzen Verzögerung eine Filmliste ohne Cover; auf dem Handy öffnet sie sich durch Tippen auf den Namen. Mit der Tastatur lässt sich der Name fokussieren und per Enter oder Leertaste öffnen. Escape schließt die Vorschau.
 
 Die Vorschau enthält bis zu fünf Filme aus Geza, jeweils mit Jahr, sofern vorhanden. Jeder Film ist anklickbar. Bei `@r` zählen die Regieeinträge, bei `@a` die Besetzungseinträge der Person. Die Sortierung bevorzugt die höchste eigene Geza-Bewertung, danach das neuere Erscheinungsjahr; unbewertete Filme folgen dahinter.
 

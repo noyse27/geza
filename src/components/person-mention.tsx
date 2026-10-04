@@ -26,7 +26,7 @@ function MentionCover({ item }: { item: MentionResult }) {
     </span>
   );
 }
-export function PersonMention({ kind, name, label }: { kind: 'r' | 'a'; name: string; label: string }) {
+export function PersonMention({ kind, name, label }: { kind: 'm' | 'r' | 'a'; name: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<MentionResult[] | null>(null);
   const [error, setError] = useState(false);
@@ -44,7 +44,9 @@ export function PersonMention({ kind, name, label }: { kind: 'r' | 'a'; name: st
     }
     const controller = new AbortController();
     setError(false);
-    fetch(`/api/mentions?${new URLSearchParams({ kind, person: name })}`, { signal: controller.signal })
+    fetch(`/api/mentions?${new URLSearchParams({ kind, [kind === 'm' ? 'id' : 'person']: name })}`, {
+      signal: controller.signal,
+    })
       .then((r) => {
         if (!r.ok) throw Error();
         return r.json();
@@ -82,33 +84,47 @@ export function PersonMention({ kind, name, label }: { kind: 'r' | 'a'; name: st
         }
       }}
     >
-      <button
-        type="button"
-        className="review-title-link"
-        aria-expanded={open}
-        onClick={() => {
-          cancel();
-          setOpen((v) => !v);
-        }}
-      >
-        {label}
-      </button>
+      {kind === 'm' ? (
+        <Link
+          className="review-title-link"
+          href={`/title/${name}`}
+          prefetch={false}
+          onFocus={() => {
+            cancel();
+            setOpen(true);
+          }}
+        >
+          {label}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="review-title-link"
+          aria-expanded={open}
+          onClick={() => {
+            cancel();
+            setOpen((v) => !v);
+          }}
+        >
+          {label}
+        </button>
+      )}
       {open && (
-        <span className={`mention-preview${kind === 'r' ? ' mention-preview-covers' : ''}`}>
-          <strong>{name}</strong>
+        <span className={`mention-preview${kind === 'm' ? ' mention-preview-covers' : ''}`}>
+          {kind !== 'm' && <strong>{name}</strong>}
           {error ? (
             <span role="status">Filme konnten nicht geladen werden.</span>
           ) : items === null ? (
             <span role="status">Lädt …</span>
           ) : items.length ? (
-            <span className={kind === 'r' ? 'mention-film-grid' : undefined}>
+            <span>
               {items.map((item) => (
                 <Link key={item.id} href={`/title/${item.id}`} prefetch={false}>
                   <span>
                     {item.label}
                     {item.year ? ` (${item.year})` : ''}
                   </span>
-                  {kind === 'r' && <MentionCover item={item} />}
+                  {kind === 'm' && <MentionCover item={item} />}
                 </Link>
               ))}
             </span>

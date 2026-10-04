@@ -8,10 +8,19 @@ export async function GET(request: Request) {
   const person = params.get('person');
   const column = kind === 'r' ? 'directors' : 'actors';
   try {
+    const id = params.get('id');
+    if (id !== null) {
+      if (kind !== 'm' || !/^[1-9]\d{0,17}$/.test(id)) return Response.json([], { status: 400 });
+      const rows = await query(
+        `SELECT id::text AS id,title AS label,year,poster FROM media WHERE id=$1 AND kind='movie' AND NOT rumpel`,
+        [id],
+      );
+      return Response.json(rows, { headers: { 'Cache-Control': 'public, max-age=60' } });
+    }
     if (person !== null) {
       if (kind === 'm' || !person.trim() || person.length > 200) return Response.json([], { status: 400 });
       const rows = await query(
-        `SELECT m.id::text AS id,m.title AS label,m.year,m.poster FROM media m LEFT JOIN ratings r ON r.media_id=m.id
+        `SELECT m.id::text AS id,m.title AS label,m.year FROM media m LEFT JOIN ratings r ON r.media_id=m.id
          WHERE m.kind='movie' AND NOT m.rumpel AND m.${column} @> ARRAY[$1]::text[]
          ORDER BY r.rating DESC NULLS LAST,m.year DESC NULLS LAST,m.title,m.id LIMIT 5`,
         [person],
