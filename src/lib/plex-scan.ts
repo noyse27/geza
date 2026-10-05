@@ -7,6 +7,7 @@ import { loadTombstones, forgetTombstones } from './rumpel';
 import { mergeMetadata, fromPlex } from './providers';
 import { resolvePlexEpisodes } from './plex-episodes';
 import { reportProgress, saveJobResult, type JobResult } from './job-history';
+import { getPlexRestoreContext, queuePlexRestore, plexWatched as seen } from './plex-watch-restore';
 
 type Metadata = Record<string, any>;
 type Entry = {
@@ -52,12 +53,6 @@ export async function plexList(path: string): Promise<Metadata[]> {
     if (!page.length || offset > total) throw Error('Plex-Bibliothek nicht vollständig gelesen');
   }
 }
-function seen(item: Metadata) {
-  // Plex omits viewCount on never-watched entries; malformed values are not zero.
-  const count = item.viewCount ?? 0;
-  if (!Number.isFinite(Number(count)) || Number(count) < 0) throw Error('Ungültiger Plex-Gesehenstatus');
-  return Number(count) > 0;
-}
 export async function processPlexScan(payload: { manual?: boolean; preview?: boolean } = {}) {
   if (isDemo()) return;
   if ((await getSetting('PLEX_SCAN_ENABLED')) === '0' && !payload.manual) return;
@@ -66,6 +61,8 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     return;
   }
   const automatic = (await getSetting('PLEX_SCAN_WATCHED_ONLY')) !== '0';
+  const restoreContext = await getPlexRestoreContext();
+  let watchedRestores = 0;
   const filter = (await getSetting('PLEX_SCAN_SECTIONS')).split(',').filter(Boolean);
   const data = await plexRequest('/library/sections');
   if (!Array.isArray(data?.MediaContainer?.Directory))
@@ -181,6 +178,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         details: { library, ratingKey: item.ratingKey, providerIds: plexIds(item) },
       });
       if (!episodes || episodes.length) remember(id, library, watched, auto);
+      if (!episodes && (await queuePlexRestore(client, restoreContext, id, item))) watchedRestores++;
       if (episodes) {
         const seasons = new Map<number, Metadata[]>();
         for (const episode of episodes)
@@ -195,6 +193,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
           for (const episode of leaves) {
             const eid = await ensurePlexMedia(episode, id, client);
             remember(eid, library, seen(episode), false);
+            if (await queuePlexRestore(client, restoreContext, eid, episode)) watchedRestores++;
           }
         }
       }
@@ -252,6 +251,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       changes: changes.slice(0, 200),
       preview: !!payload.preview,
       incompleteSeries: incompleteSeries.length,
+      watchedRestores,
     };
     if (payload.preview) await client.query('ROLLBACK');
     else {

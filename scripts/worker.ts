@@ -6,6 +6,7 @@ import { enrichMedia } from '../src/lib/providers';
 import { discoverFriendReview } from '../src/lib/friend-reviews';
 import { processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { processPlexScan } from '../src/lib/plex-scan';
+import { processPlexRestore } from '../src/lib/plex-watch-restore';
 import { processPlexPresence } from '../src/lib/plex-presence';
 import { nextPlexRun, scheduleNextScan } from '../src/lib/plex-jobs';
 import { getSetting } from '../src/lib/settings';
@@ -125,6 +126,7 @@ while (running) {
               else if (job.kind === 'plex') await processPlex(job.payload);
               else if (job.kind === 'plex-review-sync') await processPlexReviewSync(job.payload);
               else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
+              else if (job.kind === 'plex-watch-restore') await processPlexRestore(job.payload);
               else if (job.kind === 'plex-presence') await processPlexPresence(job.payload);
               else throw Error('Unbekannter Aufgabentyp');
               if (measured) {
