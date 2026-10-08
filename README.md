@@ -4,7 +4,7 @@
 
 Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-**Aktuelle Version: v1.5.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
+**Aktuelle Version: v1.6.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
 ## Funktionen im Überblick
 
@@ -21,7 +21,7 @@ Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertun
 
 ## Inhalt
 
-[Review-Anleitung](docs/reviews.md) · [Film- und Personenverweise in Reviews](#film--und-personenverweise-in-reviews)
+[Bedienungsanleitung / Manual](docs/manual.md) · [Review-Anleitung](docs/reviews.md) · [Film- und Personenverweise in Reviews](#film--und-personenverweise-in-reviews)
 
 [Lokal starten](#lokal-starten) · [Demomodus](#demomodus) · [Sichtbarkeit](#sichtbarkeit) · [Sammlungen](#sammlungen-und-filmreihen) · [Serien und Staffeln](#serien-staffeln-und-serienkatalog) · [Link-Vorschau](#link-vorschau) · [RSS-Feed](#rss-feed-abo) · [Friends of Geza](#friends-of-geza) · [Rumpelkammer](#rumpelkammer) · [Trakt-Import](#trakt-import) · [Metadaten und Plex](#metadaten-und-plex) · [Externe Reviews](#externe-reviews-und-anbieterbewertungen) · [Hosting](#hosting-und-google) · [Sicherung](#sicherung-und-updates) · [Prüfungen](#prüfungen) · [Changelog](#changelog)
 
@@ -380,6 +380,15 @@ Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt u
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
+
+### v1.6.0
+
+- **Nachvollziehbare Jobs:** Fortschritt, Startzeit, letzte Aktivität, Fehleralter und verlinkte Ergebnisse pro Titel mit Ziel und Begründung; tatsächliche Review- und Metadatenänderungen statt bloßer Gesamtzähler.
+- **Fehler abarbeiten:** Anbieter-ID-Konflikte vergleichen und korrigieren, Aufträge erneut prüfen und offene Importfälle bearbeiten. Migration 028; detaillierte Laufhistorie entsteht ab dem Update.
+- **Plex-Gesehen-Status:** fehlende Markierungen optional aus Gezas Anschauhistorie wiederherstellen; standardmäßig deaktiviert. Anschauzeitpunkte zusätzlich manuell aus Plex laden.
+- **Länder und Genres:** Zuordnungen reversibel lösen, Originalwerte bewahren und fehlende Quellen einmalig wiederherstellen. Migrationen 026–027.
+- **Reviews und Teilen:** Covervorschau an Filmverweisen sowie Bewertung und Reviewauszug im Social-Media-Vorschaubild; verbesserte Vorschau-Metadaten.
+- Aktualisierte Abhängigkeiten und Sicherheitskorrekturen. Neue [Bedienungsanleitung](docs/manual.md) und [Releasehinweise](docs/releases/v1.6.0.md).
 
 ### v1.5.0
 
