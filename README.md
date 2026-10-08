@@ -201,6 +201,39 @@ Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und
 
 „Änderungen vorab prüfen“ zeigt bis zu 200 Vorher-/Nachher-Zuordnungen und rollt die Vorschau zurück. „Jetzt scannen“ verarbeitet den dann aktuellen Bestand. Bestehende manuelle Bucketlisteneinträge werden durch Migration 019 geschützt; alte automatische Einträge bleiben bis zum nächsten vollständigen Scan erhalten. Auf der Bucketliste können weiterhin per TMDB-Suche manuelle Wünsche ergänzt werden. Weitere technische Entscheidungen und Abnahmekriterien stehen im [Refactoring-Plan](docs/refactoring-import-plex.md).
 
+## Verarbeitung und Fehler prüfen
+
+Im Adminbereich zeigt **Verarbeitung** geplante, wartende und laufende Aufträge mit
+Zeitangaben und einer Laufleiste. Beim Bibliotheksscan werden Phase und Anzahl bereits
+geprüfter Titel angezeigt, sobald die Gesamtzahl bekannt ist. Ein Lebenszeichen des
+Workers wird getrennt vom letzten fachlichen Fortschritt angezeigt; nach 90 Sekunden
+ohne Lebenszeichen erscheint „Keine aktuelle Rückmeldung“. Fehler zeigen zusätzlich
+ihr Alter, etwa „vor 3 Tagen“; genaue Zeitangaben verwenden Europe/Berlin.
+
+**Aufträge und Ergebnisse** führt zur Ausführung und ihren Titeln. Abgeschlossene
+Scans nennen neue bzw. anders eingeordnete Filme und Serien, ihr Ziel (Bucketliste,
+Archiv oder Rumpelkammer) und übersprungene Fälle. Die Ergebnisliste enthält auch
+Titel, die noch nicht in Geza angelegt wurden. Bei einem Zuordnungskonflikt zeigt sie
+die widersprüchlichen Anbieter-IDs und ermöglicht deren Korrektur mit anschließendem
+erneutem Prüfen. Sichtungen und Bewertungen werden dabei nicht zusammengeführt.
+
+Für Plex-Reviews und Metadaten werden tatsächliche Änderungen statt erfolgreicher
+Abfragen gezählt. „Ergebnisse heute“ gilt seit 00:00 Uhr Berlin und zählt pro
+abgeschlossener Ausführung; ein unveränderter erneuter Abruf zählt nicht als neuer
+Eintrag. Scan-Ergebnisse werden mit den Änderungen in derselben Transaktion gespeichert.
+
+Unter **Offene Importfälle** stehen die aktuell ungeklärten Anschauzeitpunkte und
+mehrfach vergebenen Plex-IDs. Die Zahlen unter „Letzte Importe“ bleiben historische
+Importberichte. Das Ereignisprotokoll verlinkt Titel, Aufträge und Ausführungen;
+Rohdaten bleiben ergänzend aufklappbar.
+
+Die Laufhistorie beginnt mit Migration **028**; fehlende historische Startzeiten oder
+Ergebnisse werden nicht nachträglich erfunden. Erfolgreiche ältere Ausführungen werden
+nach 90 Tagen bereinigt, der jüngste Lauf je Auftrag und ungelöste Fehler bleiben erhalten.
+Wie das Ereignisprotokoll wird die Laufhistorie nicht im Geza-Umzugsexport übertragen.
+Gezielte Datenbanktests: `npm run test:jobs` (erstellt eine eigene temporäre Datenbank
+über `DATABASE_URL`).
+
 ## Externe Reviews und Anbieterbewertungen
 
 Unter den eigenen Reviews stehen öffentliche Blöcke „Reviews bei Freunden“. Als Admin lassen sich mit „＋ Neu“ weitere Quellen mit Name, HTTPS-Link und optionaler Bewertung samt Skala anlegen. Zum Entfernen den Link leeren. Für eigene Quellen gibt es keine automatischen Abrufe; manuelle Angaben bleiben bei Hintergrundläufen erhalten.

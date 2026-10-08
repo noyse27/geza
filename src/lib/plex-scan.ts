@@ -6,6 +6,7 @@ import { plexRequest, ensurePlexMedia, plexIds } from './plex';
 import { loadTombstones, forgetTombstones } from './rumpel';
 import { mergeMetadata, fromPlex } from './providers';
 import { resolvePlexEpisodes } from './plex-episodes';
+import { reportProgress, saveJobResult, type JobResult } from './job-history';
 
 type Metadata = Record<string, any>;
 type Entry = {
@@ -45,6 +46,7 @@ export async function plexList(path: string): Promise<Metadata[]> {
       }
     if (c.offset !== undefined && Number(c.offset) !== offset) throw Error('Plex-Seitenfolge unvollständig');
     result.push(...page);
+    await reportProgress('Plex-Bestand lesen', result.length, total);
     offset += page.length;
     if (total === undefined || offset === total) return result;
     if (!page.length || offset > total) throw Error('Plex-Bibliothek nicht vollständig gelesen');
@@ -73,6 +75,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
   const entries: Entry[] = [];
   const incompleteSeries: { title: string; library: string; ratingKey: string; issues: Metadata[] }[] = [];
   for (const section of sections) {
+    await reportProgress(`Bibliothek „${section.title}“ lesen`, undefined, undefined, true);
     const selected = !filter.length || filter.includes(String(section.key));
     for (const item of await plexList(
       `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1`,
@@ -126,6 +129,8 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     const matches = new Map<string, { libraries: Set<string>; watched: boolean; automatic: boolean }>();
     let skipped = 0;
     const protectedRoots = new Set<string>();
+    const results: JobResult[] = [];
+    let processed = 0;
     const remember = (id: string, library: string, watched: boolean, auto: boolean) => {
       const prior = matches.get(id);
       matches.set(id, {
@@ -135,10 +140,24 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       });
     };
     for (const { item, library, automatic: auto, episodes, incomplete } of entries) {
+      await reportProgress(`Titel zuordnen: ${item.title}`, processed++, entries.length);
       const watched = episodes ? episodes.some(seen) || Number(item.viewedLeafCount) > 0 : seen(item);
       const deleted = tombstones.matches(item.type, plexIds(item));
       if (deleted.length && (!watched || incomplete)) {
         skipped++;
+        results.push({
+          title: item.title,
+          outcome: 'skipped',
+          reason:
+            'Zuvor in der Rumpelkammer gelöscht. Ohne neue Sichtung wird der Titel nicht automatisch wieder angelegt.',
+          details: {
+            ratingKey: item.ratingKey,
+            providerIds: plexIds(item),
+            library,
+            type: item.type,
+            deleted: true,
+          },
+        });
         continue;
       }
       await forgetTombstones(deleted, client);
@@ -146,8 +165,21 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       await mergeMetadata(id, fromPlex(item), 'plex', client);
       if (incomplete) {
         protectedRoots.add(id);
+        results.push({
+          mediaId: id,
+          title: item.title,
+          outcome: 'skipped',
+          reason: 'Episodenzuordnung unvollständig. Die bisherige Einordnung bleibt geschützt.',
+          details: { ratingKey: item.ratingKey, providerIds: plexIds(item), library },
+        });
         continue;
       }
+      results.push({
+        mediaId: id,
+        title: item.title,
+        outcome: 'unchanged',
+        details: { library, ratingKey: item.ratingKey, providerIds: plexIds(item) },
+      });
       if (!episodes || episodes.length) remember(id, library, watched, auto);
       if (episodes) {
         const seasons = new Map<number, Metadata[]>();
@@ -191,6 +223,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
           [id, [...match.libraries].sort(), match.watched, match.automatic],
         );
     await client.query('SELECT rumpel_refresh(NULL)');
+    await reportProgress('Einordnung abschließen', entries.length, entries.length, true);
     const old = new Map(before.map((r) => [r.id, r]));
     const after = (
       await client.query('SELECT id,title,kind,bucketlist,rumpel,assignment_reason FROM media ORDER BY id')
@@ -222,6 +255,45 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     };
     if (payload.preview) await client.query('ROLLBACK');
     else {
+      const afterMap = new Map(after.map((r) => [r.id, r]));
+      const recorded = new Set<string>();
+      for (const result of results) {
+        const current = result.mediaId ? afterMap.get(result.mediaId) : undefined;
+        if (result.mediaId) {
+          if (recorded.has(result.mediaId)) continue;
+          recorded.add(result.mediaId);
+        }
+        if (current) {
+          const previous = old.get(current.id);
+          result.destination = current.bucketlist
+            ? 'Bucketliste'
+            : current.rumpel
+              ? 'Rumpelkammer'
+              : 'Archiv';
+          if (result.outcome !== 'skipped') {
+            result.outcome = !previous
+              ? 'new'
+              : previous.bucketlist !== current.bucketlist || previous.rumpel !== current.rumpel
+                ? 'updated'
+                : 'unchanged';
+            result.reason = current.assignment_reason || 'Einordnung unverändert.';
+          }
+        }
+        await saveJobResult(result, client);
+      }
+      // Include titles whose destination changed because they disappeared from Plex.
+      for (const change of changes)
+        if (!recorded.has(change.id) && ['movie', 'show'].includes(change.kind))
+          await saveJobResult(
+            {
+              mediaId: change.id,
+              title: change.title,
+              outcome: change.before === 'Neu' ? 'new' : 'updated',
+              destination: change.after,
+              reason: change.assignment_reason,
+            },
+            client,
+          );
       await client.query(
         `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'enrich','enrich:'||id,jsonb_build_object('mediaId',id) FROM media
         WHERE id=ANY($1::bigint[]) AND kind IN ('movie','show') AND enriched_at IS NULL ON CONFLICT(dedupe_key) DO NOTHING`,

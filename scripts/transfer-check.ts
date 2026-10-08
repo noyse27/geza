@@ -35,6 +35,8 @@ try {
     'sessions',
     'login_attempts',
     'event_logs',
+    'job_runs',
+    'job_results',
     'feed_entries',
     'friend_instances',
     'friend_instance_cache',
