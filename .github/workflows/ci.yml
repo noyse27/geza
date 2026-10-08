@@ -69,6 +69,9 @@ jobs:
       - name: Import and Plex classification regression tests
         run: npm run test:classification
 
+      - name: Job history and progress regression tests
+        run: npm run test:jobs
+
       - name: Assignment and deletion regression tests
         run: node --import tsx scripts/assignment-check.ts
 
