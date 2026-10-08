@@ -10,6 +10,8 @@ import { TransferExport } from '@/components/transfer';
 import { rumpelCounts } from '@/lib/rumpel';
 import { FriendsAdmin } from '@/components/friends-admin';
 import { federationEnabled, instanceNickname, listFriends } from '@/lib/federation';
+import { jobOverview } from '@/lib/job-overview';
+import { JobDashboard } from '@/components/job-status';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -41,10 +43,9 @@ export default async function Page() {
     nickname,
     status,
   }));
-  const [jobs, imports, errors, rumpel] = await Promise.all([
-    query('SELECT kind,status,count(*)::int AS count FROM jobs GROUP BY kind,status'),
+  const [overview, imports, rumpel] = await Promise.all([
+    jobOverview(),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
-    query("SELECT kind,error,updated_at FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 8"),
     rumpelCounts(),
   ]);
   const [lastScan] = await query(
@@ -125,37 +126,15 @@ export default async function Page() {
         </a>
       </p>
       <div className="stats-columns">
-        <section className="panel">
-          <h2>Verarbeitung</h2>
-          {jobs.length ? (
-            jobs.map((j, i) => (
-              <p key={i} className="status-row">
-                <span>
-                  {j.kind === 'enrich'
-                    ? 'Metadaten'
-                    : j.kind === 'plex-review-sync'
-                      ? 'Plex-Reviews'
-                      : j.kind === 'plex-scan'
-                        ? 'Bibliotheks-Scan'
-                        : j.kind === 'plex-presence'
-                          ? 'Plex-Abgleich'
-                          : 'Plex'}{' '}
-                  · {j.status}
-                </span>
-                <strong>{j.count.toLocaleString('de-DE')}</strong>
-              </p>
-            ))
-          ) : (
-            <p className="muted">Keine offenen Aufgaben.</p>
-          )}
-          {errors.map((e, i) => (
-            <p key={i} className="error">
-              {e.kind}: {e.error}
-            </p>
-          ))}
-        </section>
+        <JobDashboard initial={JSON.parse(JSON.stringify(overview))} />
         <section className="panel">
           <h2>Letzte Importe</h2>
+          <p className="small muted">
+            Historischer Stand beim Import. Korrekturen ändern diese Zahlen nicht.
+          </p>
+          <p>
+            <a href="/admin/issues">Aktuell offene Fälle prüfen und bearbeiten</a>
+          </p>
           {imports.length ? (
             imports.map((r, i) => (
               <div key={i}>

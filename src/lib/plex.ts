@@ -5,6 +5,7 @@ import { getSetting } from './settings';
 import { watchedTime } from './security';
 import { recordFeedEntrySafely } from './feed';
 import type { PoolClient } from 'pg';
+import { saveJobResult } from './job-history';
 type PlexMetadata = Record<string, any>;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
   const consistent = matches.filter((r) =>
@@ -110,7 +111,7 @@ export async function ensurePlexMedia(
   const providerKeys = ['plex', 'imdb', 'tmdb', 'tvdb'].filter((key) => ids[key]);
   let matches = providerKeys.length
     ? await run(
-        `SELECT id,title,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND (${providerKeys.map((key, i) => `(ids ? '${key}' AND ids->>'${key}'=$${i + 2})`).join(' OR ')}) ORDER BY id`,
+        `SELECT id,title,year,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND (${providerKeys.map((key, i) => `(ids ? '${key}' AND ids->>'${key}'=$${i + 2})`).join(' OR ')}) ORDER BY id`,
         [kind, ...providerKeys.map((key) => ids[key])],
       )
     : [];
@@ -137,7 +138,9 @@ export async function ensurePlexMedia(
       matchCount: matches.length,
       matches,
     });
-    throw Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich');
+    throw Object.assign(Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich'), {
+      matchDetails: { title: m.title, providerIds: ids, matches, ratingKey: m.ratingKey, type: kind },
+    });
   }
   if (matches.length) {
     await run('UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3', [
@@ -216,4 +219,15 @@ export async function processPlex(payload: {
     `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,
     ['enrich:' + id, JSON.stringify({ mediaId: id })],
   );
+  await saveJobResult({
+    mediaId: id,
+    title: m.title || 'Plex-Titel',
+    outcome: 'checked',
+    reason:
+      payload.event === 'media.scrobble'
+        ? 'Anschauereignis übernommen oder bereits vorhanden.'
+        : payload.event === 'media.rate'
+          ? 'Bewertungsereignis verarbeitet.'
+          : 'Plex-Ereignis verarbeitet.',
+  });
 }

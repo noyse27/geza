@@ -2768,3 +2768,16 @@ footer > a:nth-of-type(2) {
   display: block;
   color: var(--muted);
 }
+.processing-row {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border, #34372e);
+  overflow-wrap: anywhere;
+}
+.processing-row h3, .processing-row h4 { margin: .25rem 0; }
+.job-progress { width: 100%; height: .4rem; accent-color: #d9b45b; }
+.table-scroll { overflow-x: auto; }
+.job-conflict table { width: 100%; border-collapse: collapse; }
+.job-conflict th, .job-conflict td { padding: .6rem; text-align: left; border-bottom: 1px solid #34372e; }
+@media (prefers-reduced-motion: reduce) {
+  .job-progress:indeterminate { visibility: hidden; }
+}

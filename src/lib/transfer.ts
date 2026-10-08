@@ -164,6 +164,8 @@ export async function restoreInstallation(archive: Archive, options: RestoreOpti
     }
     // Preserve wishes and evidence, but never advertise a source server check as current.
     await client.query('UPDATE media SET plex_checked_at=NULL');
+    // Runtime history stays on the source installation, like event logs.
+    await client.query('UPDATE jobs SET active_run_id=NULL,queued_at=NULL');
     await client.query('SELECT rumpel_refresh(NULL)');
     const providers = reviewModules.filter((m) => m.discover).map((m) => m.id);
     await client.query(

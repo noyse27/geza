@@ -18,10 +18,10 @@ export const nextPlexRun = (hour = 3) => {
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw Error('Ungültige Scan-Uhrzeit');
   return `((date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day' + interval '${hour} hours') AT TIME ZONE 'Europe/Berlin')`;
 };
-export async function scheduleNextScan(id: string, error: string | null = null) {
+export async function scheduleNextScan(id: string, error: string | null = null, runId?: string) {
   const hour = Number((await getSetting('PLEX_SCAN_HOUR')) || '3');
   await query(
-    `UPDATE jobs SET status='pending',available_at=${nextPlexRun(hour)},payload='{}',attempts=0,updated_at=now(),error=$2 WHERE id=$1`,
-    [id, error],
+    `UPDATE jobs SET status='pending',available_at=${nextPlexRun(hour)},payload='{}',attempts=0,updated_at=now(),error=$2 WHERE id=$1 AND ($3::bigint IS NULL OR active_run_id=$3)`,
+    [id, error, runId || null],
   );
 }
