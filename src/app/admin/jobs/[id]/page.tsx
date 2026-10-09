@@ -67,6 +67,12 @@ export default async function Run({
           )}
         </p>
         <RunProgress job={JSON.parse(JSON.stringify(run))} />
+        {run.status === 'done' && counts.some((c) => c.outcome === 'failed') && (
+          <p className="error">
+            Abgeschlossen mit offenen Konflikten. Die übrigen Titel wurden übernommen. Unter „Nicht
+            verarbeitet“ kannst du die betroffenen Einträge dauerhaft zuordnen und danach erneut prüfen.
+          </p>
+        )}
         {run.status === 'running' && (
           <p>
             Der Scan bzw. Auftrag ist noch nicht abgeschlossen. Der sichtbare Bestand kann noch auf dem

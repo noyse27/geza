@@ -6,6 +6,7 @@ import { watchedTime } from './security';
 import { recordFeedEntrySafely } from './feed';
 import type { PoolClient } from 'pg';
 import { saveJobResult } from './job-history';
+import { decidedPlexMedia, plexServerScope } from './plex-decisions';
 type PlexMetadata = Record<string, any>;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
   const consistent = matches.filter((r) =>
@@ -23,13 +24,18 @@ export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, str
   return candidates[0];
 }
 export function plexIds(m: PlexMetadata) {
-  const ids: Record<string, string> = {};
+  return Object.fromEntries(
+    Object.entries(plexIdValues(m)).map(([key, values]) => [key, values[values.length - 1]]),
+  );
+}
+export function plexIdValues(m: PlexMetadata) {
+  const ids: Record<string, string[]> = {};
   const guids = [m.guid, ...(m.Guid || []).map((g: { id: string }) => g.id)].filter(Boolean);
   for (const guid of guids) {
     const match = String(guid).match(
       /^(imdb|tmdb|tvdb|plex):\/\/(?:movie\/|show\/|episode\/|season\/)?([^?]+)/,
     );
-    if (match) ids[match[1]] = match[2];
+    if (match) ids[match[1]] = [...new Set([...(ids[match[1]] || []), match[2]])];
   }
   return ids;
 }
@@ -111,6 +117,30 @@ export async function ensurePlexMedia(
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');
   const ids = plexIds(m);
+  const values = plexIdValues(m);
+  const decision = await decidedPlexMedia(m, client);
+  if (decision) {
+    // Explicit selection keeps the canonical provider IDs, including intentionally absent IDs.
+    if (parentId && decision.parent_id && String(decision.parent_id) !== String(parentId)) {
+      const ancestor = await run("SELECT 1 FROM media WHERE id=$1 AND kind='season' AND parent_id=$2", [
+        decision.parent_id,
+        parentId,
+      ]);
+      if (!ancestor.length)
+        throw Object.assign(Error('Gespeicherte Plex-Zuordnung gehört zu einem anderen Elterntitel.'), {
+          matchDetails: {
+            title: m.title,
+            providerIds: ids,
+            matches: [decision],
+            ratingKey: m.ratingKey,
+            guid: m.guid,
+            serverId: await plexServerScope(),
+            type: kind,
+          },
+        });
+    }
+    return String(decision.id);
+  }
   const structural = parentId && ['season', 'episode'].includes(kind);
   const season = kind === 'season' ? m.index : m.parentIndex;
   if (!Object.keys(ids).length && !structural) throw Error('Keine verlässliche Medien-ID im Plex-Ereignis');
@@ -118,8 +148,8 @@ export async function ensurePlexMedia(
   const providerKeys = ['plex', 'imdb', 'tmdb', 'tvdb'].filter((key) => ids[key]);
   let matches = providerKeys.length
     ? await run(
-        `SELECT id,title,year,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND (${providerKeys.map((key, i) => `(ids ? '${key}' AND ids->>'${key}'=$${i + 2})`).join(' OR ')}) ORDER BY id`,
-        [kind, ...providerKeys.map((key) => ids[key])],
+        `SELECT id,title,year,kind,ids,parent_id,season,episode FROM media WHERE kind=$1 AND (${providerKeys.map((key, i) => `(ids ? '${key}' AND ids->>'${key}'=ANY($${i + 2}::text[]))`).join(' OR ')}) ORDER BY id`,
+        [kind, ...providerKeys.map((key) => values[key])],
       )
     : [];
   if (structural) {
@@ -132,6 +162,7 @@ export async function ensurePlexMedia(
     for (const sibling of siblings) if (!matches.some((r) => r.id === sibling.id)) matches.push(sibling);
   }
   try {
+    if (Object.values(values).some((v) => v.length > 1)) throw Error('Mehrere IDs desselben Anbieters');
     const selected = selectPlexMatch(matches, ids);
     matches = selected ? [selected] : [];
   } catch {
@@ -139,6 +170,10 @@ export async function ensurePlexMedia(
       type: kind,
       title: m.title,
       providerIds: ids,
+      providerIdValues: values,
+      ratingKey: m.ratingKey,
+      guid: m.guid,
+      serverId: await plexServerScope(),
       parentId,
       season: m.parentIndex,
       episode: m.index,
@@ -146,7 +181,16 @@ export async function ensurePlexMedia(
       matches,
     });
     throw Object.assign(Error('Mehrdeutige Provider-IDs: manuelle Zuordnung erforderlich'), {
-      matchDetails: { title: m.title, providerIds: ids, matches, ratingKey: m.ratingKey, type: kind },
+      matchDetails: {
+        title: m.title,
+        providerIds: ids,
+        providerIdValues: values,
+        matches,
+        ratingKey: m.ratingKey,
+        guid: m.guid,
+        serverId: await plexServerScope(),
+        type: kind,
+      },
     });
   }
   if (matches.length) {

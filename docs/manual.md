@@ -1,4 +1,4 @@
-# Geza bedienen – Anleitung für v1.6.0
+# Geza bedienen
 
 Die [README](../README.md) erklärt Installation, Sicherung und Verbindungen. Diese Anleitung führt durch die Bedienung und die Kontrolle des Plex-Abgleichs. Die beschriebenen Adminfunktionen stehen nach der Anmeldung zur Verfügung.
 
@@ -39,12 +39,16 @@ Im abgeschlossenen Lauf nach dem Titel suchen, gegebenenfalls über die Ergebnis
 
 ## Widersprüchliche Anbieter-IDs korrigieren
 
-1. Den fehlgeschlagenen Lauf öffnen. Die Konfliktansicht vergleicht die eingegangenen IDs mit den möglichen Geza-Titeln.
+1. Den Lauf mit offenen Konflikten oder einen älteren fehlgeschlagenen Lauf öffnen. Unter **Nicht verarbeitet** vergleicht die Konfliktansicht die eingegangenen IDs mit den möglichen Geza-Titeln.
 2. Titel, Jahr und Anbieter-IDs prüfen. Die Konflikttabelle zeigt den damaligen Stand; die Korrekturformulare laden die aktuellen IDs.
-3. Nur die belegbar falschen IDs korrigieren oder entfernen und speichern. Eine ID nicht allein deshalb löschen, weil sie einen Konflikt verursacht.
+3. Liefert Plex eine falsche ID, beim richtigen Geza-Titel **Diesen Datensatz dauerhaft verwenden** wählen. Die kanonischen IDs bleiben erhalten; künftige Abgleiche merken sich die Auswahl für diesen Plex-Eintrag. Sind dagegen die in Geza gespeicherten IDs falsch, diese im Formular korrigieren. Eine ID nicht allein deshalb löschen, weil sie einen Konflikt verursacht.
 4. **Nach Korrektur erneut prüfen** wählen und den neuen Lauf kontrollieren. Speichern allein wiederholt den Auftrag noch nicht.
 
 Wurde der Datensatz inzwischen geändert, die Seite neu laden und die aktuellen Werte erneut prüfen. Zusammengehörige IDs müssen denselben Film bzw. dieselbe Serie beschreiben; ein automatisches Zusammenführen widersprüchlicher Titel erfolgt nicht.
+
+Ab Migration 029 hält ein einzelner ID-Konflikt die übrigen Filme nicht mehr auf. Der Lauf endet mit **Abgeschlossen mit offenen Konflikten**; die problematischen Titel und ihre bisherige Einordnung bleiben geschützt. Andere neue ungesehene Filme können auf der Bucketliste erscheinen. Bei einem Konflikt innerhalb einer Serie bleibt diese Serie unverändert. Technische Fehler oder unvollständige Bibliotheksantworten brechen den Scan weiterhin insgesamt ab.
+
+Unter **Offene Importfälle → Gespeicherte Plex-Zuordnungen** kannst du Entscheidungen ansehen und aufheben. Sie bleiben auch nach einem Neustart bestehen und werden bei einem Installationstransfer mitgenommen. Ein anderer Plex-Server oder eine geänderte GUID verwendet die alte Entscheidung nicht. Beim Speichern wird der aktuelle Plex-Eintrag noch einmal geprüft; hat er sich seit dem Fehler geändert, zuerst einen neuen Scan ausführen.
 
 Unter **Offene Importfälle prüfen** sind außerdem ungeklärte Anschauzeitpunkte und mehrfach zugeordnete Plex-IDs erreichbar. Der alte Importbericht bleibt eine historische Zusammenfassung und wird durch spätere Korrekturen nicht neu geschrieben.
 

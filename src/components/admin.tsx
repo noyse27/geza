@@ -56,6 +56,7 @@ export function AdminControls({
     [scanPreview, setScanPreview] = useState<{
       changed: number;
       incompleteSeries?: number;
+      conflicts?: number;
       watchedRestores?: number;
       changes: {
         id: string;
@@ -160,14 +161,10 @@ export function AdminControls({
             </p>
           </div>
           <div className="job-meta">
-            <span>
-              Startzeit: {String(scanHour).padStart(2, '0')}:00 Uhr (Berlin)
-            </span>
+            <span>Startzeit: {String(scanHour).padStart(2, '0')}:00 Uhr (Berlin)</span>
             <span>
               Letzte Ausführung:{' '}
-              {lastRunAt
-                ? new Date(lastRunAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
-                : '–'}
+              {lastRunAt ? new Date(lastRunAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : '–'}
             </span>
             <span className={nextScan?.error ? 'error' : ''}>Status: {scanStatus}</span>
           </div>
@@ -543,6 +540,13 @@ export function AdminControls({
           {scanPreview && (
             <div>
               <h3>Vorschau: {scanPreview.changed} Änderungen</h3>
+              {!!scanPreview.conflicts && (
+                <p className="error">
+                  {scanPreview.conflicts} Einträge haben ID-Konflikte und bleiben unverändert. Die übrigen
+                  Titel können verarbeitet werden. Nach „Jetzt scannen“ stehen die Konflikte unter „Aufträge
+                  und Ergebnisse“ zur dauerhaften Zuordnung bereit.
+                </p>
+              )}
               {!!scanPreview.watchedRestores && (
                 <p>
                   {scanPreview.watchedRestores} fehlende Gesehen-Markierungen werden in Plex

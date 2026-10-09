@@ -5,6 +5,7 @@ import { logEvent } from './logging';
 import { plexRequest, plexIds, selectPlexMatch } from './plex';
 import { digest } from './security';
 import { getSetting } from './settings';
+import { decidedPlexMedia } from './plex-decisions';
 
 type Metadata = Record<string, any>;
 type RestoreContext = { url: string; token: string; server: string; fingerprint: string };
@@ -100,7 +101,11 @@ export async function processPlexRestore(payload: PlexRestore) {
     [payload.mediaId],
   );
   if (!media) return;
-  if (media.kind !== payload.type || !selectPlexMatch([media], plexIds(item)))
+  const decision = await decidedPlexMedia(item);
+  if (
+    media.kind !== payload.type ||
+    (decision ? String(decision.id) !== String(payload.mediaId) : !selectPlexMatch([media], plexIds(item)))
+  )
     throw Error('Geza-Zuordnung hat sich geändert; erneuter Bibliotheks-Scan erforderlich.');
   const key = `plex-watch-restore:${context.fingerprint}:${payload.ratingKey}`;
   // Record the attempt before the network call, including when Plex accepts it but the response is lost.

@@ -51,7 +51,7 @@ export function jobState(
 }
 export function errorHelp(error: string) {
   if (/Provider.ID|Medienzuordnung|widersprüchlich/i.test(error))
-    return 'Die Anbieter-IDs passen nicht eindeutig zusammen. Vergleiche die Kandidaten und korrigiere die falsche ID unter „Details bearbeiten“. Danach erneut prüfen.';
+    return 'Die Anbieter-IDs passen nicht eindeutig zusammen. Wähle den korrekten Datensatz dauerhaft aus, wenn Plex die abweichende ID liefert. Falsche gespeicherte IDs kannst du im Formular korrigieren. Danach erneut prüfen.';
   if (/401|403/.test(error))
     return 'Der Anbieter hat den Zugriff abgelehnt. Prüfe die Verbindung und Zugangsdaten in den Admin-Einstellungen.';
   if (/429/.test(error))
