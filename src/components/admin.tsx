@@ -57,6 +57,8 @@ export function AdminControls({
       changed: number;
       incompleteSeries?: number;
       conflicts?: number;
+      scannedLibraries?: string[];
+      issues?: { title: string; library: string; reason: string }[];
       watchedRestores?: number;
       changes: {
         id: string;
@@ -107,17 +109,20 @@ export function AdminControls({
         data.message || (data.preview ? 'Vorschau berechnet; keine Zuordnung gespeichert.' : 'Gespeichert.'),
       );
       router.refresh();
+      return true;
     } catch (e) {
       setMessage((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
   }
   async function saveScanSettings(next: { watchedOnly: boolean; enabled: boolean; sections: string[] }) {
-    setWatchedOnly(next.watchedOnly);
-    setScanEnabled(next.enabled);
-    setScanSections(next.sections);
-    await action({ action: 'plex-scan-settings', data: { ...next, hour: scanHour } });
+    if (await action({ action: 'plex-scan-settings', data: { ...next, hour: scanHour } })) {
+      setWatchedOnly(next.watchedOnly);
+      setScanEnabled(next.enabled);
+      setScanSections(next.sections);
+    }
   }
   async function uploadTrakt(form: HTMLFormElement, preview = false) {
     setImporting(true);
@@ -478,7 +483,7 @@ export function AdminControls({
           </label>
           {plexSections.length > 0 && (
             <fieldset>
-              <legend>Bibliotheken für automatische Wünsche</legend>
+              <legend>Bibliotheken für den Plex-Abgleich</legend>
               <label className="checkbox">
                 <input
                   type="checkbox"
@@ -495,8 +500,8 @@ export function AdminControls({
                 Alle Bibliotheken
               </label>
               <p className="muted">
-                Die Verfügbarkeit wird immer in allen Bibliotheken geprüft. Die Auswahl begrenzt automatische
-                Wünsche.
+                Nur die ausgewählten Bibliotheken werden gelesen und abgeglichen. Der bisherige Stand anderer
+                Bibliotheken bleibt erhalten. „Alle Bibliotheken“ prüft den gesamten Bestand.
               </p>
               {plexSections.map((s) => (
                 <label key={s.key} className="checkbox">
@@ -540,12 +545,22 @@ export function AdminControls({
           {scanPreview && (
             <div>
               <h3>Vorschau: {scanPreview.changed} Änderungen</h3>
+              {scanPreview.scannedLibraries && <p>Geprüft: {scanPreview.scannedLibraries.join(', ')}</p>}
               {!!scanPreview.conflicts && (
                 <p className="error">
-                  {scanPreview.conflicts} Einträge haben ID-Konflikte und bleiben unverändert. Die übrigen
-                  Titel können verarbeitet werden. Nach „Jetzt scannen“ stehen die Konflikte unter „Aufträge
-                  und Ergebnisse“ zur dauerhaften Zuordnung bereit.
+                  {scanPreview.conflicts} Einträge konnten nicht zugeordnet werden und bleiben unverändert.
+                  Die übrigen Titel können verarbeitet werden. Nach „Jetzt scannen“ lassen sich die Fälle
+                  unter „Aufträge und Ergebnisse“ genauer prüfen.
                 </p>
+              )}
+              {!!scanPreview.issues?.length && (
+                <ul>
+                  {scanPreview.issues.map((issue, i) => (
+                    <li key={i}>
+                      <strong>{issue.title}</strong> · {issue.library}: {issue.reason}
+                    </li>
+                  ))}
+                </ul>
               )}
               {!!scanPreview.watchedRestores && (
                 <p>

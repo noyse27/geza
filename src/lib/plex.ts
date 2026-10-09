@@ -32,7 +32,14 @@ export function plexIdValues(m: PlexMetadata) {
   const ids: Record<string, string[]> = {};
   const guids = [m.guid, ...(m.Guid || []).map((g: { id: string }) => g.id)].filter(Boolean);
   for (const guid of guids) {
-    const match = String(guid).match(
+    const normalized = String(guid)
+      .replace(
+        /^com\.plexapp\.agents\.(imdb|themoviedb|thetvdb):\/\//,
+        (_, agent) =>
+          `${({ imdb: 'imdb', themoviedb: 'tmdb', thetvdb: 'tvdb' } as Record<string, string>)[agent]}://`,
+      )
+      .replace(/^tv\.plex\.agents\.nfo\.(?:movie|tv):\/\/(?:movie|show)\/(imdb|tmdb|tvdb)_/, '$1://');
+    const match = normalized.match(
       /^(imdb|tmdb|tvdb|plex):\/\/(?:movie\/|show\/|episode\/|season\/)?([^?]+)/,
     );
     if (match) ids[match[1]] = [...new Set([...(ids[match[1]] || []), match[2]])];
@@ -143,7 +150,19 @@ export async function ensurePlexMedia(
   }
   const structural = parentId && ['season', 'episode'].includes(kind);
   const season = kind === 'season' ? m.index : m.parentIndex;
-  if (!Object.keys(ids).length && !structural) throw Error('Keine verlässliche Medien-ID im Plex-Ereignis');
+  if (!Object.keys(ids).length && !structural)
+    throw Object.assign(Error('Keine verlässliche Medien-ID im Plex-Ereignis'), {
+      matchDetails: {
+        title: m.title,
+        providerIds: ids,
+        matches: [],
+        ratingKey: m.ratingKey,
+        guid: m.guid,
+        serverId: await plexServerScope(),
+        type: kind,
+        missingIds: true,
+      },
+    });
   if (structural && (!Number.isInteger(season) || season < 0)) throw Error('Ungültige Staffelnummer');
   const providerKeys = ['plex', 'imdb', 'tmdb', 'tvdb'].filter((key) => ids[key]);
   let matches = providerKeys.length
@@ -225,7 +244,11 @@ export async function processPlex(payload: {
 }) {
   if (payload.event === 'library.new') {
     const { getPlexRestoreContext } = await import('./plex-watch-restore');
-    if (await getPlexRestoreContext()) {
+    const sections = (await getSetting('PLEX_SCAN_SECTIONS')).split(',').filter(Boolean);
+    if (sections.length === 1 && sections[0] === 'none') return;
+    const section = payload.metadata.librarySectionID;
+    if (sections.length && section != null && !sections.includes(String(section))) return;
+    if ((await getSetting('PLEX_SCAN_ENABLED')) !== '0' || (await getPlexRestoreContext())) {
       const { requestPlexScan } = await import('./plex-jobs');
       await requestPlexScan();
     }
@@ -237,12 +260,16 @@ export async function processPlex(payload: {
   }
   let m = payload.metadata;
   if (m.ratingKey) {
-    const data = await plexRequest(`/library/metadata/${encodeURIComponent(String(m.ratingKey))}`);
+    const data = await plexRequest(
+      `/library/metadata/${encodeURIComponent(String(m.ratingKey))}?includeGuids=1`,
+    );
     if (data?.MediaContainer?.Metadata?.[0]) m = { ...m, ...data.MediaContainer.Metadata[0] };
   }
   let parent: string | undefined;
   if (m.type === 'episode' && m.grandparentRatingKey) {
-    const p = await plexRequest(`/library/metadata/${encodeURIComponent(String(m.grandparentRatingKey))}`);
+    const p = await plexRequest(
+      `/library/metadata/${encodeURIComponent(String(m.grandparentRatingKey))}?includeGuids=1`,
+    );
     if (p?.MediaContainer?.Metadata?.[0]) parent = await ensurePlexMedia(p.MediaContainer.Metadata[0]);
   }
   const id = await ensurePlexMedia(m, parent);

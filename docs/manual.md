@@ -14,11 +14,17 @@ Die [README](../README.md) erklärt Installation, Sicherung und Verbindungen. Di
 
 ## Läuft der Bibliotheks-Scan noch?
 
+Unter **Bibliotheken für den Plex-Abgleich** nur die gewünschten Bibliotheken auswählen. Die Auswahl gilt für Vorschau, manuelle und automatische Scans. Andere Bibliotheken werden nicht gelesen; ihre zuletzt gespeicherten Verfügbarkeiten und Einordnungen bleiben erhalten. **Alle Bibliotheken** aktualisiert den gesamten Bestand. Ist nichts ausgewählt oder wurde eine gewählte Bibliothek entfernt, erscheint eine Meldung und der Bestand bleibt unverändert.
+
 Unter **Admin → Verarbeitung** den Bibliotheks-Scan öffnen. **Geplant** bezeichnet einen zukünftigen Termin, **Wartet** einen eingeplanten Auftrag, der noch nicht läuft. Erst **Läuft** bedeutet, dass ein Worker den Auftrag übernommen hat.
 
 Startzeit und letzte Aktivität helfen bei der Einschätzung. Ein Laufbalken zeigt Aktivität; eine Zahl wie „420 / 629“ erscheint nur, wenn die Gesamtmenge bekannt ist. Ohne Gesamtmenge ist der Balken keine Prozentangabe. Bei ausbleibender Rückmeldung erscheint ein entsprechender Hinweis: Ein alter Status allein belegt nicht, dass noch gearbeitet wird.
 
 Die Übersicht aktualisiert sich automatisch. Datum und Uhrzeit werden in Berliner Zeit angezeigt, zusätzlich gibt es relative Angaben wie „vor 3 Minuten“.
+
+Die Vorschau nennt die tatsächlich geprüften Bibliotheken und bis zu 200 problematische Einträge mit Titel und Grund. Sie speichert keine Zuordnungen. Erst **Jetzt scannen** übernimmt die Ergebnisse. Fehlende IDs werden zunächst aus Plex-Detaildaten nachgeladen; fehlt weiterhin eine verlässliche Identität, wird nur dieser Titel ausgelassen. Den genannten Eintrag in Plex zuordnen und erneut scannen. Bei unklaren Einträgen wird kein früher bekannter Titel derselben Bibliothek allein aufgrund seines vermeintlichen Fehlens entfernt. Netzwerk- und Vollständigkeitsfehler verhindern weiterhin die Veröffentlichung eines unvollständigen Scans.
+
+Neue Bibliothekseinträge lösen bei aktivem automatischem Scan auch ohne Gesehen-Wiederherstellung einen Abgleich aus, sofern Plex das Ereignis `library.new` per Webhook meldet. Die gespeicherte Bibliotheksauswahl gilt auch dabei.
 
 ## Ergebnisse eines Auftrags kontrollieren
 

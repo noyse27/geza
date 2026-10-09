@@ -16,6 +16,7 @@ type Entry = {
   automatic: boolean;
   episodes?: Metadata[];
   incomplete?: boolean;
+  issue?: string;
 };
 
 export async function plexList(path: string): Promise<Metadata[]> {
@@ -67,21 +68,53 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
   const data = await plexRequest('/library/sections');
   if (!Array.isArray(data?.MediaContainer?.Directory))
     throw Error('Plex-Bibliotheken konnten nicht gelesen werden');
-  const sections = data.MediaContainer.Directory.filter((s: Metadata) => ['movie', 'show'].includes(s.type));
-  if (!sections.length) throw Error('Keine Film- oder Serienbibliotheken; Bestand bleibt unverändert.');
+  const sections = data.MediaContainer.Directory.filter(
+    (s: Metadata) => ['movie', 'show'].includes(s.type) && (!filter.length || filter.includes(String(s.key))),
+  );
+  if (!sections.length)
+    throw Error(
+      'Keine ausgewählte Film- oder Serienbibliothek verfügbar. Bitte die Bibliotheksauswahl prüfen; der Bestand bleibt unverändert.',
+    );
   const entries: Entry[] = [];
   const incompleteSeries: { title: string; library: string; ratingKey: string; issues: Metadata[] }[] = [];
   for (const section of sections) {
     await reportProgress(`Bibliothek „${section.title}“ lesen`, undefined, undefined, true);
-    const selected = !filter.length || filter.includes(String(section.key));
-    for (const item of await plexList(
+    for (let item of await plexList(
       `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1`,
     )) {
-      if (!['movie', 'show'].includes(item.type)) throw Error('Unerwarteter Plex-Medientyp');
+      if (!['movie', 'show'].includes(item.type)) {
+        entries.push({
+          item,
+          library: String(section.title),
+          automatic,
+          issue: 'Unerwarteter Plex-Medientyp. Diesen Eintrag in Plex prüfen.',
+        });
+        continue;
+      }
+      if (!Object.keys(plexIds(item)).length && item.ratingKey) {
+        const details = await plexRequest(
+          `/library/metadata/${encodeURIComponent(item.ratingKey)}?includeGuids=1`,
+        ).catch((error) => {
+          if (/^Plex(?::)? HTTP (404|410)(?:\s|$)/.test(error.message)) return null;
+          throw error;
+        });
+        const detail = details?.MediaContainer?.Metadata?.find(
+          (m: Metadata) => String(m.ratingKey) === String(item.ratingKey) && m.type === item.type,
+        );
+        if (detail) item = { ...item, ...detail };
+      }
       let episodes: Metadata[] | undefined;
       let incomplete = false;
       if (item.type === 'show') {
-        if (!item.ratingKey) throw Error('Plex-Serie ohne Bibliotheksschlüssel');
+        if (!item.ratingKey) {
+          entries.push({
+            item,
+            library: String(section.title),
+            automatic,
+            issue: 'Plex-Serie ohne Bibliotheksschlüssel. Diesen Eintrag in Plex prüfen.',
+          });
+          continue;
+        }
         const leaves = await plexList(
           `/library/metadata/${encodeURIComponent(item.ratingKey)}/allLeaves?includeGuids=1`,
         );
@@ -103,14 +136,22 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
             detail,
           );
         }
-        for (const e of episodes) seen(e);
-      } else seen(item);
+      }
+      let issue: string | undefined;
+      try {
+        if (episodes) episodes.forEach(seen);
+        else seen(item);
+      } catch {
+        issue =
+          'Ungültiger Plex-Gesehenstatus. Diesen Eintrag in Plex prüfen; die bisherige Einordnung bleibt geschützt.';
+      }
       entries.push({
         item,
         library: String(section.title),
-        automatic: automatic && selected,
+        automatic,
         episodes,
         incomplete,
+        issue,
       });
     }
   }
@@ -127,6 +168,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     let skipped = 0;
     let conflicts = 0;
     const protectedRoots = new Set<string>();
+    const uncertainLibraries = new Set<string>();
     const results: JobResult[] = [];
     let processed = 0;
     let pendingMatches = new Map<string, { libraries: Set<string>; watched: boolean; automatic: boolean }>();
@@ -138,7 +180,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         automatic: auto || !!prior?.automatic,
       });
     };
-    for (const { item, library, automatic: auto, episodes, incomplete } of entries) {
+    for (const { item, library, automatic: auto, episodes, incomplete, issue } of entries) {
       await reportProgress(`Titel zuordnen: ${item.title}`, processed++, entries.length);
       await client.query('SAVEPOINT plex_entry');
       pendingMatches = new Map();
@@ -146,6 +188,17 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       const previousRestores = watchedRestores;
       let entryRootId: string | undefined;
       try {
+        if (issue)
+          throw Object.assign(Error(issue), {
+            matchDetails: {
+              title: item.title || 'Unbenannter Plex-Eintrag',
+              providerIds: plexIds(item),
+              matches: [],
+              ratingKey: item.ratingKey,
+              type: item.type,
+              itemIssue: issue,
+            },
+          });
         const watched = episodes ? episodes.some(seen) || Number(item.viewedLeafCount) > 0 : seen(item);
         const deleted = tombstones.matches(item.type, plexIds(item));
         if (deleted.length && (!watched || incomplete)) {
@@ -214,6 +267,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         results.length = previousResults;
         watchedRestores = previousRestores;
         conflicts++;
+        if (detail.missingIds || detail.itemIssue) uncertainLibraries.add(library);
         // Protect all candidate families, including a series containing a conflicting episode.
         const candidateIds = (detail.matches || [])
           .map((m: any) => String(m.id))
@@ -242,7 +296,10 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
           title: detail.title || item.title,
           outcome: 'failed',
           reason:
-            'ID-Konflikt: Dieser Titel wurde nicht übernommen. Die übrigen Titel werden weiter verarbeitet. Den korrekten Datensatz dauerhaft auswählen und erneut scannen.',
+            detail.itemIssue ||
+            (detail.missingIds
+              ? 'Plex liefert auch in den Detaildaten keine verlässliche Medien-ID. Diesen Titel in Plex zuordnen und erneut scannen. Die übrigen Titel werden verarbeitet.'
+              : 'ID-Konflikt: Dieser Titel wurde nicht übernommen. Die übrigen Titel werden weiter verarbeitet. Den korrekten Datensatz dauerhaft auswählen und erneut scannen.'),
           details: { ...detail, library },
         });
       } finally {
@@ -260,16 +317,35 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         )
       ).rows.map((r) => r.id),
     );
+    const scannedLibraries = sections.map((s: Metadata) => String(s.title));
+    // Only withdraw evidence from libraries actually read. Unidentified entries may be old titles,
+    // so retain absence evidence for their library until its identities can be resolved.
+    const previousLibraries = !filter.length
+      ? (await client.query('SELECT DISTINCT unnest(plex_libraries) AS name FROM media')).rows.map(
+          (r) => r.name,
+        )
+      : [];
+    const clearLibraries = [...new Set<string>([...scannedLibraries, ...previousLibraries])].filter(
+      (name) => !uncertainLibraries.has(name),
+    );
     await client.query(
-      `UPDATE media SET plex_libraries='{}',plex_checked_at=now(),plex_automatic=false,
-      origins=array_remove(origins,'legacy-bucket') WHERE kind IN ('movie','show','season','episode') AND NOT(id=ANY($1::bigint[]))`,
-      [[...protectedIds]],
+      `UPDATE media SET
+      plex_libraries=ARRAY(SELECT unnest(plex_libraries) EXCEPT SELECT unnest($2::text[])),
+      plex_checked_at=now(),
+      plex_automatic=CASE WHEN EXISTS(SELECT 1 FROM unnest(plex_libraries) l WHERE NOT(l=ANY($2::text[]))) THEN plex_automatic ELSE false END,
+      origins=array_remove(origins,'legacy-bucket')
+      WHERE kind IN ('movie','show','season','episode') AND NOT(id=ANY($1::bigint[]))
+      AND (plex_libraries && $2::text[] OR ($3 AND NOT(plex_libraries && $4::text[])))`,
+      [[...protectedIds], clearLibraries, !filter.length, [...uncertainLibraries]],
     );
     for (const [id, match] of matches)
       if (!protectedIds.has(id))
         await client.query(
-          `UPDATE media SET plex_libraries=$2,plex_watched=$3,plex_automatic=$4,
-      origins=ARRAY(SELECT DISTINCT unnest(origins||ARRAY['plex'])) WHERE id=$1`,
+          `UPDATE media SET plex_libraries=ARRAY(SELECT DISTINCT unnest(plex_libraries||$2::text[])),
+      plex_checked_at=now(),
+      plex_watched=CASE WHEN cardinality(plex_libraries)>0 THEN COALESCE(plex_watched,false) OR $3 ELSE $3 END,
+      plex_automatic=plex_automatic OR $4,
+      origins=ARRAY(SELECT DISTINCT unnest(array_remove(origins,'legacy-bucket')||ARRAY['plex'])) WHERE id=$1`,
           [id, [...match.libraries].sort(), match.watched, match.automatic],
         );
     await client.query('SELECT rumpel_refresh(NULL)');
@@ -303,6 +379,11 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       preview: !!payload.preview,
       incompleteSeries: incompleteSeries.length,
       conflicts,
+      issues: results
+        .filter((r) => r.outcome === 'failed')
+        .slice(0, 200)
+        .map((r) => ({ title: r.title, library: r.details?.library, reason: r.reason })),
+      scannedLibraries,
       watchedRestores,
     };
     if (payload.preview) await client.query('ROLLBACK');
