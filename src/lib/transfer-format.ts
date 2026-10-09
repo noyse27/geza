@@ -19,6 +19,7 @@ export const dataTables = [
   'import_runs',
   'rumpel_deleted',
   'facet_terms',
+  'plex_match_decisions',
 ] as const;
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
 export const MAX_JSON_BYTES = 512 * 1024 * 1024;
@@ -30,7 +31,7 @@ const tablesSchema = z
       z.ZodArray<typeof row>
     >,
   )
-  .extend({ facet_terms: z.array(row).optional() })
+  .extend({ facet_terms: z.array(row).optional(), plex_match_decisions: z.array(row).optional() })
   .strict();
 const sealedSchema = z
   .object({
@@ -52,7 +53,10 @@ const archiveSchema = z
   })
   .strict();
 export type Archive = Omit<z.infer<typeof archiveSchema>, 'tables'> & {
-  tables: z.infer<typeof tablesSchema> & { facet_terms: Record<string, unknown>[] };
+  tables: z.infer<typeof tablesSchema> & {
+    facet_terms: Record<string, unknown>[];
+    plex_match_decisions: Record<string, unknown>[];
+  };
 };
 export const credentialsSchema = z
   .object({
@@ -125,7 +129,14 @@ export function decodeArchive(bytes: Buffer): Archive {
     );
     const { checksum: expected, ...content } = value;
     if (checksum(content) !== expected) throw Error('checksum');
-    return { ...value, tables: { ...value.tables, facet_terms: value.tables.facet_terms ?? [] } };
+    return {
+      ...value,
+      tables: {
+        ...value.tables,
+        facet_terms: value.tables.facet_terms ?? [],
+        plex_match_decisions: value.tables.plex_match_decisions ?? [],
+      },
+    };
   } catch {
     throw Error('Keine vollständige, unbeschädigte Geza-Umzugsdatei der unterstützten Version.');
   }

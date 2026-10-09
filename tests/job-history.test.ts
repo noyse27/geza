@@ -8,11 +8,90 @@ import { runContext, mediaSnapshot, changeOutcome, reportProgress } from '../src
 import { jobState, relativeTime } from '../src/lib/job-display';
 import { jobOverview } from '../src/lib/job-overview';
 import { processPlexScan } from '../src/lib/plex-scan';
-import { processPlexReviewSync } from '../src/lib/plex';
+import { ensurePlexMedia, processPlexReviewSync } from '../src/lib/plex';
+import { plexServerScope } from '../src/lib/plex-decisions';
 import { scheduleNextScan } from '../src/lib/plex-jobs';
 
 after(() => pool.end());
-test('job history: committed scan results, rollback, retry, review deltas and live worker', async () => {
+test('episode conflict rolls back its series only and protects the existing family', async () => {
+  await setSetting('PLEX_URL', 'http://plex.test');
+  await setSetting('PLEX_TOKEN', 'test');
+  const [show] = await query(`INSERT INTO media(kind,title,ids,plex_libraries,plex_automatic,origins)
+    VALUES('show','Serie unverändert','{"tvdb":"901111"}',ARRAY['Alt'],true,ARRAY['plex']) RETURNING id`);
+  await query(
+    `INSERT INTO media(kind,title,parent_id,season,episode,ids) VALUES('episode','Konfliktfolge',$1,1,2,'{"tmdb":"901222","imdb":"tt901333"}')`,
+    [show.id],
+  );
+  const before = await query(
+    'SELECT id,title,ids,plex_libraries,bucketlist,rumpel FROM media WHERE id=$1 OR parent_id=$1 ORDER BY id',
+    [show.id],
+  );
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const path = new URL(String(input)).pathname;
+    const data =
+      path === '/library/sections'
+        ? { Directory: [{ key: '1', title: 'Test', type: 'show' }] }
+        : path.includes('allLeaves')
+          ? {
+              totalSize: 2,
+              Metadata: [
+                { type: 'episode', title: 'Neue Folge', parentIndex: 1, index: 1 },
+                {
+                  type: 'episode',
+                  title: 'Konfliktfolge',
+                  parentIndex: 1,
+                  index: 2,
+                  Guid: [{ id: 'tmdb://901222' }, { id: 'imdb://tt901444' }],
+                },
+              ],
+            }
+          : {
+              totalSize: 2,
+              Metadata: [
+                {
+                  type: 'show',
+                  title: 'Nicht übernehmen',
+                  ratingKey: '901',
+                  Guid: [{ id: 'tvdb://901111' }],
+                },
+                {
+                  type: 'movie',
+                  title: 'Nach Serienkonflikt',
+                  ratingKey: '902',
+                  Guid: [{ id: 'tmdb://901555' }],
+                },
+              ],
+            };
+    return Response.json({ MediaContainer: data });
+  }) as typeof fetch;
+  try {
+    const report = await processPlexScan({ manual: true });
+    assert.equal(report?.conflicts, 1);
+    assert.deepEqual(
+      await query(
+        'SELECT id,title,ids,plex_libraries,bucketlist,rumpel FROM media WHERE id=$1 OR parent_id=$1 ORDER BY id',
+        [show.id],
+      ),
+      before,
+    );
+    assert.equal(
+      (await query("SELECT bucketlist FROM media WHERE title='Nach Serienkonflikt'"))[0].bucketlist,
+      true,
+    );
+    assert.equal(
+      (
+        await query("SELECT 1 FROM media WHERE title='Neue Folge' OR (kind='season' AND parent_id=$1)", [
+          show.id,
+        ])
+      ).length,
+      0,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test('job history: isolated conflicts, persistent decisions, retry, review deltas and live worker', async () => {
   assert.match(process.env.DATABASE_URL || '', /geza_test_jobs_/);
   await setSetting('PLEX_URL', 'http://plex.test');
   await setSetting('PLEX_TOKEN', 'test');
@@ -34,16 +113,28 @@ test('job history: committed scan results, rollback, retry, review deltas and li
       return Response.json({ data: { metadataReviewV2: { message: body, hasSpoilers: false } } });
     if (u.pathname === '/library/sections')
       return Response.json({ MediaContainer: { Directory: [{ key: '1', title: '#NEU', type: 'movie' }] } });
-    const movies = [
-      { type: 'movie', title: 'Dick und Jane', ratingKey: '123', Guid: [{ id: 'tmdb://9591' }] },
-    ];
-    if (conflict)
+    const movies: Array<{
+      type: string;
+      title: string;
+      ratingKey: string;
+      guid?: string;
+      Guid: { id: string }[];
+    }> = [{ type: 'movie', title: 'Dick und Jane', ratingKey: '123', Guid: [{ id: 'tmdb://9591' }] }];
+    if (conflict) {
       movies.push({
         type: 'movie',
         title: 'Konfliktfilm',
         ratingKey: '124',
+        guid: 'plex://movie/111111111111111111111111',
         Guid: [{ id: 'tmdb://222' }, { id: 'imdb://tt111' }],
       });
+      movies.push({
+        type: 'movie',
+        title: 'Neu trotz Konflikt',
+        ratingKey: '125',
+        Guid: [{ id: 'tmdb://999333' }],
+      });
+    }
     return Response.json({ MediaContainer: { totalSize: movies.length, Metadata: movies } });
   }) as typeof fetch;
   try {
@@ -65,21 +156,102 @@ test('job history: committed scan results, rollback, retry, review deltas and li
     await query(
       'INSERT INTO media(kind,title,ids) VALUES(\'movie\',\'A\',\'{"tmdb":"222","imdb":"tt333"}\'),(\'movie\',\'B\',\'{"imdb":"tt111","tmdb":"444"}\')',
     );
-    // The first title changes classification before a later conflict rolls everything back.
+    // A later conflict must not discard valid titles or alter the conflicting candidates.
     await query("UPDATE media SET bucket_preference='exclude' WHERE id=$1", [result.media_id]);
-    const before = (
-      await query('SELECT ids,bucketlist,plex_checked_at FROM media WHERE id=$1', [result.media_id])
-    )[0];
+    const candidatesBefore = await query(
+      "SELECT id,ids,bucketlist,rumpel,plex_checked_at FROM media WHERE title IN ('A','B') ORDER BY id",
+    );
     conflict = true;
     const failed = await run();
-    await assert.rejects(
-      runContext.run({ id: failed.id, lastProgress: 0 }, () => processPlexScan({ manual: true })),
-      /Mehrdeutige Provider/,
+    const partial = await runContext.run({ id: failed.id, lastProgress: 0 }, () =>
+      processPlexScan({ manual: true }),
     );
-    assert.equal((await query('SELECT * FROM job_results WHERE run_id=$1', [failed.id])).length, 0);
+    assert.equal(partial?.conflicts, 1);
+    assert.equal(
+      (await query("SELECT * FROM job_results WHERE run_id=$1 AND outcome='failed'", [failed.id])).length,
+      1,
+    );
+    assert.equal((await query('SELECT * FROM job_results WHERE run_id=$1', [failed.id])).length, 3);
+    assert.equal(
+      (await query("SELECT bucketlist FROM media WHERE title='Neu trotz Konflikt'"))[0].bucketlist,
+      true,
+      'new unwatched title after a conflict reaches the bucketlist',
+    );
     assert.deepEqual(
-      (await query('SELECT ids,bucketlist,plex_checked_at FROM media WHERE id=$1', [result.media_id]))[0],
-      before,
+      await query(
+        "SELECT id,ids,bucketlist,rumpel,plex_checked_at FROM media WHERE title IN ('A','B') ORDER BY id",
+      ),
+      candidatesBefore,
+    );
+    const candidate = candidatesBefore[1];
+    const source = {
+      type: 'movie',
+      title: 'Konfliktfilm',
+      ratingKey: '124',
+      guid: 'plex://movie/111111111111111111111111',
+      Guid: [{ id: 'tmdb://222' }, { id: 'imdb://tt111' }],
+    };
+    await query(
+      'INSERT INTO plex_match_decisions(server_id,rating_key,guid,media_id,provider_ids) VALUES($1,$2,$3,$4,$5)',
+      [
+        await plexServerScope(),
+        source.ratingKey,
+        source.guid,
+        candidate.id,
+        JSON.stringify({ tmdb: '222', imdb: 'tt111' }),
+      ],
+    );
+    assert.equal(await ensurePlexMedia(source), candidate.id);
+    assert.equal(await ensurePlexMedia(source), candidate.id, 'choice survives repeated imports');
+    const resolvedRun = await run();
+    const resolved = await runContext.run({ id: resolvedRun.id, lastProgress: 0 }, () =>
+      processPlexScan({ manual: true }),
+    );
+    assert.equal(resolved?.conflicts, 0, 'next full scan remembers the choice');
+    assert.equal(
+      (await query('SELECT bucketlist FROM media WHERE id=$1', [candidate.id]))[0].bucketlist,
+      true,
+    );
+    assert.equal(
+      (
+        await query("SELECT count(*)::int AS n FROM job_results WHERE run_id=$1 AND outcome='failed'", [
+          resolvedRun.id,
+        ])
+      )[0].n,
+      0,
+    );
+    assert.equal(
+      await ensurePlexMedia({ ...source, Guid: [...source.Guid, { id: 'tmdb://444' }] }),
+      candidate.id,
+      'explicit choice also resolves duplicate TMDB GUIDs',
+    );
+    assert.deepEqual(
+      (await query('SELECT ids FROM media WHERE id=$1', [candidate.id]))[0].ids,
+      candidate.ids,
+      'Plex must not overwrite chosen canonical IDs',
+    );
+    await assert.rejects(
+      ensurePlexMedia({ ...source, guid: 'plex://movie/222222222222222222222222' }),
+      /Mehrdeutige/,
+    );
+    await setSetting('PLEX_SERVER_ID', 'another-server');
+    await assert.rejects(ensurePlexMedia(source), /Mehrdeutige/);
+    await setSetting('PLEX_SERVER_ID', '');
+    await query('DELETE FROM plex_match_decisions');
+    await assert.rejects(
+      ensurePlexMedia({
+        ...source,
+        ratingKey: '555',
+        guid: 'plex://movie/333333333333333333333333',
+        Guid: [{ id: 'tmdb://444' }, { id: 'tmdb://222' }],
+      }),
+      /Mehrdeutige/,
+      'duplicate provider IDs must not silently select the last GUID',
+    );
+    await assert.rejects(
+      ensurePlexMedia(source),
+      /Mehrdeutige/,
+      'removing a choice restores normal matching',
     );
     await query("UPDATE job_runs SET status='failed',finished_at=now(),error='Konflikt' WHERE id=$1", [
       failed.id,

@@ -125,77 +125,128 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     const tombstones = await loadTombstones(client);
     const matches = new Map<string, { libraries: Set<string>; watched: boolean; automatic: boolean }>();
     let skipped = 0;
+    let conflicts = 0;
     const protectedRoots = new Set<string>();
     const results: JobResult[] = [];
     let processed = 0;
+    let pendingMatches = new Map<string, { libraries: Set<string>; watched: boolean; automatic: boolean }>();
     const remember = (id: string, library: string, watched: boolean, auto: boolean) => {
-      const prior = matches.get(id);
-      matches.set(id, {
-        libraries: (prior?.libraries || new Set()).add(library),
+      const prior = pendingMatches.get(id) || matches.get(id);
+      pendingMatches.set(id, {
+        libraries: new Set(prior?.libraries).add(library),
         watched: watched || !!prior?.watched,
         automatic: auto || !!prior?.automatic,
       });
     };
     for (const { item, library, automatic: auto, episodes, incomplete } of entries) {
       await reportProgress(`Titel zuordnen: ${item.title}`, processed++, entries.length);
-      const watched = episodes ? episodes.some(seen) || Number(item.viewedLeafCount) > 0 : seen(item);
-      const deleted = tombstones.matches(item.type, plexIds(item));
-      if (deleted.length && (!watched || incomplete)) {
-        skipped++;
-        results.push({
-          title: item.title,
-          outcome: 'skipped',
-          reason:
-            'Zuvor in der Rumpelkammer gelöscht. Ohne neue Sichtung wird der Titel nicht automatisch wieder angelegt.',
-          details: {
-            ratingKey: item.ratingKey,
-            providerIds: plexIds(item),
-            library,
-            type: item.type,
-            deleted: true,
-          },
-        });
-        continue;
-      }
-      await forgetTombstones(deleted, client);
-      const id = await ensurePlexMedia(item, undefined, client);
-      await mergeMetadata(id, fromPlex(item), 'plex', client);
-      if (incomplete) {
-        protectedRoots.add(id);
+      await client.query('SAVEPOINT plex_entry');
+      pendingMatches = new Map();
+      const previousResults = results.length;
+      const previousRestores = watchedRestores;
+      let entryRootId: string | undefined;
+      try {
+        const watched = episodes ? episodes.some(seen) || Number(item.viewedLeafCount) > 0 : seen(item);
+        const deleted = tombstones.matches(item.type, plexIds(item));
+        if (deleted.length && (!watched || incomplete)) {
+          skipped++;
+          results.push({
+            title: item.title,
+            outcome: 'skipped',
+            reason:
+              'Zuvor in der Rumpelkammer gelöscht. Ohne neue Sichtung wird der Titel nicht automatisch wieder angelegt.',
+            details: {
+              ratingKey: item.ratingKey,
+              providerIds: plexIds(item),
+              library,
+              type: item.type,
+              deleted: true,
+            },
+          });
+          continue;
+        }
+        await forgetTombstones(deleted, client);
+        const id = await ensurePlexMedia(item, undefined, client);
+        entryRootId = id;
+        await mergeMetadata(id, fromPlex(item), 'plex', client);
+        if (incomplete) {
+          protectedRoots.add(id);
+          results.push({
+            mediaId: id,
+            title: item.title,
+            outcome: 'skipped',
+            reason: 'Episodenzuordnung unvollständig. Die bisherige Einordnung bleibt geschützt.',
+            details: { ratingKey: item.ratingKey, providerIds: plexIds(item), library },
+          });
+          continue;
+        }
         results.push({
           mediaId: id,
           title: item.title,
-          outcome: 'skipped',
-          reason: 'Episodenzuordnung unvollständig. Die bisherige Einordnung bleibt geschützt.',
-          details: { ratingKey: item.ratingKey, providerIds: plexIds(item), library },
+          outcome: 'unchanged',
+          details: { library, ratingKey: item.ratingKey, providerIds: plexIds(item) },
         });
-        continue;
-      }
-      results.push({
-        mediaId: id,
-        title: item.title,
-        outcome: 'unchanged',
-        details: { library, ratingKey: item.ratingKey, providerIds: plexIds(item) },
-      });
-      if (!episodes || episodes.length) remember(id, library, watched, auto);
-      if (!episodes && (await queuePlexRestore(client, restoreContext, id, item))) watchedRestores++;
-      if (episodes) {
-        const seasons = new Map<number, Metadata[]>();
-        for (const episode of episodes)
-          seasons.set(episode.parentIndex, [...(seasons.get(episode.parentIndex) || []), episode]);
-        for (const [number, leaves] of seasons) {
-          const sid = await ensurePlexMedia(
-            { type: 'season', index: number, title: `Staffel ${number}` },
-            id,
-            client,
-          );
-          remember(sid, library, leaves.some(seen), auto);
-          for (const episode of leaves) {
-            const eid = await ensurePlexMedia(episode, id, client);
-            remember(eid, library, seen(episode), false);
-            if (await queuePlexRestore(client, restoreContext, eid, episode)) watchedRestores++;
+        if (!episodes || episodes.length) remember(id, library, watched, auto);
+        if (!episodes && (await queuePlexRestore(client, restoreContext, id, item))) watchedRestores++;
+        if (episodes) {
+          const seasons = new Map<number, Metadata[]>();
+          for (const episode of episodes)
+            seasons.set(episode.parentIndex, [...(seasons.get(episode.parentIndex) || []), episode]);
+          for (const [number, leaves] of seasons) {
+            const sid = await ensurePlexMedia(
+              { type: 'season', index: number, title: `Staffel ${number}` },
+              id,
+              client,
+            );
+            remember(sid, library, leaves.some(seen), auto);
+            for (const episode of leaves) {
+              const eid = await ensurePlexMedia(episode, id, client);
+              remember(eid, library, seen(episode), false);
+              if (await queuePlexRestore(client, restoreContext, eid, episode)) watchedRestores++;
+            }
           }
         }
+        for (const [key, value] of pendingMatches) matches.set(key, value);
+      } catch (error) {
+        const detail = (error as { matchDetails?: Record<string, any> }).matchDetails;
+        await client.query('ROLLBACK TO SAVEPOINT plex_entry');
+        if (!detail) throw error;
+        results.length = previousResults;
+        watchedRestores = previousRestores;
+        conflicts++;
+        // Protect all candidate families, including a series containing a conflicting episode.
+        const candidateIds = (detail.matches || [])
+          .map((m: any) => String(m.id))
+          .filter((id: string) => /^\d+$/.test(id));
+        if (entryRootId) candidateIds.push(entryRootId);
+        const rootIds = (
+          await client.query(
+            `WITH RECURSIVE ancestors AS (
+          SELECT id,parent_id FROM media WHERE id=ANY($1::bigint[])
+          UNION SELECT m.id,m.parent_id FROM media m JOIN ancestors a ON a.parent_id=m.id
+        ) SELECT id FROM ancestors`,
+            [candidateIds],
+          )
+        ).rows;
+        for (const root of rootIds) protectedRoots.add(root.id);
+        // The root may have been found successfully before an episode failed.
+        const rootCandidates = (
+          await client.query(
+            `SELECT id FROM media WHERE kind=$1 AND (
+          ids->>'plex'=$2 OR ids->>'imdb'=$3 OR ids->>'tmdb'=$4 OR ids->>'tvdb'=$5)`,
+            [item.type, ...['plex', 'imdb', 'tmdb', 'tvdb'].map((k) => plexIds(item)[k] || null)],
+          )
+        ).rows;
+        for (const root of rootCandidates) protectedRoots.add(root.id);
+        results.push({
+          title: detail.title || item.title,
+          outcome: 'failed',
+          reason:
+            'ID-Konflikt: Dieser Titel wurde nicht übernommen. Die übrigen Titel werden weiter verarbeitet. Den korrekten Datensatz dauerhaft auswählen und erneut scannen.',
+          details: { ...detail, library },
+        });
+      } finally {
+        await client.query('RELEASE SAVEPOINT plex_entry');
       }
     }
     // Absence is not an unwatched event: retain known seen evidence for missing items.
@@ -251,6 +302,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       changes: changes.slice(0, 200),
       preview: !!payload.preview,
       incompleteSeries: incompleteSeries.length,
+      conflicts,
       watchedRestores,
     };
     if (payload.preview) await client.query('ROLLBACK');
@@ -301,7 +353,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       );
       await client.query('COMMIT');
       await logEvent(
-        incompleteSeries.length ? 'warn' : 'info',
+        incompleteSeries.length || conflicts ? 'warn' : 'info',
         'plex-scan',
         'Plex-Bestand und Einordnung abgeglichen',
         report,

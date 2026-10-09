@@ -229,6 +229,15 @@ Titel, die noch nicht in Geza angelegt wurden. Bei einem Zuordnungskonflikt zeig
 die widersprüchlichen Anbieter-IDs und ermöglicht deren Korrektur mit anschließendem
 erneutem Prüfen. Sichtungen und Bewertungen werden dabei nicht zusammengeführt.
 
+Bei wiederkehrenden falschen Plex-IDs lässt sich **Diesen Datensatz dauerhaft verwenden**
+wählen. Migration **029** speichert die Entscheidung für Plex-Server, Bibliotheksschlüssel
+und GUID; die Anbieter-IDs des gewählten Geza-Titels bleiben erhalten. Unter
+**Offene Importfälle → Gespeicherte Plex-Zuordnungen** lassen sich Entscheidungen aufheben.
+Einzelne ID-Konflikte brechen den Scan nicht mehr ab: Die betroffenen Titel bzw. Serien
+bleiben geschützt, andere Titel werden übernommen. Der Lauf zeigt „Abgeschlossen mit
+offenen Konflikten“. Unvollständige Plex-Antworten oder technische Fehler brechen weiterhin
+den gesamten Scan ab. Mehrere IDs desselben Anbieters werden ausdrücklich als Konflikt angezeigt.
+
 Für Plex-Reviews und Metadaten werden tatsächliche Änderungen statt erfolgreicher
 Abfragen gezählt. „Ergebnisse heute“ gilt seit 00:00 Uhr Berlin und zählt pro
 abgeschlossener Ausführung; ein unveränderter erneuter Abruf zählt nicht als neuer

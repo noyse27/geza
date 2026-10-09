@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { WatchEditor } from '@/components/editor';
 import { IdCorrection } from '@/components/id-correction';
+import { PlexDecision } from '@/components/plex-decision';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Offene Importfälle', robots: { index: false, follow: false } };
 export default async function Issues({
@@ -13,7 +14,15 @@ export default async function Issues({
   await requireAdmin();
   const p = await searchParams,
     page = Math.min(100000, Math.max(0, Math.floor(Number(p.page) || 0)));
-  const tab = p.tab === 'ids' ? 'ids' : 'dates';
+  const tab = p.tab === 'decisions' ? 'decisions' : p.tab === 'ids' ? 'ids' : 'dates';
+  const decisions =
+    tab === 'decisions'
+      ? await query(
+          `SELECT d.*,m.title,m.ids FROM plex_match_decisions d
+    JOIN media m ON m.id=d.media_id ORDER BY d.created_at DESC,d.media_id LIMIT 51 OFFSET $1`,
+          [page * 50],
+        )
+      : [];
   const [dateCount, collisionCount] = await Promise.all([
     query('SELECT count(*)::int AS n FROM watches WHERE watched_at IS NULL'),
     query(
@@ -48,7 +57,41 @@ export default async function Issues({
       <p>
         <Link href="/admin/issues">{dateCount[0].n} ungeklärte Anschauzeitpunkte</Link> ·{' '}
         <Link href="/admin/issues?tab=ids">{collisionCount[0].n} mehrfach zugeordnete Plex-ID-Gruppen</Link>
+        {' · '}
+        <Link href="/admin/issues?tab=decisions">Gespeicherte Plex-Zuordnungen</Link>
       </p>
+      {tab === 'decisions' && (
+        <>
+          <h2>Gespeicherte Plex-Zuordnungen</h2>
+          <p>
+            Diese Auswahl gilt bei künftigen Abgleichen. Die Anbieter-IDs des gewählten Titels bleiben
+            erhalten. Eine aufgehobene Zuordnung wird beim nächsten Scan neu geprüft.
+          </p>
+          {decisions.slice(0, 50).map((d) => (
+            <section className="panel" key={`${d.server_id}:${d.rating_key}:${d.guid}`}>
+              <h3>
+                <Link href={`/title/${d.media_id}`}>{d.title}</Link>
+              </h3>
+              <p>
+                Plex-Eintrag {d.rating_key} · gespeichert am{' '}
+                {new Date(d.created_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}
+              </p>
+              <PlexDecision
+                mediaId={String(d.media_id)}
+                ids={d.ids}
+                selected
+                details={{
+                  ratingKey: d.rating_key,
+                  guid: d.guid,
+                  serverId: d.server_id,
+                  providerIds: d.provider_ids,
+                }}
+              />
+            </section>
+          ))}
+          {!decisions.length && <p>Keine gespeicherten Zuordnungen.</p>}
+        </>
+      )}
       {tab === 'dates' && (
         <>
           <h2>Anschauzeitpunkte</h2>
@@ -106,7 +149,7 @@ export default async function Issues({
           {!collisions.length && <p>Keine mehrfach zugeordneten Plex-IDs.</p>}
         </>
       )}
-      {(watches.length > 50 || collisions.length > 50) && (
+      {(watches.length > 50 || collisions.length > 50 || decisions.length > 50) && (
         <Link className="button" href={`/admin/issues?tab=${tab}&page=${page + 1}`}>
           Weitere Fälle
         </Link>

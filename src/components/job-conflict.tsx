@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { IdCorrection } from './id-correction';
 import { query } from '@/lib/db';
+import { PlexDecision } from './plex-decision';
+import { plexServerScope } from '@/lib/plex-decisions';
 export async function JobConflict({ details }: { details: Record<string, any> }) {
   const candidates = Array.isArray(details.matches) ? details.matches : [];
   if (!candidates.length && !details.providerIds) return null;
@@ -8,6 +10,12 @@ export async function JobConflict({ details }: { details: Record<string, any> })
   const ids = candidates.map((m: any) => String(m.id)).filter((id: string) => /^\d+$/.test(id));
   const current = ids.length
     ? await query('SELECT id,title,ids FROM media WHERE id=ANY($1::bigint[])', [ids])
+    : [];
+  const decisions = details.ratingKey
+    ? await query(
+        'SELECT media_id FROM plex_match_decisions WHERE server_id=$1 AND rating_key=$2 AND ($3::text IS NULL OR guid=$3)',
+        [details.serverId || (await plexServerScope()), String(details.ratingKey), details.guid || null],
+      )
     : [];
   return (
     <div className="job-conflict">
@@ -29,7 +37,9 @@ export async function JobConflict({ details }: { details: Record<string, any> })
             <tr>
               <th>Empfangen aus Plex</th>
               {providers.map((p) => (
-                <td key={p}>{details.providerIds?.[p] || '—'}</td>
+                <td key={p}>
+                  {details.providerIdValues?.[p]?.join(', ') || details.providerIds?.[p] || '—'}
+                </td>
               ))}
             </tr>
             {candidates.map((m: any, i: number) => (
@@ -73,9 +83,24 @@ export async function JobConflict({ details }: { details: Record<string, any> })
           gespeicherten IDs.
         </p>
       )}
+      {details.ratingKey && (
+        <p>
+          Wenn Plex dauerhaft eine falsche Anbieter-ID liefert, wähle den richtigen Datensatz aus. Die Auswahl
+          gilt für diesen Plex-Eintrag auf diesem Server. Seine gespeicherten Anbieter-IDs werden dabei nicht
+          durch Plex überschrieben. Danach den Scan erneut prüfen.
+        </p>
+      )}
       {current.map((m) => (
         <div key={m.id}>
           <p>{m.title || `Titel ${m.id}`}</p>
+          {details.ratingKey && (
+            <PlexDecision
+              mediaId={String(m.id)}
+              ids={m.ids}
+              details={details}
+              selected={decisions.some((d) => String(d.media_id) === String(m.id))}
+            />
+          )}
           <IdCorrection mediaId={String(m.id)} ids={m.ids} />
         </div>
       ))}

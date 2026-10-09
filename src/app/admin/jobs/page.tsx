@@ -131,7 +131,8 @@ export default async function Jobs({
         {runs.slice(0, 50).map((r) => (
           <div className="processing-row" key={r.id}>
             <Link href={`/admin/jobs/${r.id}${outcome ? `?outcome=${outcome}` : ''}`}>
-              {jobNames[r.kind] || r.kind} · {jobState(r)} · Versuch {r.attempt}
+              {jobNames[r.kind] || r.kind} · {jobState(r)}
+              {r.status === 'done' && r.counts?.failed ? ' mit offenen Konflikten' : ''} · Versuch {r.attempt}
             </Link>
             <p>
               {exactTime(r.started_at)} · <TimeAgo value={(r.finished_at || r.started_at).toISOString()} />

@@ -167,9 +167,10 @@ export function JobDashboard({ initial }: { initial: Overview }) {
       ))}
       <h3>Letzte Ausführungen</h3>
       {data.runs.map((run) => (
-        <p key={run.id} className={run.status === 'failed' ? 'error' : ''}>
+        <p key={run.id} className={run.status === 'failed' || run.counts?.failed ? 'error' : ''}>
           <Link href={`/admin/jobs/${run.id}`}>
             {jobNames[run.kind] || run.kind} · {jobState(run)}
+            {run.status === 'done' && !!run.counts?.failed && ' mit offenen Konflikten'}
           </Link>{' '}
           · <TimeAgo value={run.finished_at || run.started_at} />
           {Object.entries(run.counts || {}).map(([outcome, count]) => (

@@ -14,8 +14,20 @@ let target: pg.Client | undefined;
 let appPool: pg.Pool | undefined;
 let output = '';
 const base = 'http://127.0.0.1:32119';
+const decisionItem = {
+  type: 'movie',
+  title: 'Saint Clare HTTP',
+  ratingKey: '999',
+  guid: 'plex://movie/111111111111111111111111',
+  Guid: [{ id: 'imdb://tt9024562' }, { id: 'tmdb://735505' }],
+};
 const plex = createServer((req, res) => {
   const path = new URL(req.url!, 'http://localhost').pathname;
+  if (path === '/library/metadata/999') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ MediaContainer: { Metadata: [decisionItem] } }));
+    return;
+  }
   const data =
     path === '/library/sections'
       ? { Directory: [{ key: '1', title: 'Serien', type: 'show' }] }
@@ -266,6 +278,37 @@ try {
     (await query('SELECT 1 FROM watches WHERE source_id LIKE $1', ['cascade:' + wholeWatch.id + ':%']))
       .length,
     0,
+  );
+  const [chosen] = await query(
+    `INSERT INTO media(kind,title,ids) VALUES('movie','Saint Clare HTTP','{"imdb":"tt9024562","tmdb":"1026222"}') RETURNING id,ids`,
+  );
+  const { plexIds, ensurePlexMedia } = await import('../src/lib/plex');
+  const { plexServerScope } = await import('../src/lib/plex-decisions');
+  const decision = {
+    mediaId: chosen.id,
+    expected: chosen.ids,
+    ratingKey: '999',
+    providerIds: plexIds(decisionItem),
+    serverId: await plexServerScope(),
+    guid: decisionItem.guid,
+  };
+  const decide = (body: unknown, h = headers) =>
+    fetch(base + '/api/admin/plex-decisions', { method: 'POST', headers: h, body: JSON.stringify(body) });
+  assert.equal((await decide(decision, { ...headers, Cookie: '' })).status, 401);
+  assert.equal((await decide(decision, { ...headers, Origin: 'https://wrong.example' })).status, 403);
+  assert.equal((await decide({ ...decision, expected: {} })).status, 409);
+  assert.equal((await decide({ ...decision, guid: 'plex://movie/changed' })).status, 409);
+  const saved = await decide(decision);
+  assert.equal(saved.status, 200, await saved.text());
+  assert.equal(await ensurePlexMedia(decisionItem), chosen.id);
+  assert.deepEqual((await query('SELECT ids FROM media WHERE id=$1', [chosen.id]))[0].ids, chosen.ids);
+  const list = await fetch(base + '/admin/issues?tab=decisions', { headers });
+  assert.equal(list.status, 200);
+  assert.match(await list.text(), /Saint Clare HTTP/);
+  assert.equal((await decide({ ...decision, remove: true })).status, 200);
+  await assert.rejects(ensurePlexMedia(decisionItem), /Mehrdeutige/);
+  console.log(
+    'Plex decision HTTP checks passed: auth, origin, stale IDs/GUID, save, preserved canonical IDs, management list and removal.',
   );
   console.log(
     'HTTP checks passed: authenticated admin, preview rollback, season bucketlist, manual exclusion, ZIP preview/import and Plex follow-up.',

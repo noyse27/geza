@@ -81,6 +81,8 @@ try {
     `INSERT INTO jobs(kind,status,payload) VALUES('plex','pending','{"event":"media.scrobble","eventId":"5fbaac04-c234-4d7b-9140-1a7108dfb830","metadata":{"title":"Unresolved"}}')`,
   );
   await query(`INSERT INTO import_runs(report) VALUES('{"files":1,"media":3}')`);
+  await query(`INSERT INTO plex_match_decisions(server_id,rating_key,guid,media_id,provider_ids)
+    VALUES('test-server','123','plex://movie/test',100,'{"tmdb":"777"}')`);
   await query(
     `INSERT INTO rumpel_deleted(kind,title,year,ids) VALUES('movie','Gelöscht',2001,'{"imdb":"tt1"}')`,
   );
