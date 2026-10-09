@@ -33,10 +33,13 @@ export function plexIds(m: PlexMetadata) {
   }
   return ids;
 }
-export async function plexRequest(path: string) {
+export async function plexRequest(
+  path: string,
+  options: { emptyResponse?: boolean; connection?: { url: string; token: string } } = {},
+) {
   if (isDemo()) throw Error('Externe Anfragen sind im Demomodus deaktiviert.');
-  const base = await getSetting('PLEX_URL'),
-    token = await getSetting('PLEX_TOKEN');
+  const base = options.connection?.url ?? (await getSetting('PLEX_URL')),
+    token = options.connection?.token ?? (await getSetting('PLEX_TOKEN'));
   if (!base || !token) return null;
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
@@ -47,6 +50,10 @@ export async function plexRequest(path: string) {
     redirect: 'error',
   });
   if (!r.ok) throw Error(`Plex HTTP ${r.status}`);
+  if (options.emptyResponse) {
+    await r.text();
+    return true;
+  }
   return r.json();
 }
 export async function findPlex(ids: Record<string, unknown>, kind: string) {
@@ -170,7 +177,20 @@ export async function processPlex(payload: {
   metadata: PlexMetadata;
   receivedAt: string;
   eventId: string;
+  playback?: boolean;
 }) {
+  if (payload.event === 'library.new') {
+    const { getPlexRestoreContext } = await import('./plex-watch-restore');
+    if (await getPlexRestoreContext()) {
+      const { requestPlexScan } = await import('./plex-jobs');
+      await requestPlexScan();
+    }
+    return;
+  }
+  if (payload.event === 'media.scrobble' && payload.playback === false) {
+    const { isPlexRestoreEcho } = await import('./plex-watch-restore');
+    if (await isPlexRestoreEcho(payload.metadata, payload.receivedAt)) return;
+  }
   let m = payload.metadata;
   if (m.ratingKey) {
     const data = await plexRequest(`/library/metadata/${encodeURIComponent(String(m.ratingKey))}`);

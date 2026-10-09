@@ -66,7 +66,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ secret:
             receivedServerUuid: raw.Server?.uuid,
           },
         );
-      if (!['media.scrobble', 'media.rate'].includes(raw.event))
+      if (!['media.scrobble', 'media.rate', 'library.new'].includes(raw.event))
         return respond(
           200,
           'Webhook-Ereignis wird nicht verarbeitet',
@@ -122,6 +122,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ secret:
               receivedAt: new Date().toISOString(),
               eventId,
               fingerprint,
+              playback: !!raw.Player?.uuid,
             }),
           ]);
         }

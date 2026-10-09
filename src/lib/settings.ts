@@ -14,6 +14,7 @@ export const settingKeys = [
   'PLEX_SCAN_ENABLED',
   'PLEX_SCAN_SECTIONS',
   'PLEX_SCAN_HOUR',
+  'PLEX_RESTORE_WATCHED',
   'FEED_GRACE_MINUTES',
   'INSTANCE_NICKNAME',
 ] as const;

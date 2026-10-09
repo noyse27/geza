@@ -4,7 +4,7 @@
 
 Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-**Aktuelle Version: v1.5.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
+**Aktuelle Version: v1.6.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
 ## Funktionen im Überblick
 
@@ -21,7 +21,7 @@ Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertun
 
 ## Inhalt
 
-[Review-Anleitung](docs/reviews.md) · [Film- und Personenverweise in Reviews](#film--und-personenverweise-in-reviews)
+[Bedienungsanleitung / Manual](docs/manual.md) · [Review-Anleitung](docs/reviews.md) · [Film- und Personenverweise in Reviews](#film--und-personenverweise-in-reviews)
 
 [Lokal starten](#lokal-starten) · [Demomodus](#demomodus) · [Sichtbarkeit](#sichtbarkeit) · [Sammlungen](#sammlungen-und-filmreihen) · [Serien und Staffeln](#serien-staffeln-und-serienkatalog) · [Link-Vorschau](#link-vorschau) · [RSS-Feed](#rss-feed-abo) · [Friends of Geza](#friends-of-geza) · [Rumpelkammer](#rumpelkammer) · [Trakt-Import](#trakt-import) · [Metadaten und Plex](#metadaten-und-plex) · [Externe Reviews](#externe-reviews-und-anbieterbewertungen) · [Hosting](#hosting-und-google) · [Sicherung](#sicherung-und-updates) · [Prüfungen](#prüfungen) · [Changelog](#changelog)
 
@@ -194,6 +194,18 @@ https://<url>[:<port>]/api/plex/DEIN-WEBHOOK-GEHEIMNIS
 Unterstützt sind `media.scrobble` und `media.rate`. `userRating` wird als 0–10 interpretiert; 0 entfernt die Bewertung. Ohne verlässlichen Ereigniszeitpunkt wird die Empfangszeit als geschätzt gekennzeichnet. Die tatsächlichen Payloads des eigenen Plex-Servers müssen bei der Einrichtung geprüft werden.
 
 Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und Ablehnungsgründe, Anbieterabfragen mit URL/HTTP-Status sowie Job-Ergebnisse und Wiederholungsversuche. Über die Anfrage-ID lässt sich ein Webhook bis zur Verarbeitung verfolgen. Filter und ältere Einträge sind verfügbar; zum Nachladen die Seite aktualisieren. Zugangsdaten, Cookies und vollständige Request-Bodies werden nicht gespeichert. Der Worker löscht stündlich Einträge, die älter als 14 Tage sind. Bei Datenbankausfällen schreibt der Logger ersatzweise in die Container-Konsole; deren Aufbewahrung richtet sich nach der Docker-Konfiguration. Anfragen, die Geza gar nicht erreichen, können hier nicht erscheinen. Bestehende alte Jobfehler erhalten nachträglich keine zusätzlichen Details.
+
+### Gesehen-Status aus Geza in Plex wiederherstellen
+
+Unter **Admin → Verbindungen** lässt sich **Gesehen-Status aus Geza in Plex wiederherstellen** einschalten und speichern (standardmäßig aus). Anschließend kann **Jetzt scannen** bereits verlorene Markierungen nachholen. Der tägliche Bibliotheks-Scan und das Webhook-Ereignis `library.new` stoßen weitere Abgleiche an. Ohne aktivierten täglichen Scan funktioniert weiterhin der manuelle Scan und der Auslöser über den Webhook.
+
+Geza bleibt die Quelle: Existiert für einen Film oder eine einzelne Episode ein Anschauereignis in Geza, wird ein eindeutig zugeordneter, in Plex ungesehener Eintrag über die Plex-API als gesehen markiert. Das gilt auch für importierte Anschauereignisse ohne bekanntes Datum und mehrere Bibliothekskopien. Titel werden über ihre Medien-IDs zugeordnet, nicht über ihren Namen. Eine teilweise gesehene Serie wird niemals pauschal als vollständig gesehen markiert. Bloße Bewertungen oder Serienmarkierungen ersetzen kein Anschauereignis der konkreten Episode.
+
+**Geza-Watched-Einträge werden dabei weder überschrieben noch gelöscht oder neu datiert.** Der Sync liest die Anschauhistorie ausschließlich. Auch ein manuelles „ungesehen“ in Plex wird beim nächsten Abgleich wieder auf „gesehen“ gesetzt, solange Geza ein Anschauereignis besitzt. Eine gewünschte Korrektur muss deshalb manuell in Geza erfolgen. Wiederhergestellt wird der Gesehen-Status, nicht das ursprüngliche Plex-Anschau-Datum oder die Anzahl der Wiedergaben.
+
+URL, Token, Server-UUID und Account-ID müssen eingerichtet sein. Der Token bestimmt den Plex-Benutzer und muss zum selben Benutzer gehören, dessen Historie Geza führt; es findet kein Abgleich anderer Benutzer statt. Vorschauen senden keine Änderungen an Plex. Der Worker prüft vor jeder Wiederherstellung den Server, die aktuelle Medien-GUID und das weiterhin vorhandene Geza-Anschauereignis. Fehlgeschlagene Aufträge werden wiederholt und protokolliert. Unklare Zuordnungen und Einträge ohne Plex-GUID werden nicht automatisch wiederhergestellt. Im Demomodus bleibt die Funktion deaktiviert.
+
+Die Markierung verwendet den auch von [Python PlexAPI verwendeten Scrobble-Endpunkt](https://python-plexapi.readthedocs.io/en/latest/_modules/plexapi/mixins/played_unplayed.html). Neue Bibliothekseinträge meldet Plex über [seine Webhooks](https://support.plex.tv/articles/115002267687-webhooks/).
 
 **Neue Plex-Reviewtexte:** Ihre automatische Übernahme ist weiterhin offen, weil kein dokumentierter Review-Webhook vorliegt. Trakt-Reviews und in Geza geschriebene Reviews funktionieren unabhängig davon.
 
@@ -368,6 +380,15 @@ Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt u
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
+
+### v1.6.0
+
+- **Nachvollziehbare Jobs:** Fortschritt, Startzeit, letzte Aktivität, Fehleralter und verlinkte Ergebnisse pro Titel mit Ziel und Begründung; tatsächliche Review- und Metadatenänderungen statt bloßer Gesamtzähler.
+- **Fehler abarbeiten:** Anbieter-ID-Konflikte vergleichen und korrigieren, Aufträge erneut prüfen und offene Importfälle bearbeiten. Migration 028; detaillierte Laufhistorie entsteht ab dem Update.
+- **Plex-Gesehen-Status:** fehlende Markierungen optional aus Gezas Anschauhistorie wiederherstellen; standardmäßig deaktiviert. Anschauzeitpunkte zusätzlich manuell aus Plex laden.
+- **Länder und Genres:** Zuordnungen reversibel lösen, Originalwerte bewahren und fehlende Quellen einmalig wiederherstellen. Migrationen 026–027.
+- **Reviews und Teilen:** Covervorschau an Filmverweisen sowie Bewertung und Reviewauszug im Social-Media-Vorschaubild; verbesserte Vorschau-Metadaten.
+- Aktualisierte Abhängigkeiten und Sicherheitskorrekturen. Neue [Bedienungsanleitung](docs/manual.md) und [Releasehinweise](docs/releases/v1.6.0.md).
 
 ### v1.5.0
 

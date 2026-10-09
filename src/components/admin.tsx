@@ -56,6 +56,7 @@ export function AdminControls({
     [scanPreview, setScanPreview] = useState<{
       changed: number;
       incompleteSeries?: number;
+      watchedRestores?: number;
       changes: {
         id: string;
         title: string;
@@ -229,6 +230,30 @@ export function AdminControls({
             </label>
           ))}
         </div>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={formValues.PLEX_RESTORE_WATCHED === '1'}
+            disabled={demo || busy}
+            onChange={(e) =>
+              setFormValues((current) => ({
+                ...current,
+                PLEX_RESTORE_WATCHED: e.target.checked ? '1' : '0',
+              }))
+            }
+          />
+          Gesehen-Status aus Geza in Plex wiederherstellen
+        </label>
+        <input
+          type="hidden"
+          name="PLEX_RESTORE_WATCHED"
+          value={formValues.PLEX_RESTORE_WATCHED === '1' ? '1' : '0'}
+        />
+        <p className="muted small">
+          Bei neuen Bibliothekseinträgen und beim Plex-Scan werden Filme und einzelne Episoden mit einem
+          Anschauereignis in Geza auch in Plex als gesehen markiert. Gezas Anschauhistorie bleibt erhalten;
+          Änderungen daran sind nur manuell möglich. Der Plex-Token muss zu deinem Benutzer gehören.
+        </p>
         <div className="button-row">
           <button className="button primary" disabled={busy}>
             Verbindungen speichern
@@ -518,6 +543,12 @@ export function AdminControls({
           {scanPreview && (
             <div>
               <h3>Vorschau: {scanPreview.changed} Änderungen</h3>
+              {!!scanPreview.watchedRestores && (
+                <p>
+                  {scanPreview.watchedRestores} fehlende Gesehen-Markierungen werden in Plex
+                  wiederhergestellt.
+                </p>
+              )}
               {!!scanPreview.incompleteSeries && (
                 <p>
                   {scanPreview.incompleteSeries} Serien können wegen unklarer Episodendaten nicht neu
