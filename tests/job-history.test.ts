@@ -8,11 +8,110 @@ import { runContext, mediaSnapshot, changeOutcome, reportProgress } from '../src
 import { jobState, relativeTime } from '../src/lib/job-display';
 import { jobOverview } from '../src/lib/job-overview';
 import { processPlexScan } from '../src/lib/plex-scan';
-import { ensurePlexMedia, processPlexReviewSync } from '../src/lib/plex';
+import { ensurePlexMedia, plexIds, processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { plexServerScope } from '../src/lib/plex-decisions';
 import { scheduleNextScan } from '../src/lib/plex-jobs';
 
 after(() => pool.end());
+test('selected library sync: details fallback, missing IDs, preview and unselected evidence', async () => {
+  await setSetting('PLEX_URL', 'http://plex.test');
+  await setSetting('PLEX_TOKEN', 'test');
+  await setSetting('PLEX_SCAN_SECTIONS', '1');
+  await setSetting('PLEX_SCAN_WATCHED_ONLY', '1');
+  await query(`INSERT INTO media(kind,title,ids,plex_libraries,plex_checked_at,plex_automatic,origins) VALUES
+    ('movie','Sync outside','{"tmdb":"811"}',ARRAY['Andere'],now()-interval '1 day',true,ARRAY['plex']),
+    ('movie','Sync old','{"tmdb":"812"}',ARRAY['#NEU'],now()-interval '1 day',true,ARRAY['plex'])`);
+  await query("UPDATE media SET plex_watched=false WHERE title LIKE 'Sync %'");
+  const before = await query(
+    "SELECT id,title,plex_libraries,plex_checked_at,bucketlist,plex_automatic FROM media WHERE title LIKE 'Sync %' ORDER BY id",
+  );
+  const original = globalThis.fetch;
+  let missing = true;
+  globalThis.fetch = (async (input) => {
+    const path = new URL(String(input)).pathname;
+    if (path.includes('/sections/2/')) throw Error('UNSELECTED LIBRARY MUST NOT BE READ');
+    if (path === '/library/sections')
+      return Response.json({
+        MediaContainer: {
+          Directory: [
+            { key: '1', title: '#NEU', type: 'movie' },
+            { key: '2', title: 'Andere', type: 'movie' },
+          ],
+        },
+      });
+    if (path === '/library/metadata/82')
+      return Response.json({
+        MediaContainer: {
+          Metadata: [
+            { ratingKey: '82', type: 'movie', title: 'Sync hydrated', Guid: [{ id: 'tmdb://822' }] },
+          ],
+        },
+      });
+    if (path === '/library/metadata/83') return new Response('{}', { status: 404 });
+    const entries = [
+      { ratingKey: '81', type: 'movie', title: 'Sync good', Guid: [{ id: 'tmdb://821' }] },
+      { ratingKey: '82', type: 'movie', title: 'Sync hydrated' },
+      ...(missing ? [{ ratingKey: '83', type: 'movie', title: 'Sync no ID', guid: 'local://unknown' }] : []),
+    ];
+    return Response.json({ MediaContainer: { totalSize: entries.length, Metadata: entries } });
+  }) as typeof fetch;
+  try {
+    const preview = await processPlexScan({ manual: true, preview: true });
+    assert.deepEqual(preview?.scannedLibraries, ['#NEU']);
+    assert.equal(preview?.conflicts, 1);
+    assert.equal(preview?.issues[0].title, 'Sync no ID');
+    assert.deepEqual(
+      await query(
+        "SELECT id,title,plex_libraries,plex_checked_at,bucketlist,plex_automatic FROM media WHERE title LIKE 'Sync %' ORDER BY id",
+      ),
+      before,
+    );
+    await processPlexScan({ manual: true });
+    const fresh = await query(
+      "SELECT bucketlist,plex_checked_at FROM media WHERE title IN ('Sync good','Sync hydrated')",
+    );
+    assert.equal(fresh.length, 2);
+    assert.ok(fresh.every((r) => r.bucketlist && r.plex_checked_at));
+    assert.deepEqual(
+      await query(
+        "SELECT id,title,plex_libraries,plex_checked_at,bucketlist,plex_automatic FROM media WHERE title IN ('Sync outside','Sync old') ORDER BY id",
+      ),
+      before,
+      'unselected library and uncertain absence evidence are preserved',
+    );
+    missing = false;
+    await processPlexScan({ manual: true });
+    assert.equal((await query("SELECT bucketlist FROM media WHERE title='Sync old'"))[0].bucketlist, false);
+    assert.equal(
+      (await query("SELECT bucketlist FROM media WHERE title='Sync outside'"))[0].bucketlist,
+      true,
+    );
+    assert.deepEqual(plexIds({ guid: 'com.plexapp.agents.imdb://tt12345?lang=de' }), { imdb: 'tt12345' });
+    assert.deepEqual(plexIds({ guid: 'tv.plex.agents.nfo.movie://movie/imdb_tt12345' }), { imdb: 'tt12345' });
+    await setSetting('PLEX_RESTORE_WATCHED', '0');
+    await query("DELETE FROM jobs WHERE dedupe_key IN ('plex-scan-manual','plex-scan-followup')");
+    const newEvent = {
+      event: 'library.new',
+      eventId: 'new-sync-test',
+      receivedAt: new Date().toISOString(),
+      metadata: { librarySectionID: '2' },
+    };
+    await processPlex(newEvent);
+    assert.equal((await query("SELECT 1 FROM jobs WHERE dedupe_key='plex-scan-manual'")).length, 0);
+    await processPlex({ ...newEvent, metadata: { librarySectionID: '1' } });
+    assert.equal(
+      (await query("SELECT 1 FROM jobs WHERE dedupe_key='plex-scan-manual' AND status='pending'")).length,
+      1,
+      'library.new queues a selected-library scan even when watched restoration is off',
+    );
+    await setSetting('PLEX_SCAN_SECTIONS', 'none');
+    await assert.rejects(processPlexScan({ manual: true }), /Keine ausgewählte/);
+  } finally {
+    globalThis.fetch = original;
+    await setSetting('PLEX_SCAN_SECTIONS', '');
+    await query("DELETE FROM media WHERE title LIKE 'Sync %'");
+  }
+});
 test('episode conflict rolls back its series only and protects the existing family', async () => {
   await setSetting('PLEX_URL', 'http://plex.test');
   await setSetting('PLEX_TOKEN', 'test');

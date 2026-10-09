@@ -4,6 +4,13 @@ import { query } from '@/lib/db';
 import { PlexDecision } from './plex-decision';
 import { plexServerScope } from '@/lib/plex-decisions';
 export async function JobConflict({ details }: { details: Record<string, any> }) {
+  if (details.missingIds || details.itemIssue)
+    return (
+      <p>
+        Plex-Eintrag {details.ratingKey || 'ohne Bibliotheksschlüssel'}: Diesen Titel in Plex prüfen und
+        zuordnen, danach erneut scannen. Ohne verlässliche ID wird kein neuer Geza-Datensatz geraten.
+      </p>
+    );
   const candidates = Array.isArray(details.matches) ? details.matches : [];
   if (!candidates.length && !details.providerIds) return null;
   const providers = ['imdb', 'tmdb', 'tvdb', 'plex'];

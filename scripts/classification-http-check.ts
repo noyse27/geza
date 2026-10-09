@@ -30,7 +30,12 @@ const plex = createServer((req, res) => {
   }
   const data =
     path === '/library/sections'
-      ? { Directory: [{ key: '1', title: 'Serien', type: 'show' }] }
+      ? {
+          Directory: [
+            { key: '1', title: 'Serien', type: 'show' },
+            { key: '2', title: 'Nicht ausgewählt', type: 'movie' },
+          ],
+        }
       : path === '/library/sections/1/all'
         ? {
             Metadata: [
@@ -99,6 +104,15 @@ try {
   assert.ok(admin.includes('Einordnung nach dem Import'));
   assert.ok(admin.includes('Änderungen vorab prüfen'));
   assert.ok(admin.includes('Alle Bibliotheken'));
+  const selection = await fetch(base + '/api/admin', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'plex-scan-settings',
+      data: { watchedOnly: true, enabled: true, sections: ['1'], hour: 3 },
+    }),
+  });
+  assert.equal(selection.status, 200);
   const unauth = await fetch(base + '/api/admin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: base },

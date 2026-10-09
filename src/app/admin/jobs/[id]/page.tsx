@@ -69,8 +69,9 @@ export default async function Run({
         <RunProgress job={JSON.parse(JSON.stringify(run))} />
         {run.status === 'done' && counts.some((c) => c.outcome === 'failed') && (
           <p className="error">
-            Abgeschlossen mit offenen Konflikten. Die übrigen Titel wurden übernommen. Unter „Nicht
-            verarbeitet“ kannst du die betroffenen Einträge dauerhaft zuordnen und danach erneut prüfen.
+            Abgeschlossen mit offenen Problemen. Die übrigen Titel wurden übernommen. Unter „Nicht
+            verarbeitet“ steht der Grund pro Titel. Fehlende Daten in Plex ergänzen oder den richtigen
+            Geza-Datensatz auswählen und danach erneut prüfen.
           </p>
         )}
         {run.status === 'running' && (
