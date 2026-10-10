@@ -37,6 +37,27 @@ export async function saveJobResult(result: JobResult, client?: PoolClient) {
   if (client) await client.query(sql, values);
   else await query(sql, values);
 }
+// Keep batches in the caller's transaction: a later failure must discard every result.
+export async function saveJobResults(results: JobResult[], client: PoolClient) {
+  const run = runContext.getStore();
+  if (!run) return;
+  for (let start = 0; start < results.length; start += 200) {
+    const rows = results.slice(start, start + 200).map((result) => ({
+      media_id: result.mediaId || null,
+      title: result.title,
+      outcome: result.outcome,
+      destination: result.destination || null,
+      reason: result.reason || null,
+      details: redact(result.details || {}),
+    }));
+    await client.query(
+      `INSERT INTO job_results(run_id,media_id,title,outcome,destination,reason,details)
+      SELECT $1,r.media_id,r.title,r.outcome,r.destination,r.reason,r.details
+      FROM jsonb_to_recordset($2::jsonb) AS r(media_id bigint,title text,outcome text,destination text,reason text,details jsonb)`,
+      [run.id, JSON.stringify(rows)],
+    );
+  }
+}
 export async function mediaSnapshot(id: string, kind: string) {
   if (kind === 'plex-review-sync')
     return await query(

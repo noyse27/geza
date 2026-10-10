@@ -5,7 +5,7 @@ import { getSetting } from './settings';
 import { findPlex } from './plex';
 import { saveProviderRating, savePlexRatings } from './provider-ratings';
 import { normalizeCertification } from './certification';
-import { normalizeFacetArray } from './facets';
+import { normalizeFacetArray, facetProjector } from './facets';
 import type { PoolClient } from 'pg';
 type Raw = Record<string, any>;
 const fields = [
@@ -42,7 +42,24 @@ export function fromPlex(m: Raw): Raw {
     runtime: m.duration ? Math.round(m.duration / 60000) : undefined,
   };
 }
-export async function mergeMetadata(id: string, data: Raw, source = 'plex', client?: PoolClient) {
+type MergeRules = { country: (raw: string[]) => string[]; genre: (raw: string[]) => string[] };
+// The rules belong to this transaction only. The same advisory lock protects facet edits.
+export async function prepareMetadataMerge(client: PoolClient) {
+  await client.query('SELECT pg_advisory_xact_lock(729383)');
+  await client.query("SET LOCAL geza.facet_projection='on'");
+  const rules: MergeRules = {
+    country: await facetProjector('country', client),
+    genre: await facetProjector('genre', client),
+  };
+  return (id: string, data: Raw, source = 'plex') => mergeMetadata(id, data, source, client, rules);
+}
+export async function mergeMetadata(
+  id: string,
+  data: Raw,
+  source = 'plex',
+  client?: PoolClient,
+  rules?: MergeRules,
+) {
   if (!client) {
     const own = await pool.connect();
     try {
@@ -57,32 +74,46 @@ export async function mergeMetadata(id: string, data: Raw, source = 'plex', clie
     }
     return;
   }
-  await client.query('SELECT pg_advisory_xact_lock(729383)');
-  await client.query("SET LOCAL geza.facet_projection='on'");
+  if (!rules) {
+    await client.query('SELECT pg_advisory_xact_lock(729383)');
+    await client.query("SET LOCAL geza.facet_projection='on'");
+  }
   data = { ...data };
   const originals = { countries: data.countries, genres: data.genres };
   const run = client
     ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
     : query;
-  if (data.countries) data.countries = await normalizeFacetArray('country', data.countries, client);
-  if (data.genres) data.genres = await normalizeFacetArray('genre', data.genres, client);
+  if (data.countries)
+    data.countries = rules
+      ? rules.country(data.countries)
+      : await normalizeFacetArray('country', data.countries, client);
+  if (data.genres)
+    data.genres = rules ? rules.genre(data.genres) : await normalizeFacetArray('genre', data.genres, client);
   const current = (await run('SELECT * FROM media WHERE id=$1', [id]))[0];
   if (!current) return;
   const priority: Record<string, number> = { plex: 3, tvdb: 2, tmdb: 1 };
   const coverPriority: Record<string, number> = { tmdb: 3, tvdb: 2 };
-  const keys = fields.filter(
-    (k) =>
-      (k !== 'poster' || source === 'tmdb' || source === 'tvdb') &&
-      !current.locked_fields.includes(k) &&
-      data[k] != null &&
-      data[k] !== '' &&
-      (!Array.isArray(data[k]) || data[k].length) &&
-      (!current[k] ||
-        (Array.isArray(current[k]) && !current[k].length) ||
-        ((k === 'countries' || k === 'genres') && current.field_sources?.[k] === source) ||
-        ((k === 'poster' ? coverPriority : priority)[source] || 0) >
-          ((k === 'poster' ? coverPriority : priority)[current.field_sources?.[k]] || 0)),
-  );
+  const keys = fields
+    .filter(
+      (k) =>
+        (k !== 'poster' || source === 'tmdb' || source === 'tvdb') &&
+        !current.locked_fields.includes(k) &&
+        data[k] != null &&
+        data[k] !== '' &&
+        (!Array.isArray(data[k]) || data[k].length) &&
+        (!current[k] ||
+          (Array.isArray(current[k]) && !current[k].length) ||
+          ((k === 'countries' || k === 'genres') && current.field_sources?.[k] === source) ||
+          ((k === 'poster' ? coverPriority : priority)[source] || 0) >
+            ((k === 'poster' ? coverPriority : priority)[current.field_sources?.[k]] || 0)),
+    )
+    .filter(
+      (k) =>
+        JSON.stringify(current[k]) !== JSON.stringify(data[k]) ||
+        current.field_sources?.[k] !== source ||
+        ((k === 'countries' || k === 'genres') &&
+          JSON.stringify(current[`original_${k}`]) !== JSON.stringify(originals[k])),
+    );
   for (const field of ['countries', 'genres'] as const) {
     if (keys.includes(field))
       await run(`UPDATE media SET original_${field}=$2 WHERE id=$1`, [id, originals[field]]);

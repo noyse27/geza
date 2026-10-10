@@ -4,15 +4,115 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { query, pool } from '../src/lib/db';
 import { setSetting } from '../src/lib/settings';
-import { runContext, mediaSnapshot, changeOutcome, reportProgress } from '../src/lib/job-history';
+import {
+  runContext,
+  mediaSnapshot,
+  changeOutcome,
+  reportProgress,
+  saveJobResults,
+} from '../src/lib/job-history';
 import { jobState, relativeTime } from '../src/lib/job-display';
 import { jobOverview } from '../src/lib/job-overview';
 import { processPlexScan } from '../src/lib/plex-scan';
 import { ensurePlexMedia, plexIds, processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { plexServerScope } from '../src/lib/plex-decisions';
 import { scheduleNextScan } from '../src/lib/plex-jobs';
+import pg from 'pg';
 
 after(() => pool.end());
+test('batched results preserve ordering, redaction and transaction rollback across chunks', async () => {
+  const [job] = await query("INSERT INTO jobs(kind) VALUES('plex-scan') RETURNING id");
+  const [run] = await query(
+    "INSERT INTO job_runs(job_id,kind,attempt) VALUES($1,'plex-scan',1) RETURNING id",
+    [job.id],
+  );
+  const results = Array.from({ length: 205 }, (_, i) => ({
+    title: `Result ${i}`,
+    outcome: 'unchanged',
+    details: { token: 'must-not-leak' },
+  }));
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await runContext.run({ id: run.id, lastProgress: 0 }, () => saveJobResults(results, client));
+    await client.query('ROLLBACK');
+    assert.equal((await query('SELECT 1 FROM job_results WHERE run_id=$1', [run.id])).length, 0);
+    await client.query('BEGIN');
+    await runContext.run({ id: run.id, lastProgress: 0 }, () => saveJobResults(results, client));
+    await client.query('COMMIT');
+    const saved = await query('SELECT title,details FROM job_results WHERE run_id=$1 ORDER BY id', [run.id]);
+    assert.deepEqual(
+      saved.map((r) => r.title),
+      results.map((r) => r.title),
+    );
+    assert.ok(!JSON.stringify(saved).includes('must-not-leak'));
+  } finally {
+    client.release();
+  }
+});
+test('scan query budget for 40 unchanged films', async () => {
+  await setSetting('PLEX_URL', 'http://plex.test');
+  await setSetting('PLEX_TOKEN', 'test');
+  const films = Array.from({ length: 40 }, (_, i) => ({
+    type: 'movie',
+    title: `Budget ${i}`,
+    ratingKey: String(70000 + i),
+    guid: `plex://movie/${String(70000 + i).padStart(24, '0')}`,
+    Guid: [{ id: `tmdb://${70000 + i}` }],
+    Country: [{ tag: 'USA' }],
+    Genre: [{ tag: 'Drama' }],
+  }));
+  const originalFetch = globalThis.fetch;
+  const originalQuery = pg.Client.prototype.query;
+  let count = 0;
+  globalThis.fetch = (async (input) =>
+    Response.json({
+      MediaContainer:
+        new URL(String(input)).pathname === '/library/sections'
+          ? { Directory: [{ key: '1', title: 'Budget', type: 'movie' }] }
+          : { totalSize: films.length, Metadata: films },
+    })) as typeof fetch;
+  try {
+    await processPlexScan({ manual: true });
+    const before = await query("SELECT id,updated_at FROM media WHERE title LIKE 'Budget %' ORDER BY id");
+    const [job] = await query("INSERT INTO jobs(kind) VALUES('plex-scan') RETURNING id");
+    const [run] = await query(
+      "INSERT INTO job_runs(job_id,kind,attempt) VALUES($1,'plex-scan',1) RETURNING id",
+      [job.id],
+    );
+    pg.Client.prototype.query = function (this: pg.Client, ...args: any[]) {
+      count++;
+      return (originalQuery as any).apply(this, args);
+    } as typeof originalQuery;
+    await runContext.run({ id: run.id, lastProgress: 0 }, () => processPlexScan({ manual: true }));
+    pg.Client.prototype.query = originalQuery;
+    const results = await query('SELECT outcome FROM job_results WHERE run_id=$1', [run.id]);
+    assert.equal(results.length, 40);
+    assert.ok(results.every((r) => r.outcome === 'unchanged'));
+    assert.deepEqual(
+      await query("SELECT id,updated_at FROM media WHERE title LIKE 'Budget %' ORDER BY id"),
+      before,
+      'unchanged metadata retains its modification timestamp',
+    );
+    console.log(`SYNC_QUERY_BUDGET: ${count} database calls for 40 unchanged films including results`);
+    assert.ok(count < 400, `query budget regressed: ${count}`);
+    await query("INSERT INTO facet_aliases(category,alias,canonical) VALUES('country','USA','Testland')");
+    await processPlexScan({ manual: true });
+    assert.ok(
+      (await query("SELECT countries FROM media WHERE title LIKE 'Budget %'")).every((r) =>
+        r.countries.includes('Testland'),
+      ),
+      'next scan loads new facet rules rather than reusing stale projections',
+    );
+  } finally {
+    pg.Client.prototype.query = originalQuery;
+    globalThis.fetch = originalFetch;
+    await query(
+      "DELETE FROM facet_aliases WHERE category='country' AND alias='USA' AND canonical='Testland'",
+    );
+    await query("DELETE FROM media WHERE title LIKE 'Budget %'");
+  }
+});
 test('selected library sync: details fallback, missing IDs, preview and unselected evidence', async () => {
   await setSetting('PLEX_URL', 'http://plex.test');
   await setSetting('PLEX_TOKEN', 'test');
