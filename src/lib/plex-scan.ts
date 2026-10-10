@@ -4,9 +4,10 @@ import { pool } from './db';
 import { getSetting } from './settings';
 import { plexRequest, ensurePlexMedia, plexIds } from './plex';
 import { loadTombstones, forgetTombstones } from './rumpel';
-import { mergeMetadata, fromPlex } from './providers';
+import { prepareMetadataMerge, fromPlex } from './providers';
 import { resolvePlexEpisodes } from './plex-episodes';
-import { reportProgress, saveJobResult, type JobResult } from './job-history';
+import { reportProgress, saveJobResults, type JobResult } from './job-history';
+import { plexServerScope } from './plex-decisions';
 import { getPlexRestoreContext, queuePlexRestore, plexWatched as seen } from './plex-watch-restore';
 
 type Metadata = Record<string, any>;
@@ -19,12 +20,15 @@ type Entry = {
   issue?: string;
 };
 
-export async function plexList(path: string): Promise<Metadata[]> {
+export async function plexList(
+  path: string,
+  read: (path: string) => Promise<any> = plexRequest,
+): Promise<Metadata[]> {
   const result: Metadata[] = [];
   let expectedTotal: number | undefined;
   const ratingKeys = new Set<string>();
   for (let offset = 0; ;) {
-    const data = await plexRequest(
+    const data = await read(
       `${path}${path.includes('?') ? '&' : '?'}X-Plex-Container-Start=${offset}&X-Plex-Container-Size=500`,
     );
     const c = data?.MediaContainer;
@@ -54,33 +58,18 @@ export async function plexList(path: string): Promise<Metadata[]> {
     if (!page.length || offset > total) throw Error('Plex-Bibliothek nicht vollständig gelesen');
   }
 }
-export async function processPlexScan(payload: { manual?: boolean; preview?: boolean } = {}) {
-  if (isDemo()) return;
-  if ((await getSetting('PLEX_SCAN_ENABLED')) === '0' && !payload.manual) return;
-  if (!(await getSetting('PLEX_URL')) || !(await getSetting('PLEX_TOKEN'))) {
-    if (payload.manual) throw Error('Plex ist nicht verbunden.');
-    return;
-  }
-  const automatic = (await getSetting('PLEX_SCAN_WATCHED_ONLY')) !== '0';
-  const restoreContext = await getPlexRestoreContext();
-  let watchedRestores = 0;
-  const filter = (await getSetting('PLEX_SCAN_SECTIONS')).split(',').filter(Boolean);
-  const data = await plexRequest('/library/sections');
-  if (!Array.isArray(data?.MediaContainer?.Directory))
-    throw Error('Plex-Bibliotheken konnten nicht gelesen werden');
-  const sections = data.MediaContainer.Directory.filter(
-    (s: Metadata) => ['movie', 'show'].includes(s.type) && (!filter.length || filter.includes(String(s.key))),
-  );
-  if (!sections.length)
-    throw Error(
-      'Keine ausgewählte Film- oder Serienbibliothek verfügbar. Bitte die Bibliotheksauswahl prüfen; der Bestand bleibt unverändert.',
-    );
+async function readScanEntries(
+  sections: Metadata[],
+  automatic: boolean,
+  read: (path: string) => Promise<any>,
+) {
   const entries: Entry[] = [];
   const incompleteSeries: { title: string; library: string; ratingKey: string; issues: Metadata[] }[] = [];
   for (const section of sections) {
     await reportProgress(`Bibliothek „${section.title}“ lesen`, undefined, undefined, true);
     for (let item of await plexList(
       `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1`,
+      read,
     )) {
       if (!['movie', 'show'].includes(item.type)) {
         entries.push({
@@ -92,7 +81,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         continue;
       }
       if (!Object.keys(plexIds(item)).length && item.ratingKey) {
-        const details = await plexRequest(
+        const details = await read(
           `/library/metadata/${encodeURIComponent(item.ratingKey)}?includeGuids=1`,
         ).catch((error) => {
           if (/^Plex(?::)? HTTP (404|410)(?:\s|$)/.test(error.message)) return null;
@@ -117,8 +106,14 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         }
         const leaves = await plexList(
           `/library/metadata/${encodeURIComponent(item.ratingKey)}/allLeaves?includeGuids=1`,
+          read,
         );
-        const resolved = await resolvePlexEpisodes(item, leaves);
+        const resolved = await resolvePlexEpisodes(item, leaves, async (key) => {
+          const response = await read(`/library/metadata/${encodeURIComponent(key)}?includeGuids=1`);
+          const records = response?.MediaContainer?.Metadata;
+          if (!Array.isArray(records)) throw Error(`Plex-Metadaten für Bibliotheksschlüssel ${key} fehlen`);
+          return records.find((record: Metadata) => String(record.ratingKey) === key);
+        });
         episodes = resolved.episodes;
         incomplete = resolved.issues.length > 0;
         if (incomplete) {
@@ -155,12 +150,41 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       });
     }
   }
+  return { entries, incompleteSeries };
+}
+
+export async function processPlexScan(payload: { manual?: boolean; preview?: boolean } = {}) {
+  if (isDemo()) return;
+  if ((await getSetting('PLEX_SCAN_ENABLED')) === '0' && !payload.manual) return;
+  const connection = { url: await getSetting('PLEX_URL'), token: await getSetting('PLEX_TOKEN') };
+  if (!connection.url || !connection.token) {
+    if (payload.manual) throw Error('Plex ist nicht verbunden.');
+    return;
+  }
+  const automatic = (await getSetting('PLEX_SCAN_WATCHED_ONLY')) !== '0';
+  const scope = await plexServerScope();
+  const read = (path: string) => plexRequest(path, { connection });
+  const restoreContext = await getPlexRestoreContext();
+  let watchedRestores = 0;
+  const filter = (await getSetting('PLEX_SCAN_SECTIONS')).split(',').filter(Boolean);
+  const data = await read('/library/sections');
+  if (!Array.isArray(data?.MediaContainer?.Directory))
+    throw Error('Plex-Bibliotheken konnten nicht gelesen werden');
+  const sections = data.MediaContainer.Directory.filter(
+    (s: Metadata) => ['movie', 'show'].includes(s.type) && (!filter.length || filter.includes(String(s.key))),
+  );
+  if (!sections.length)
+    throw Error(
+      'Keine ausgewählte Film- oder Serienbibliothek verfügbar. Bitte die Bibliotheksauswahl prüfen; der Bestand bleibt unverändert.',
+    );
+  const { entries, incompleteSeries } = await readScanEntries(sections, automatic, read);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query('SET LOCAL statement_timeout=120000');
     await client.query('SELECT pg_advisory_xact_lock(729383)');
     await client.query("SET LOCAL geza.skip_rumpel='on'");
+    const merge = await prepareMetadataMerge(client);
     const before = (await client.query('SELECT id,title,kind,bucketlist,rumpel,assignment_reason FROM media'))
       .rows;
     const tombstones = await loadTombstones(client);
@@ -219,9 +243,9 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
           continue;
         }
         await forgetTombstones(deleted, client);
-        const id = await ensurePlexMedia(item, undefined, client);
+        const id = await ensurePlexMedia(item, undefined, client, scope);
         entryRootId = id;
-        await mergeMetadata(id, fromPlex(item), 'plex', client);
+        await merge(id, fromPlex(item));
         if (incomplete) {
           protectedRoots.add(id);
           results.push({
@@ -243,17 +267,21 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         if (!episodes && (await queuePlexRestore(client, restoreContext, id, item))) watchedRestores++;
         if (episodes) {
           const seasons = new Map<number, Metadata[]>();
-          for (const episode of episodes)
-            seasons.set(episode.parentIndex, [...(seasons.get(episode.parentIndex) || []), episode]);
+          for (const episode of episodes) {
+            const leaves = seasons.get(episode.parentIndex) || [];
+            leaves.push(episode);
+            seasons.set(episode.parentIndex, leaves);
+          }
           for (const [number, leaves] of seasons) {
             const sid = await ensurePlexMedia(
               { type: 'season', index: number, title: `Staffel ${number}` },
               id,
               client,
+              scope,
             );
             remember(sid, library, leaves.some(seen), auto);
             for (const episode of leaves) {
-              const eid = await ensurePlexMedia(episode, id, client);
+              const eid = await ensurePlexMedia(episode, id, client, scope);
               remember(eid, library, seen(episode), false);
               if (await queuePlexRestore(client, restoreContext, eid, episode)) watchedRestores++;
             }
@@ -390,6 +418,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
     else {
       const afterMap = new Map(after.map((r) => [r.id, r]));
       const recorded = new Set<string>();
+      const completedResults: JobResult[] = [];
       for (const result of results) {
         const current = result.mediaId ? afterMap.get(result.mediaId) : undefined;
         if (result.mediaId) {
@@ -412,21 +441,19 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
             result.reason = current.assignment_reason || 'Einordnung unverändert.';
           }
         }
-        await saveJobResult(result, client);
+        completedResults.push(result);
       }
       // Include titles whose destination changed because they disappeared from Plex.
       for (const change of changes)
         if (!recorded.has(change.id) && ['movie', 'show'].includes(change.kind))
-          await saveJobResult(
-            {
-              mediaId: change.id,
-              title: change.title,
-              outcome: change.before === 'Neu' ? 'new' : 'updated',
-              destination: change.after,
-              reason: change.assignment_reason,
-            },
-            client,
-          );
+          completedResults.push({
+            mediaId: change.id,
+            title: change.title,
+            outcome: change.before === 'Neu' ? 'new' : 'updated',
+            destination: change.after,
+            reason: change.assignment_reason,
+          });
+      await saveJobResults(completedResults, client);
       await client.query(
         `INSERT INTO jobs(kind,dedupe_key,payload) SELECT 'enrich','enrich:'||id,jsonb_build_object('mediaId',id) FROM media
         WHERE id=ANY($1::bigint[]) AND kind IN ('movie','show') AND enriched_at IS NULL ON CONFLICT(dedupe_key) DO NOTHING`,

@@ -117,15 +117,16 @@ export async function ensurePlexMedia(
   m: PlexMetadata,
   parentId?: string,
   client?: PoolClient,
+  serverScope?: string,
 ): Promise<string> {
   const run = client
     ? async (sql: string, values: unknown[] = []) => (await client.query(sql, values)).rows
     : query;
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');
-  const ids = plexIds(m);
   const values = plexIdValues(m);
-  const decision = await decidedPlexMedia(m, client);
+  const ids = Object.fromEntries(Object.entries(values).map(([key, list]) => [key, list[list.length - 1]]));
+  const decision = await decidedPlexMedia(m, client, serverScope);
   if (decision) {
     // Explicit selection keeps the canonical provider IDs, including intentionally absent IDs.
     if (parentId && decision.parent_id && String(decision.parent_id) !== String(parentId)) {
@@ -141,7 +142,7 @@ export async function ensurePlexMedia(
             matches: [decision],
             ratingKey: m.ratingKey,
             guid: m.guid,
-            serverId: await plexServerScope(),
+            serverId: serverScope ?? (await plexServerScope()),
             type: kind,
           },
         });
@@ -158,7 +159,7 @@ export async function ensurePlexMedia(
         matches: [],
         ratingKey: m.ratingKey,
         guid: m.guid,
-        serverId: await plexServerScope(),
+        serverId: serverScope ?? (await plexServerScope()),
         type: kind,
         missingIds: true,
       },
@@ -192,7 +193,7 @@ export async function ensurePlexMedia(
       providerIdValues: values,
       ratingKey: m.ratingKey,
       guid: m.guid,
-      serverId: await plexServerScope(),
+      serverId: serverScope ?? (await plexServerScope()),
       parentId,
       season: m.parentIndex,
       episode: m.index,
@@ -207,17 +208,16 @@ export async function ensurePlexMedia(
         matches,
         ratingKey: m.ratingKey,
         guid: m.guid,
-        serverId: await plexServerScope(),
+        serverId: serverScope ?? (await plexServerScope()),
         type: kind,
       },
     });
   }
   if (matches.length) {
-    await run('UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3', [
-      JSON.stringify(ids),
-      parentId || null,
-      matches[0].id,
-    ]);
+    await run(
+      'UPDATE media SET ids=ids||$1::jsonb,parent_id=COALESCE(parent_id,$2) WHERE id=$3 AND (ids IS DISTINCT FROM ids||$1::jsonb OR (parent_id IS NULL AND $2::bigint IS NOT NULL))',
+      [JSON.stringify(ids), parentId || null, matches[0].id],
+    );
     return matches[0].id;
   }
   return (
