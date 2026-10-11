@@ -167,13 +167,22 @@ export type Review = {
   parent_source_id?: string;
   created_at: string;
 };
-export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: string }) {
+export function ReviewEditor({
+  review,
+  mediaId,
+  rating,
+}: {
+  review?: Review;
+  mediaId: string;
+  rating: number | null;
+}) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [loadingPlexReview, setLoadingPlexReview] = useState(false);
   const [loadedBody, setLoadedBody] = useState(review?.body || '');
   const [bodyVersion, setBodyVersion] = useState(0);
+  const [loadedRating, setLoadedRating] = useState<number | null>(null);
   useEffect(() => {
     setLoadedBody(review?.body || '');
   }, [review?.body]);
@@ -206,8 +215,10 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
                   body: f.get('body'),
                   spoiler: f.get('spoiler') === 'on',
                   is_public: f.get('is_public') === 'on',
+                  rating: rating == null ? loadedRating : null,
                 },
               });
+              setLoadedRating(null);
               setOpen(false);
               router.refresh();
             } catch (e) {
@@ -236,10 +247,12 @@ export function ReviewEditor({ review, mediaId }: { review?: Review; mediaId: st
                 setLoadedBody(data.body);
                 setBodyVersion((v) => v + 1);
                 if (spoilerRef.current) spoilerRef.current.checked = data.spoiler;
-                if (typeof data.rating === 'number')
+                if (rating == null && typeof data.rating === 'number') {
+                  setLoadedRating(data.rating);
                   window.dispatchEvent(
                     new CustomEvent('plex-rating', { detail: { mediaId, rating: data.rating } }),
                   );
+                }
               } catch (e) {
                 setError((e as Error).message);
               } finally {
