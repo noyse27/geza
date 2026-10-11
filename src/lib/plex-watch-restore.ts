@@ -79,12 +79,12 @@ export async function processPlexRestore(payload: PlexRestore) {
   if (!['movie', 'episode'].includes(payload.type) || !payload.ratingKey || !payload.guid)
     throw Error('Ungültiger Plex-Wiederherstellungsauftrag');
   const options = { connection: context };
-  const identity = await plexRequest('/identity', options);
+  const identity = await plexRequest('/identity', { ...options, purpose: 'watch-restore' });
   if (identity?.MediaContainer?.machineIdentifier !== context.server)
     throw Error('Plex-Server-UUID stimmt nicht mit dem Wiederherstellungsauftrag überein.');
   const path = `/library/metadata/${encodeURIComponent(payload.ratingKey)}?includeGuids=1`;
   const read = async () => {
-    const data = await plexRequest(path, options);
+    const data = await plexRequest(path, { ...options, purpose: 'watch-restore' });
     const item = data?.MediaContainer?.Metadata?.find(
       (m: Metadata) => String(m.ratingKey) === payload.ratingKey,
     );
@@ -114,7 +114,11 @@ export async function processPlexRestore(payload: PlexRestore) {
     [key],
   );
   const params = new URLSearchParams({ key: payload.ratingKey, identifier: 'com.plexapp.plugins.library' });
-  await plexRequest(`/:/scrobble?${params}`, { ...options, emptyResponse: true });
+  await plexRequest(`/:/scrobble?${params}`, {
+    ...options,
+    emptyResponse: true,
+    purpose: 'watch-restore',
+  });
   if (!plexWatched(await read())) throw Error('Plex hat den Gesehen-Status noch nicht bestätigt.');
   await logEvent('info', 'plex-watch-restore', 'Gesehen-Status aus Geza in Plex wiederhergestellt', {
     mediaId: payload.mediaId,

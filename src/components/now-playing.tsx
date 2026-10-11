@@ -1,43 +1,53 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Film, Play, Pause } from 'lucide-react';
+import { Film, Play, Pause, RefreshCw } from 'lucide-react';
 import type { NowPlayingItem } from '@/lib/now-playing';
 
 export function NowPlaying() {
   const [items, setItems] = useState<NowPlayingItem[]>([]);
   const [received, setReceived] = useState(0);
   const [now, setNow] = useState(0);
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+  const controllerRef = useRef<AbortController | null>(null);
+  async function refresh() {
+    controllerRef.current?.abort();
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function refresh() {
-      try {
-        if (document.visibilityState === 'hidden') return;
-        const response = await fetch('/api/admin/now-playing', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!response.ok) throw Error('Plex unavailable');
-        const data = await response.json();
-        if (!controller.signal.aborted) {
-          setItems(data.items);
-          setReceived(Date.now());
-          setNow(Date.now());
-        }
-      } catch {
-        if (!controller.signal.aborted) setItems([]);
-      } finally {
-        if (!controller.signal.aborted) timer = setTimeout(refresh, 15000);
+    controllerRef.current = controller;
+    setRefreshing(true);
+    try {
+      let clientId = sessionStorage.getItem('geza:diagnostic-client');
+      if (!clientId) {
+        clientId = crypto.randomUUID();
+        sessionStorage.setItem('geza:diagnostic-client', clientId);
       }
+      const response = await fetch('/api/admin/now-playing', {
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: { 'X-Geza-Diagnostic-Client': clientId },
+      });
+      if (!response.ok) throw Error('Plex unavailable');
+      const data = await response.json();
+      if (!controller.signal.aborted) {
+        setItems(data.items);
+        setReceived(Date.now());
+        setNow(Date.now());
+      }
+    } catch {
+      if (!controller.signal.aborted) setItems([]);
+    } finally {
+      if (!controller.signal.aborted) setRefreshing(false);
     }
+  }
+  useEffect(() => {
     void refresh();
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => {
-      controller.abort();
-      clearTimeout(timer);
+      controllerRef.current?.abort();
       clearInterval(tick);
     };
+    // The Home mount is deliberately the only automatic Plex refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!items.length) return null;
   return (
@@ -45,6 +55,16 @@ export function NowPlaying() {
       className="now-playing"
       aria-label={items.some((item) => item.simulated) ? 'Simulierte Wiedergabe' : 'Jetzt auf Plex'}
     >
+      <button
+        type="button"
+        className="icon-button now-playing-refresh"
+        onClick={() => void refresh()}
+        disabled={refreshing}
+        title="Now Playing aktualisieren"
+        aria-label="Now Playing aktualisieren"
+      >
+        <RefreshCw size={17} aria-hidden="true" />
+      </button>
       {items.map((item) => {
         const position = Math.min(
           item.duration,

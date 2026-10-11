@@ -45,7 +45,8 @@ async function recoveryLoader(): Promise<FacetRecoveryLoader> {
   const connected = !!(await getSetting('PLEX_URL')) && !!(await getSetting('PLEX_TOKEN'));
   // Read the library in pages once, rather than issuing thousands of title searches.
   if (connected) {
-    const sections = (await plexRequest('/library/sections'))?.MediaContainer?.Directory;
+    const sections = (await plexRequest('/library/sections', { purpose: 'facet-recovery' }))?.MediaContainer
+      ?.Directory;
     if (!Array.isArray(sections)) throw Error('Plex-Bibliotheken konnten nicht gelesen werden.');
     for (const section of sections.filter((s: Media) => ['movie', 'show'].includes(s.type))) {
       for (const item of await plexList(
@@ -75,7 +76,7 @@ async function recoveryLoader(): Promise<FacetRecoveryLoader> {
     );
     if (exact.length) candidates = exact;
     if (!candidates.length && connected && !['movie', 'show'].includes(media.kind)) {
-      const item = await findPlex(media.ids, media.kind);
+      const item = await findPlex(media.ids, media.kind, 'facet-recovery');
       if (
         item &&
         Object.entries(plexIds(item)).every(

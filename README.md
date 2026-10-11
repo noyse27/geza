@@ -175,7 +175,7 @@ Exporte, Zugangsdaten, Backups und lokale Protokolle sind von Git und Docker-Bui
 
 ## Metadaten und Plex
 
-Die private Home-Seite zeigt mit „Now Playing“ aktive Film- und Episodenwiedergaben des verbundenen Plex-Servers. Der Block lädt separat und fragt alle 15 Sekunden `/status/sessions` ab, solange der Browser-Tab sichtbar ist. Er zeigt Titel, Staffel/Episode, Fortschritt, Restlaufzeit und während der Wiedergabe die geschätzte Endzeit in Berlin. Pausierte und puffernde Wiedergaben sind gekennzeichnet; mehrere Sitzungen erscheinen als einzelne Karten. Angezeigt werden alle aktiven Sitzungen des verbundenen Servers, ausschließlich nach Admin-Anmeldung. Ohne Wiedergabe, ohne Plex-Konfiguration oder bei Verbindungsfehlern bleibt der Block ausgeblendet. Eindeutige Katalogtreffer erhalten Detail-Link und vorhandenes Katalog-Cover; Fehlt ein Katalog-Cover, verwendet ausschließlich dieser private Block das Plex-Cover als Fallback (bei Episoden bevorzugt das Serienposter). Das Bild wird über eine admin-geschützte Route ohne Weitergabe des Plex-Tokens geladen und nicht im Katalog gespeichert. Es sind weder neue Webhooks noch eine Migration erforderlich.
+Die private Home-Seite zeigt mit „Now Playing“ aktive Film- und Episodenwiedergaben des verbundenen Plex-Servers. Beim Öffnen der Home-Seite wird `/status/sessions` genau einmal abgefragt; weitere Plex-Abfragen erfolgen nur über den Aktualisieren-Button oben rechts am Wiedergabeblock. Die angezeigte Fortschritts- und Restzeit läuft lokal weiter. Der Block zeigt Titel, Staffel/Episode und während der Wiedergabe die geschätzte Endzeit in Berlin. Pausierte und puffernde Wiedergaben sind gekennzeichnet; mehrere Sitzungen erscheinen als einzelne Karten. Angezeigt werden alle aktiven Sitzungen des verbundenen Servers, ausschließlich nach Admin-Anmeldung. Ohne Wiedergabe, ohne Plex-Konfiguration oder bei Verbindungsfehlern bleibt der Block ausgeblendet und wird erst beim nächsten Aufruf der Home-Seite erneut geprüft. Eindeutige Katalogtreffer erhalten Detail-Link und vorhandenes Katalog-Cover; fehlt ein Katalog-Cover, verwendet ausschließlich dieser private Block das Plex-Cover als Fallback (bei Episoden bevorzugt das Serienposter). Das Bild wird über eine admin-geschützte Route ohne Weitergabe des Plex-Tokens geladen und nicht im Katalog gespeichert. Es sind weder neue Webhooks noch eine Migration erforderlich.
 
 Auf Episoden- und Staffelseiten können angemeldete Admins über **Zuordnung korrigieren** eine vorhandene Serie suchen und Staffel sowie Episodennummer ändern. Cover, Jahr, Datensatz-ID und ein Link zur Serienansicht helfen bei gleichnamigen Treffern. Anschauereignisse, Bewertungen und Reviews bleiben am bisherigen Datensatz erhalten; erneute Trakt-Importe überschreiben die korrigierte Zuordnung nicht. Die Funktion führt keine doppelten Episoden zusammen.
 
@@ -194,6 +194,8 @@ https://<url>[:<port>]/api/plex/DEIN-WEBHOOK-GEHEIMNIS
 Unterstützt sind `media.scrobble` und `media.rate`. `userRating` wird als 0–10 interpretiert; 0 entfernt die Bewertung. Ohne verlässlichen Ereigniszeitpunkt wird die Empfangszeit als geschätzt gekennzeichnet. Die tatsächlichen Payloads des eigenen Plex-Servers müssen bei der Einrichtung geprüft werden.
 
 Unter **Admin → Ereignisprotokoll** (`/admin/logs`) stehen Webhook-Empfang und Ablehnungsgründe, Anbieterabfragen mit URL/HTTP-Status sowie Job-Ergebnisse und Wiederholungsversuche. Über die Anfrage-ID lässt sich ein Webhook bis zur Verarbeitung verfolgen. Filter und ältere Einträge sind verfügbar; zum Nachladen die Seite aktualisieren. Zugangsdaten, Cookies und vollständige Request-Bodies werden nicht gespeichert. Der Worker löscht stündlich Einträge, die älter als 14 Tage sind. Bei Datenbankausfällen schreibt der Logger ersatzweise in die Container-Konsole; deren Aufbewahrung richtet sich nach der Docker-Konfiguration. Anfragen, die Geza gar nicht erreichen, können hier nicht erscheinen. Bestehende alte Jobfehler erhalten nachträglich keine zusätzlichen Details.
+
+Unter **Admin → Fehlerdiagnose** lässt sich die erweiterte Plex-Protokollierung für 1, 6 oder 24 Stunden aktivieren. Sie endet automatisch und ergänzt Plex-Abfragen um ihren Auslöser sowie bei „Now Playing“ um eine zufällige Browser-Instanz, damit mehrere offene Tabs erkennbar werden. Ein bereinigtes JSON-Diagnosepaket enthält das Ereignisprotokoll, Plex-Zugriffszahlen und zugehörige Auftragsläufe der letzten Stunden, aber keine Tokens, Secrets oder vollständigen Webhook-Inhalte.
 
 ### Gesehen-Status aus Geza in Plex wiederherstellen
 
@@ -458,7 +460,7 @@ Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-ch
 
 - Offene Scrobbles können nach dem Speichern im selben Dialog weiter zugeordnet werden; die History wird erst beim Schließen aktualisiert.
 - Serientreffer bei der Scrobble-Zuordnung zeigen die Anzahl ihrer bereits zugeordneten Katalogepisoden.
-- Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; automatische Aktualisierung alle 15 Sekunden.
+- Die private Home-Seite zeigt aktive Plex-Wiedergaben mit Katalog-Cover, Fortschritt, Restlaufzeit, geschätzter Endzeit und Pausenstatus; Plex wird einmal beim Seitenaufruf und danach nur manuell aktualisiert.
 
 ### v1.1.1
 

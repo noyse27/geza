@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     // Verify current Plex metadata, including for historical conflicts recorded before this feature.
     const response = await plexRequest(
       `/library/metadata/${encodeURIComponent(data.ratingKey)}?includeGuids=1`,
+      { purpose: 'manual-match-decision' },
     );
     const item = response?.MediaContainer?.Metadata?.find((m: any) => String(m.ratingKey) === data.ratingKey);
     const incoming = item ? plexIds(item) : {};

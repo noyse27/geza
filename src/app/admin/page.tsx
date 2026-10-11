@@ -12,6 +12,7 @@ import { FriendsAdmin } from '@/components/friends-admin';
 import { federationEnabled, instanceNickname, listFriends } from '@/lib/federation';
 import { jobOverview } from '@/lib/job-overview';
 import { JobDashboard } from '@/components/job-status';
+import { diagnosticState } from '@/lib/diagnostics';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -25,7 +26,7 @@ export default async function Page() {
   let plexSections: { key: string; title: string; type: string }[] = [];
   if (!isDemo() && settings.PLEX_URL && settings.PLEX_TOKEN) {
     try {
-      const data = await plexRequest('/library/sections');
+      const data = await plexRequest('/library/sections', { purpose: 'admin-library-list' });
       plexSections = (data?.MediaContainer?.Directory || [])
         .filter((s: { type: string }) => ['movie', 'show'].includes(s.type))
         .map((s: { key: string; title: string; type: string }) => ({
@@ -43,10 +44,11 @@ export default async function Page() {
     nickname,
     status,
   }));
-  const [overview, imports, rumpel] = await Promise.all([
+  const [overview, imports, rumpel, diagnostics] = await Promise.all([
     jobOverview(),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
     rumpelCounts(),
+    diagnosticState(),
   ]);
   const [lastScan] = await query(
     "SELECT created_at,context FROM event_logs WHERE source='plex-scan' AND message='Plex-Bestand und Einordnung abgeglichen' ORDER BY id DESC LIMIT 1",
@@ -91,6 +93,7 @@ export default async function Page() {
               }
             : null
         }
+        diagnosticUntil={diagnostics.until}
       />
       {isDemo() ? (
         <section className="panel">

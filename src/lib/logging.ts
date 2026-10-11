@@ -48,9 +48,14 @@ export async function logEvent(
     );
   }
 }
-export async function loggedFetch(provider: string, url: string, init: RequestInit = {}) {
+export async function loggedFetch(
+  provider: string,
+  url: string,
+  init: RequestInit = {},
+  diagnosticContext: Record<string, unknown> = {},
+) {
   const started = Date.now();
-  const context = { provider, url, method: init.method || 'GET' };
+  const context = { provider, url, method: init.method || 'GET', ...diagnosticContext };
   await logEvent('info', 'provider', 'Anbieterabfrage gestartet', context);
   try {
     const response = await fetch(url, init);

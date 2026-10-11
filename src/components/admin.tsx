@@ -10,6 +10,7 @@ type Props = {
   plexSections: { key: string; title: string; type: string }[];
   lastScan?: { createdAt: string; context: Record<string, number> } | null;
   nextScan?: { availableAt: string; updatedAt: string; error: string | null } | null;
+  diagnosticUntil?: string | null;
 };
 type ImportReport = {
   dryRun?: boolean;
@@ -42,6 +43,7 @@ export function AdminControls({
   plexSections,
   lastScan,
   nextScan,
+  diagnosticUntil,
   demo = false,
 }: Props) {
   const [message, setMessage] = useState(''),
@@ -73,6 +75,7 @@ export function AdminControls({
       (values.PLEX_SCAN_SECTIONS || '').split(',').filter(Boolean),
     ),
     [origin, setOrigin] = useState('');
+  const [diagnosticsUntil, setDiagnosticsUntil] = useState(diagnosticUntil || '');
   const router = useRouter();
   useEffect(() => setOrigin(window.location.origin), []);
   const plexConfigured = configured.PLEX_URL && configured.PLEX_TOKEN;
@@ -104,6 +107,7 @@ export function AdminControls({
       if (!r.ok) throw Error((await r.json()).error);
       const data = await r.json();
       if (data.settings) setFormValues((current) => ({ ...current, ...data.settings }));
+      if ('diagnosticUntil' in data) setDiagnosticsUntil(data.diagnosticUntil || '');
       if (data.preview) setScanPreview(data.preview);
       setMessage(
         data.message || (data.preview ? 'Vorschau berechnet; keine Zuordnung gespeichert.' : 'Gespeichert.'),
@@ -156,6 +160,49 @@ export function AdminControls({
       : 'Erfolgreich.';
   return (
     <>
+      <div className="panel">
+        <h2>Fehlerdiagnose</h2>
+        <p className="muted">
+          Zeichnet vorübergehend den Auslöser von Plex-Zugriffen und eine zufällige Browser-Instanz auf.
+          Zugangsdaten und vollständige Webhook-Inhalte werden nicht gespeichert.
+        </p>
+        <p>
+          Status:{' '}
+          <strong>
+            {diagnosticsUntil && new Date(diagnosticsUntil).getTime() > Date.now()
+              ? `aktiv bis ${new Date(diagnosticsUntil).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}`
+              : 'aus'}
+          </strong>
+        </p>
+        <div className="button-row">
+          {[1, 6, 24].map((hours) => (
+            <button
+              className={hours === 6 ? 'button primary' : 'button'}
+              type="button"
+              disabled={busy || demo}
+              key={hours}
+              onClick={() => action({ action: 'diagnostic-logging', hours })}
+            >
+              Für {hours} {hours === 1 ? 'Stunde' : 'Stunden'} aktivieren
+            </button>
+          ))}
+          <button
+            className="button"
+            type="button"
+            disabled={busy || demo || !diagnosticsUntil}
+            onClick={() => action({ action: 'diagnostic-logging', hours: 0 })}
+          >
+            Deaktivieren
+          </button>
+          <a className="button" href="/api/admin/diagnostics/export?hours=6">
+            Diagnose der letzten 6 Stunden als JSON
+          </a>
+        </div>
+        <p className="muted small">
+          Die Aufzeichnung endet automatisch. Der Export enthält auch das normale Ereignisprotokoll und die
+          zugehörigen Auftragsläufe im gewählten Zeitraum.
+        </p>
+      </div>
       <div className="panel">
         <h2>Automatische Jobs</h2>
         <div className="job-row">

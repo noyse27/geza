@@ -8,7 +8,7 @@ import { query } from '@/lib/db';
 import { demoPlaybackItems, type DemoPlaybackMedia } from '@/lib/demo-now-playing';
 
 export const dynamic = 'force-dynamic';
-export async function GET() {
+export async function GET(req: Request) {
   const headers = { 'Cache-Control': 'private, no-store' };
   if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401, headers });
   if (isDemo()) {
@@ -23,7 +23,9 @@ export async function GET() {
     return Response.json({ items: demoPlaybackItems(media) }, { headers });
   }
   try {
-    const data = await plexRequest('/status/sessions');
+    const rawClientId = req.headers.get('x-geza-diagnostic-client') || '';
+    const clientId = /^[a-zA-Z0-9-]{1,64}$/.test(rawClientId) ? rawClientId : undefined;
+    const data = await plexRequest('/status/sessions', { purpose: 'now-playing', clientId });
     const items = [];
     for (const raw of data?.MediaContainer?.Metadata || []) {
       const item = playbackItem(raw);
