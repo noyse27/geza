@@ -1239,6 +1239,29 @@ nav .active:after {
   border-radius: 7px;
   color: var(--accent);
 }
+.admin-warning {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 30px;
+  padding: 18px 20px;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--text);
+}
+.admin-warning strong {
+  color: var(--danger);
+}
+.admin-warning a {
+  color: var(--accent);
+}
+.compact-heading {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.compact-heading h3 {
+  margin: 0;
+}
 .detail-page {
   padding-top: 30px;
 }

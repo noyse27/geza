@@ -30,3 +30,23 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Auftrag konnte nicht eingeplant werden.' }, { status: 400 });
   }
 }
+
+export async function DELETE(req: Request) {
+  if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401 });
+  if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
+  if (isDemo()) return Response.json({ error: 'In der Demo deaktiviert' }, { status: 403 });
+
+  const deleted = await query<{ id: string }>(
+    `DELETE FROM jobs
+      WHERE status='failed'
+        AND NOT EXISTS(SELECT 1 FROM job_runs WHERE job_id=jobs.id)
+      RETURNING id::text`,
+  );
+  return Response.json({
+    message:
+      deleted.length === 1
+        ? 'Eine historische Fehlermeldung gelöscht.'
+        : `${deleted.length} historische Fehlermeldungen gelöscht.`,
+    deleted: deleted.length,
+  });
+}
