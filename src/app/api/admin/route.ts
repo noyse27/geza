@@ -27,6 +27,7 @@ import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
 import { createManualWatch } from '@/lib/manual-watches';
 import { recordFeedEntrySafely } from '@/lib/feed';
 import { acceptFriendship, removeFriend, requestFriendship } from '@/lib/federation';
+import { DIAGNOSTIC_LOG_UNTIL } from '@/lib/diagnostics';
 export const maxDuration = 300;
 const mediaSchema = z.object({
   title: z.string().min(1).max(500),
@@ -281,7 +282,7 @@ export async function POST(req: Request) {
       const [media] = await query('SELECT ids,kind FROM media WHERE id=$1', [mediaId]);
       if (!media) throw Error('Titel nicht gefunden.');
       if (!media.ids?.plex) throw Error('Kein Plex-Verweis für diesen Titel vorhanden.');
-      const metadata = await findPlex(media.ids, media.kind);
+      const metadata = await findPlex(media.ids, media.kind, 'manual-watch-import');
       if (!metadata) throw Error('Titel in Plex nicht gefunden.');
       const timestamp = Number(metadata.lastViewedAt);
       const date = new Date(timestamp * 1000);
@@ -373,6 +374,17 @@ export async function POST(req: Request) {
         await query('UPDATE media SET plex_checked_at=NULL');
         await requestPlexScan();
       }
+    } else if (body.action === 'diagnostic-logging') {
+      const hours = z.union([z.literal(0), z.literal(1), z.literal(6), z.literal(24)]).parse(body.hours);
+      const until = hours ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : '';
+      await setSetting(DIAGNOSTIC_LOG_UNTIL, until);
+      return Response.json({
+        ok: true,
+        diagnosticUntil: until || null,
+        message: hours
+          ? `Erweitertes Diagnoseprotokoll für ${hours} Stunde${hours === 1 ? '' : 'n'} aktiviert.`
+          : 'Erweitertes Diagnoseprotokoll deaktiviert.',
+      });
     } else if (body.action === 'generate-webhook-secret') {
       const secret = randomBytes(32).toString('base64url');
       await setSetting('PLEX_WEBHOOK_SECRET', secret);

@@ -7,6 +7,7 @@ import { recordFeedEntrySafely } from './feed';
 import type { PoolClient } from 'pg';
 import { saveJobResult } from './job-history';
 import { decidedPlexMedia, plexServerScope } from './plex-decisions';
+import { diagnosticState } from './diagnostics';
 type PlexMetadata = Record<string, any>;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
   const consistent = matches.filter((r) =>
@@ -48,7 +49,12 @@ export function plexIdValues(m: PlexMetadata) {
 }
 export async function plexRequest(
   path: string,
-  options: { emptyResponse?: boolean; connection?: { url: string; token: string } } = {},
+  options: {
+    emptyResponse?: boolean;
+    connection?: { url: string; token: string };
+    purpose?: string;
+    clientId?: string;
+  } = {},
 ) {
   if (isDemo()) throw Error('Externe Anfragen sind im Demomodus deaktiviert.');
   const base = options.connection?.url ?? (await getSetting('PLEX_URL')),
@@ -56,12 +62,24 @@ export async function plexRequest(
   if (!base || !token) return null;
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
-  const r = await loggedFetch('Plex', url.toString(), {
-    cache: 'no-store',
-    headers: { 'X-Plex-Token': token, Accept: 'application/json' },
-    signal: AbortSignal.timeout(12000),
-    redirect: 'error',
-  });
+  const diagnostics = await diagnosticState();
+  const r = await loggedFetch(
+    'Plex',
+    url.toString(),
+    {
+      cache: 'no-store',
+      headers: { 'X-Plex-Token': token, Accept: 'application/json' },
+      signal: AbortSignal.timeout(12000),
+      redirect: 'error',
+    },
+    diagnostics.enabled
+      ? {
+          diagnostic: true,
+          purpose: options.purpose || 'unspecified',
+          ...(options.clientId ? { clientId: options.clientId } : {}),
+        }
+      : {},
+  );
   if (!r.ok) throw Error(`Plex HTTP ${r.status}`);
   if (options.emptyResponse) {
     await r.text();
@@ -69,9 +87,11 @@ export async function plexRequest(
   }
   return r.json();
 }
-export async function findPlex(ids: Record<string, unknown>, kind: string) {
+export async function findPlex(ids: Record<string, unknown>, kind: string, purpose = 'media-lookup') {
   if (!ids.plex) return null;
-  const data = await plexRequest(`/library/all?guid=${encodeURIComponent(`plex://${kind}/${ids.plex}`)}`);
+  const data = await plexRequest(`/library/all?guid=${encodeURIComponent(`plex://${kind}/${ids.plex}`)}`, {
+    purpose,
+  });
   return data?.MediaContainer?.Metadata?.[0] || null;
 }
 const reviewQuery = `query GetReview($metadataID: ID!) {
@@ -83,12 +103,18 @@ const reviewQuery = `query GetReview($metadataID: ID!) {
 export async function fetchPlexReview(metadataID: string) {
   const token = await getSetting('PLEX_TOKEN');
   if (!token) return null;
-  const r = await loggedFetch('Plex Community', 'https://community.plex.tv/api', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Plex-Token': token },
-    body: JSON.stringify({ operationName: 'GetReview', query: reviewQuery, variables: { metadataID } }),
-    signal: AbortSignal.timeout(12000),
-  });
+  const diagnostics = await diagnosticState();
+  const r = await loggedFetch(
+    'Plex Community',
+    'https://community.plex.tv/api',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Plex-Token': token },
+      body: JSON.stringify({ operationName: 'GetReview', query: reviewQuery, variables: { metadataID } }),
+      signal: AbortSignal.timeout(12000),
+    },
+    diagnostics.enabled ? { diagnostic: true, purpose: 'review-sync' } : {},
+  );
   if (!r.ok) throw Error(`Plex Community HTTP ${r.status}`);
   const data = await r.json();
   if (data.errors) throw Error(data.errors[0]?.message || 'Plex Community GraphQL-Fehler');
@@ -262,6 +288,7 @@ export async function processPlex(payload: {
   if (m.ratingKey) {
     const data = await plexRequest(
       `/library/metadata/${encodeURIComponent(String(m.ratingKey))}?includeGuids=1`,
+      { purpose: 'webhook-metadata' },
     );
     if (data?.MediaContainer?.Metadata?.[0]) m = { ...m, ...data.MediaContainer.Metadata[0] };
   }
@@ -269,6 +296,7 @@ export async function processPlex(payload: {
   if (m.type === 'episode' && m.grandparentRatingKey) {
     const p = await plexRequest(
       `/library/metadata/${encodeURIComponent(String(m.grandparentRatingKey))}?includeGuids=1`,
+      { purpose: 'webhook-parent-metadata' },
     );
     if (p?.MediaContainer?.Metadata?.[0]) parent = await ensurePlexMedia(p.MediaContainer.Metadata[0]);
   }

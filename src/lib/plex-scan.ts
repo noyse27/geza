@@ -163,7 +163,12 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
   }
   const automatic = (await getSetting('PLEX_SCAN_WATCHED_ONLY')) !== '0';
   const scope = await plexServerScope();
-  const read = (path: string) => plexRequest(path, { connection });
+  const purpose = payload.preview
+    ? 'library-scan-preview'
+    : payload.manual
+      ? 'library-scan-manual'
+      : 'library-scan-daily';
+  const read = (path: string) => plexRequest(path, { connection, purpose });
   const restoreContext = await getPlexRestoreContext();
   let watchedRestores = 0;
   const filter = (await getSetting('PLEX_SCAN_SECTIONS')).split(',').filter(Boolean);

@@ -267,7 +267,7 @@ export async function refreshProviderRatings(id: string, providers: string[]) {
     try {
       if (provider === 'tmdb') await tmdb(m);
       if (provider === 'imdb') {
-        const p = await findPlex(m.ids, m.kind);
+        const p = await findPlex(m.ids, m.kind, 'metadata-rating-enrichment');
         if (p) await savePlexRatings(id, p, m.ids);
       }
       // TVDB has no supported rating source; the detail view links to its ID.
@@ -374,7 +374,7 @@ export async function enrichMedia(id: string) {
       const errors: string[] = [];
       if (await getSetting('PLEX_URL'))
         try {
-          const p = await findPlex(m.ids, m.kind);
+          const p = await findPlex(m.ids, m.kind, 'metadata-enrichment');
           if (p) {
             await mergeMetadata(id, fromPlex(p));
             await savePlexRatings(id, p, m.ids);
