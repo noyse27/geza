@@ -236,21 +236,44 @@ export async function POST(req: Request) {
       );
     } else if (body.action === 'review') {
       const data = z
-        .object({ body: z.string().min(1).max(30000), spoiler: z.boolean(), is_public: z.boolean() })
+        .object({
+          body: z.string().min(1).max(30000),
+          spoiler: z.boolean(),
+          is_public: z.boolean(),
+          rating: z.number().int().min(1).max(10).nullable().optional(),
+        })
         .parse(body.data);
-      let reviewMediaId: string | undefined = body.mediaId;
-      if (body.id)
-        reviewMediaId = (
-          await query<{ media_id: string }>(
-            'UPDATE reviews SET body=$1,spoiler=$2,is_public=$3,updated_at=now() WHERE id=$4 RETURNING media_id',
-            [data.body, data.spoiler, data.is_public, body.id],
-          )
-        )[0]?.media_id;
-      else
-        await query(
-          "INSERT INTO reviews(media_id,source,source_id,body,spoiler,is_public) VALUES($1,'geza',$2,$3,$4,$5)",
-          [body.mediaId, crypto.randomUUID(), data.body, data.spoiler, data.is_public],
-        );
+      const client = await pool.connect();
+      let reviewMediaId: string | undefined;
+      try {
+        await client.query('BEGIN');
+        if (body.id)
+          reviewMediaId = (
+            await client.query<{ media_id: string }>(
+              'UPDATE reviews SET body=$1,spoiler=$2,is_public=$3,updated_at=now() WHERE id=$4 RETURNING media_id',
+              [data.body, data.spoiler, data.is_public, body.id],
+            )
+          ).rows[0]?.media_id;
+        else
+          reviewMediaId = (
+            await client.query<{ media_id: string }>(
+              "INSERT INTO reviews(media_id,source,source_id,body,spoiler,is_public) VALUES($1,'geza',$2,$3,$4,$5) RETURNING media_id",
+              [body.mediaId, crypto.randomUUID(), data.body, data.spoiler, data.is_public],
+            )
+          ).rows[0]?.media_id;
+        if (!reviewMediaId) throw Error('Review nicht gefunden.');
+        if (data.rating != null)
+          await client.query(
+            "INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,$2,now(),'plex') ON CONFLICT(media_id) DO NOTHING",
+            [reviewMediaId, data.rating],
+          );
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
       if (reviewMediaId) await recordFeedEntrySafely(reviewMediaId);
     } else if (body.action === 'plex-review') {
       const [media] = await query<{ ids: Record<string, string> }>('SELECT ids FROM media WHERE id=$1', [

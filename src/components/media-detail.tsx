@@ -320,13 +320,15 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
               <span className="eyebrow">WAS BLEIBT</span>
               <h2>Reviews</h2>
             </div>
-            {admin && <ReviewEditor mediaId={id} />}
+            {admin && <ReviewEditor mediaId={id} rating={rating ?? null} />}
           </div>
           {reviews.length ? (
             reviews.map((r) => (
               <div key={r.id}>
                 <ReviewBody review={JSON.parse(JSON.stringify(r))} admin={admin} />
-                {admin && <ReviewEditor review={JSON.parse(JSON.stringify(r))} mediaId={id} />}
+                {admin && (
+                  <ReviewEditor review={JSON.parse(JSON.stringify(r))} mediaId={id} rating={rating ?? null} />
+                )}
               </div>
             ))
           ) : (

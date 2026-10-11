@@ -164,6 +164,41 @@ try {
   assert.ok(!(await page(show.id)).includes('Nur diese Staffel'));
   assert.ok(!(await page(episode.id)).includes('Nur diese Staffel'));
   assert.deepEqual(await query('SELECT media_id,rating FROM ratings'), [{ media_id: season.id, rating: 8 }]);
+  const unrated = await query("INSERT INTO media(kind,title) VALUES('movie','Review rating') RETURNING id");
+  assert.equal(
+    (
+      await fetch(base + '/api/admin', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'review',
+          mediaId: unrated[0].id,
+          data: { body: 'Review mit Plex-Wertung', spoiler: false, is_public: true, rating: 7 },
+        }),
+      })
+    ).status,
+    200,
+  );
+  assert.deepEqual(await query('SELECT rating,source FROM ratings WHERE media_id=$1', [unrated[0].id]), [
+    { rating: 7, source: 'plex' },
+  ]);
+  assert.equal(
+    (
+      await fetch(base + '/api/admin', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'review',
+          mediaId: season.id,
+          data: { body: 'Vorhandene Wertung bleibt', spoiler: false, is_public: true, rating: 2 },
+        }),
+      })
+    ).status,
+    200,
+  );
+  assert.deepEqual(await query('SELECT rating,source FROM ratings WHERE media_id=$1', [season.id]), [
+    { rating: 8, source: 'geza' },
+  ]);
   // Imported history can have only episodes: derive stable records, including specials.
   await query(
     "INSERT INTO media(kind,title,parent_id,season,episode) VALUES('episode','Special', $1,0,1),('episode','Zehnte Staffel',$1,10,1)",
