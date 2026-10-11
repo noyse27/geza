@@ -13,6 +13,7 @@ import { federationEnabled, instanceNickname, listFriends } from '@/lib/federati
 import { jobOverview } from '@/lib/job-overview';
 import { JobDashboard } from '@/components/job-status';
 import { diagnosticState } from '@/lib/diagnostics';
+import { webhookHealth } from '@/lib/webhook-health';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -44,12 +45,31 @@ export default async function Page() {
     nickname,
     status,
   }));
-  const [overview, imports, rumpel, diagnostics] = await Promise.all([
+  const [overview, imports, rumpel, diagnostics, webhookRows] = await Promise.all([
     jobOverview(),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
     rumpelCounts(),
     diagnosticState(),
+    query<{ last_received_at: string | null; hours_since_last_received: number | null }>(
+      `SELECT created_at::text AS last_received_at,
+              EXTRACT(EPOCH FROM (now() - created_at)) / 3600 AS hours_since_last_received
+         FROM event_logs
+        WHERE source='webhook' AND message='Externe Webhook-Anfrage empfangen'
+        ORDER BY id DESC
+        LIMIT 1`,
+    ),
   ]);
+  const webhookConfigured = !!(
+    settings.PLEX_WEBHOOK_SECRET &&
+    settings.PLEX_ACCOUNT_ID &&
+    settings.PLEX_SERVER_ID
+  );
+  const webhookStatus = webhookHealth(
+    webhookRows[0]?.last_received_at ?? null,
+    webhookRows[0]?.hours_since_last_received == null
+      ? null
+      : Number(webhookRows[0].hours_since_last_received),
+  );
   const [lastScan] = await query(
     "SELECT created_at,context FROM event_logs WHERE source='plex-scan' AND message='Plex-Bestand und Einordnung abgeglichen' ORDER BY id DESC LIMIT 1",
   );
@@ -65,6 +85,28 @@ export default async function Page() {
         </h1>
         <p>Deine Verbindungen. Deine Daten. Deine Kontrolle.</p>
       </div>
+      {webhookConfigured && webhookStatus.state === 'stale' && (
+        <aside className="admin-warning" role="alert">
+          <strong>Seit {webhookStatus.daysSinceLastReceived} Tagen kein Plex-Webhook empfangen.</strong>
+          <span>
+            Letzter Eingang:{' '}
+            {new Date(webhookStatus.lastReceivedAt).toLocaleString('de-DE', {
+              timeZone: 'Europe/Berlin',
+            })}
+            . Prüfe den Webhook in Plex und starte den Plex Media Server bei Bedarf neu.{' '}
+            <a href="/admin/logs">Ereignisprotokoll öffnen</a>
+          </span>
+        </aside>
+      )}
+      {webhookConfigured && webhookStatus.state === 'never' && (
+        <aside className="admin-warning" role="status">
+          <strong>Noch keinen Plex-Webhook empfangen.</strong>
+          <span>
+            Starte in Plex kurz eine Wiedergabe, um die Verbindung zu prüfen.{' '}
+            <a href="/admin/logs">Ereignisprotokoll öffnen</a>
+          </span>
+        </aside>
+      )}
       <div id="reviewanbieter">
         <ReviewBoxAdmin
           boxes={JSON.parse(JSON.stringify(boxes))}

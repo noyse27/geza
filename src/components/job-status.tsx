@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Trash2 } from 'lucide-react';
 import { exactTime, relativeTime, jobState, jobNames, outcomeNames } from '@/lib/job-display';
 type Row = Record<string, any>;
 type Overview = {
@@ -70,7 +71,9 @@ export function RunProgress({ job }: { job: Row }) {
 }
 export function JobDashboard({ initial }: { initial: Overview }) {
   const [data, setData] = useState(initial),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [deletingLegacyErrors, setDeletingLegacyErrors] = useState(false),
+    [legacyMessage, setLegacyMessage] = useState('');
   useEffect(() => {
     let stopped = false;
     let active = initial.queue.some(
@@ -198,7 +201,34 @@ export function JobDashboard({ initial }: { initial: Overview }) {
       ))}
       {data.legacyErrors.length > 0 && (
         <>
-          <h3>Offene Fehler aus älteren Aufträgen</h3>
+          <div className="section-heading compact-heading">
+            <h3>Offene Fehler aus älteren Aufträgen</h3>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Alle historischen Fehlermeldungen löschen"
+              title="Alle historischen Fehlermeldungen löschen"
+              disabled={deletingLegacyErrors}
+              onClick={async () => {
+                if (!window.confirm('Alle historischen Fehlermeldungen löschen?')) return;
+                setDeletingLegacyErrors(true);
+                setLegacyMessage('');
+                try {
+                  const response = await fetch('/api/admin/jobs', { method: 'DELETE' });
+                  const result = await response.json();
+                  if (!response.ok) throw Error(result.error || 'Löschen fehlgeschlagen.');
+                  setData((current) => ({ ...current, legacyErrors: [] }));
+                  setLegacyMessage(result.message);
+                } catch (caught) {
+                  setLegacyMessage(caught instanceof Error ? caught.message : 'Verbindung fehlgeschlagen.');
+                } finally {
+                  setDeletingLegacyErrors(false);
+                }
+              }}
+            >
+              <Trash2 size={17} />
+            </button>
+          </div>
           {data.legacyErrors.map((job) => (
             <p key={job.id} className="error">
               <Link href={`/admin/jobs?job=${job.id}`}>
@@ -212,6 +242,11 @@ export function JobDashboard({ initial }: { initial: Overview }) {
             </p>
           ))}
         </>
+      )}
+      {legacyMessage && (
+        <p className="small" role="status">
+          {legacyMessage}
+        </p>
       )}
       <details>
         <summary>Gesamtbestand der Aufträge (keine Zuwächse)</summary>
