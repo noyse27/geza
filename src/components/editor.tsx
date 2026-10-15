@@ -6,6 +6,7 @@ import type { Media } from '@/lib/types';
 import { AssignmentEditor } from './assignment-editor';
 import { DeleteMediaButton } from './delete-media-button';
 import { MentionEditor } from './mention-editor';
+import { ShareButton } from './share-button';
 async function post(body: unknown) {
   const r = await fetch('/api/admin', {
     method: 'POST',
@@ -35,6 +36,7 @@ export function MediaEditor({
         </button>
         {['episode', 'season'].includes(item.kind) && <AssignmentEditor item={item} />}
         <DeleteMediaButton item={item} />
+        <ShareButton title={item.title} year={item.year} />
       </div>
       {open && (
         <div className="modal-backdrop">
