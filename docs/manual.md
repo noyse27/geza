@@ -6,6 +6,8 @@ Die [README](../README.md) erklärt Installation, Sicherung und Verbindungen. Di
 
 Über die Suche einen Film oder eine Serie öffnen. Auf der Detailseite lassen sich Bewertungen, Reviews und Anschauereignisse verwalten. Öffentliche Besucher sehen veröffentlichte Inhalte; das vollständige Anschautagebuch bleibt privat.
 
+Angemeldete Admins finden bei **Details bearbeiten** und **Datensatz löschen** auch **Teilen**. Unterstützt der Browser den nativen Teilen-Dialog, öffnet Geza ihn mit Titel und Detailadresse. Andernfalls wird die Adresse ohne Suchparameter oder Sprungmarke kopiert; „Link kopiert“ bestätigt den Vorgang. Geteilt wird ausschließlich die öffentliche Detailseite, nicht der private Tagebuchbereich.
+
 - [Reviews schreiben und Filme oder Personen verlinken](reviews.md)
 - [Sammlungen und Filmreihen](sammlungen.md)
 - [Ungeklärte Anschauereignisse nachpflegen](scrobbles.md)
@@ -61,6 +63,10 @@ Unter **Offene Importfälle prüfen** sind außerdem ungeklärte Anschauzeitpunk
 ## Webhooks und Fehler verstehen
 
 **Admin → Ereignisprotokoll** zeigt Zeitpunkt, Alter, Bereich und eine verständliche Beschreibung. Verlinkte Titel und Ausführungen führen zum betroffenen Datensatz bzw. zum Ergebnis. Die technischen Rohdaten unter **Details** helfen bei einer weitergehenden Diagnose; für die Korrektur zuerst die Erklärung und die Verknüpfungen nutzen. Ein alter Fehler kann zu einem inzwischen erfolgreich wiederholten Lauf gehören.
+
+Sind Webhook-Geheimnis, Account-ID und Server-UUID eingerichtet, weist der Admin-Bereich nach 48 Stunden ohne empfangenes Plex-Ereignis darauf hin. Wurde noch nie ein Webhook empfangen, kurz eine Wiedergabe in Plex starten. Bleibt auch danach der Eingang aus, zuerst die in Plex hinterlegte Webhook-Adresse und anschließend das Ereignisprotokoll prüfen.
+
+Für schwer nachvollziehbare Plex-Zugriffe lässt sich unter **Admin → Fehlerdiagnose** die erweiterte Protokollierung für 1, 6 oder 24 Stunden aktivieren; sie endet automatisch. Der JSON-Export der letzten sechs Stunden bündelt das Ereignisprotokoll, Plex-Zugriffszahlen und zugehörige Auftragsläufe. Tokens, Secrets und vollständige Webhook-Inhalte werden nicht aufgenommen. Die Diagnose nur während der Fehlersuche einschalten und den Export bei einer Supportanfrage mitsenden.
 
 ## Fehlende Gesehen-Markierungen in Plex wiederherstellen
 
