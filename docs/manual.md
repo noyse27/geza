@@ -76,4 +76,4 @@ Im Adminbereich **Länder und Genres** öffnen. Schreibweisen können einem geme
 
 ## Aktualisieren und sichern
 
-Vor dem Update eine Sicherung erstellen und die [Updateanleitung](../README.md#sicherung-und-updates) befolgen. App und Worker gemeinsam aktualisieren. Migrationen laufen beim Start automatisch. [Releasehinweise zu v1.6.0](releases/v1.6.0.md) beschreiben den Umfang und die Datenbankänderungen.
+Vor dem Update eine Sicherung erstellen und die [Updateanleitung](../README.md#sicherung-und-updates) befolgen. App und Worker gemeinsam aktualisieren. Migrationen laufen beim Start automatisch. [Releasehinweise zu v1.7.0](releases/v1.7.0.md) beschreiben den Umfang und die Datenbankänderungen.
