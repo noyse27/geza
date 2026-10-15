@@ -4,7 +4,7 @@
 
 Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-**Aktuelle Version: v1.6.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
+**Aktuelle Version: v1.7.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
 ## Funktionen im Überblick
 
@@ -88,11 +88,11 @@ Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` i
 
 Beim Schreiben eines Reviews lassen sich Filme, Regisseure und Darsteller aus dem eigenen Geza-Katalog auswählen:
 
-| Eingabe | Sucht nach | Im gespeicherten Review |
-| --- | --- | --- |
-| `@mHellraiser` | Filmtitel und Originaltitel | Anklickbarer Titel zur Geza-Filmseite |
-| `@rTony Randel` | Regisseuren | Unterstrichener Name mit Filmvorschau |
-| `@aSophie Marceau` | Darstellern | Unterstrichener Name mit Filmvorschau |
+| Eingabe            | Sucht nach                  | Im gespeicherten Review               |
+| ------------------ | --------------------------- | ------------------------------------- |
+| `@mHellraiser`     | Filmtitel und Originaltitel | Anklickbarer Titel zur Geza-Filmseite |
+| `@rTony Randel`    | Regisseuren                 | Unterstrichener Name mit Filmvorschau |
+| `@aSophie Marceau` | Darstellern                 | Unterstrichener Name mit Filmvorschau |
 
 Ab zwei Suchzeichen hinter dem Kürzel erscheinen bis zu sechs Treffer am Cursor. Mit Pfeiltasten und Enter oder per Klick auswählen; Escape schließt die Liste. Nach der Auswahl bleibt nur der lesbare Titel oder Name im Text. Beim Darüberfahren über einen Personenverweis, auf dem Handy per Tippen, erscheinen bis zu fünf Filme der Person in der ausgewählten Rolle, nach Geza-Bewertung sortiert.
 
@@ -397,6 +397,14 @@ Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt u
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
+
+### v1.7.0
+
+- **Verlässlicher Plex-Abgleich:** Bibliotheksgrenzen werden strikt eingehalten, unvollständige Metadaten isoliert und gespeicherte Zuordnungsentscheidungen bei späteren Läufen wiederverwendet. Migration 029.
+- **Schnellere Verarbeitung:** gemeinsame Scanregeln, gebündelte Ergebnisse und gezieltere Metadatenabfragen reduzieren unnötige Plex-Aufrufe.
+- **Diagnose und Kontrolle:** optionales Plex-Diagnoseprotokoll mit sicherem Export, verlinkte Konflikte und ein Admin-Hinweis auf ausbleibende Webhooks. Veraltete Protokolle werden automatisch bereinigt.
+- **Reviews und Teilen:** aus Plex übernommene Review-Bewertungen werden zuverlässig gespeichert; Admins können Detailseiten über den nativen Systemdialog teilen oder den Link kopieren.
+- Neue [Releasehinweise](docs/releases/v1.7.0.md) mit Details zu Update und Migration.
 
 ### v1.6.0
 
