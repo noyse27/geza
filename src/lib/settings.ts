@@ -21,6 +21,10 @@ export const settingKeys = [
   'COMMENTS_TEXT_ENABLED',
   'COMMENTS_REACTIONS_ENABLED',
   'COMMENTS_TRUST_THRESHOLD',
+  'PRIVACY_CONTROLLER_NAME',
+  'PRIVACY_CONTROLLER_ADDRESS',
+  'PRIVACY_CONTROLLER_EMAIL',
+  'PRIVACY_HOSTING_PROVIDER',
 ] as const;
 export async function getSetting(key: string) {
   if (isDemo())

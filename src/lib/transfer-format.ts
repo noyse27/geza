@@ -23,6 +23,8 @@ export const dataTables = [
   'review_commenters',
   'review_comments',
   'review_reactions',
+  'media_view_totals',
+  'media_view_dedup',
 ] as const;
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
 export const MAX_JSON_BYTES = 512 * 1024 * 1024;
@@ -40,6 +42,8 @@ const tablesSchema = z
     review_commenters: z.array(row).optional(),
     review_comments: z.array(row).optional(),
     review_reactions: z.array(row).optional(),
+    media_view_totals: z.array(row).optional(),
+    media_view_dedup: z.array(row).optional(),
   })
   .strict();
 const sealedSchema = z
@@ -68,6 +72,8 @@ export type Archive = Omit<z.infer<typeof archiveSchema>, 'tables'> & {
     review_commenters: Record<string, unknown>[];
     review_comments: Record<string, unknown>[];
     review_reactions: Record<string, unknown>[];
+    media_view_totals: Record<string, unknown>[];
+    media_view_dedup: Record<string, unknown>[];
   };
 };
 export const credentialsSchema = z
@@ -150,6 +156,8 @@ export function decodeArchive(bytes: Buffer): Archive {
         review_commenters: value.tables.review_commenters ?? [],
         review_comments: value.tables.review_comments ?? [],
         review_reactions: value.tables.review_reactions ?? [],
+        media_view_totals: value.tables.media_view_totals ?? [],
+        media_view_dedup: value.tables.media_view_dedup ?? [],
       },
     };
   } catch {

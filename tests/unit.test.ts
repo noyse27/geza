@@ -16,6 +16,37 @@ import { playbackItem } from '../src/lib/now-playing';
 import { nowPlayingCatalog } from '../src/lib/now-playing-catalog';
 import { plexCoverFallback, validPlexCoverPath } from '../src/lib/plex-cover';
 import { pool } from '../src/lib/db';
+import { berlinDay, dailyVisitorHash, isAutomatedView } from '../src/lib/page-view-identity';
+
+test('cookieless view identity deduplicates per title and Berlin day', () => {
+  const request = new Request('https://geza.example/title/1', {
+    headers: { 'user-agent': 'Test Browser', 'x-forwarded-for': '203.0.113.5, 127.0.0.1' },
+  });
+  const secret = 's'.repeat(40);
+  const first = dailyVisitorHash(request, '1', secret, '2026-10-18');
+  assert.equal(first, dailyVisitorHash(request, '1', secret, '2026-10-18'));
+  assert.notEqual(first, dailyVisitorHash(request, '2', secret, '2026-10-18'));
+  assert.notEqual(first, dailyVisitorHash(request, '1', secret, '2026-10-19'));
+  assert.match(first, /^[a-f0-9]{64}$/);
+  assert.equal(berlinDay(new Date('2026-10-17T22:30:00Z')), '2026-10-18');
+});
+
+test('view counting excludes bots and prefetches without blocking normal browsers', () => {
+  assert.equal(
+    isAutomatedView(new Request('https://geza.example', { headers: { 'user-agent': 'Googlebot' } })),
+    true,
+  );
+  assert.equal(
+    isAutomatedView(
+      new Request('https://geza.example', { headers: { 'user-agent': 'Mozilla/5.0', purpose: 'prefetch' } }),
+    ),
+    true,
+  );
+  assert.equal(
+    isAutomatedView(new Request('https://geza.example', { headers: { 'user-agent': 'Mozilla/5.0' } })),
+    false,
+  );
+});
 
 test('IMDb rating refresh rejects stale Plex identities and accepts the corrected identity', async (t) => {
   const writes: unknown[][] = [];

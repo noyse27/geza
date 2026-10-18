@@ -18,16 +18,19 @@ export default function Page() {
       <p>
         Serienmetadaten: <a href="https://thetvdb.com/">TheTVDB.com</a>.
       </p>
-      <h2>Dein Tagebuch bleibt privat</h2>
+      <h2>Öffentlich und privat</h2>
       <p>
-        Bewertungen und veröffentlichte Reviews sind öffentlich. Anschauereignisse, Watched-Status,
-        Zeitpunkte, Wiederholungen und persönliche Statistiken bleiben hinter dem Login. Bewusst als
-        Entwurf gespeicherte Reviews sind nur für den Administrator sichtbar.
+        Bewertungen und veröffentlichte Reviews sind öffentlich. Anschauereignisse, Watched-Status, einzelne
+        Zeitpunkte und Wiederholungen bleiben hinter dem Login. Zusammengefasste Statistiken sind öffentlich.
+        Bewusst als Entwurf gespeicherte Reviews sind nur für den Administrator sichtbar.
       </p>
       <p>
-        Bei aktivierten Kommentaren werden Name, Kommentar und eine freiwillige Website öffentlich
-        angezeigt. Die E-Mail-Adresse bleibt privat und dient zusammen mit einem zufälligen Browser-Cookie
-        der Moderation und Spam-Abwehr. Netzwerkadressen werden nur als täglich wechselnder Hash verarbeitet.
+        Weitere Einzelheiten stehen in der <a href="/datenschutz">Datenschutzerklärung</a>.
+      </p>
+      <p>
+        Bei aktivierten Kommentaren werden Name, Kommentar und eine freiwillige Website öffentlich angezeigt.
+        Die E-Mail-Adresse bleibt privat und dient zusammen mit einem zufälligen Browser-Cookie der Moderation
+        und Spam-Abwehr. Netzwerkadressen werden nur als täglich wechselnder Hash verarbeitet.
       </p>
       <h2>Schrift</h2>
       <p>Syne wird lokal ausgeliefert. Für die Schrift werden keine Verbindungen zu Google aufgebaut.</p>
