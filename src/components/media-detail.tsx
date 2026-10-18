@@ -23,6 +23,9 @@ import { SeriesCatalog } from './series-catalog';
 import { ExpandWatch } from './editor';
 import { queueSeriesCatalog } from '@/lib/series-catalog';
 import { getSetting } from '@/lib/settings';
+import { cookies } from 'next/headers';
+import { commentSettings, reviewDiscussions } from '@/lib/review-comments';
+import { ReviewDiscussion } from '@/components/review-discussion';
 import { isDemo } from '@/lib/demo-mode';
 import { PlexWatchLoader } from './editor';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
@@ -55,6 +58,12 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
     `SELECT id,body,spoiler,is_public,parent_source_id,created_at FROM reviews WHERE media_id=$1 ${admin ? '' : 'AND is_public'} ORDER BY created_at DESC`,
     [id],
   );
+  const discussionSettings = await commentSettings();
+  const discussionReviewIds = discussionSettings.enabled
+    ? reviews.filter((review) => review.is_public).map((review) => String(review.id))
+    : [];
+  const discussionBrowser = (await cookies()).get('geza_commenter')?.value;
+  const discussions = await reviewDiscussions(discussionReviewIds, discussionBrowser);
   const watches = admin
     ? await query(
         'SELECT id,watched_at,time_estimated FROM watches WHERE media_id=$1 ORDER BY watched_at DESC NULLS LAST',
@@ -326,6 +335,15 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
             reviews.map((r) => (
               <div key={r.id}>
                 <ReviewBody review={JSON.parse(JSON.stringify(r))} admin={admin} />
+                {discussionSettings.enabled && r.is_public && (
+                  <ReviewDiscussion
+                    reviewId={String(r.id)}
+                    comments={JSON.parse(JSON.stringify(discussions.get(String(r.id))?.comments || []))}
+                    initialReactions={discussions.get(String(r.id))?.reactions || []}
+                    commentsEnabled={discussionSettings.comments}
+                    reactionsEnabled={discussionSettings.reactions}
+                  />
+                )}
                 {admin && (
                   <ReviewEditor review={JSON.parse(JSON.stringify(r))} mediaId={id} rating={rating ?? null} />
                 )}

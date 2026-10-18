@@ -24,6 +24,11 @@ export default function Page() {
         Zeitpunkte, Wiederholungen und persönliche Statistiken bleiben hinter dem Login. Bewusst als
         Entwurf gespeicherte Reviews sind nur für den Administrator sichtbar.
       </p>
+      <p>
+        Bei aktivierten Kommentaren werden Name, Kommentar und eine freiwillige Website öffentlich
+        angezeigt. Die E-Mail-Adresse bleibt privat und dient zusammen mit einem zufälligen Browser-Cookie
+        der Moderation und Spam-Abwehr. Netzwerkadressen werden nur als täglich wechselnder Hash verarbeitet.
+      </p>
       <h2>Schrift</h2>
       <p>Syne wird lokal ausgeliefert. Für die Schrift werden keine Verbindungen zu Google aufgebaut.</p>
       <h2>Kontakt</h2>

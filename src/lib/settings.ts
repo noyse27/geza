@@ -17,6 +17,10 @@ export const settingKeys = [
   'PLEX_RESTORE_WATCHED',
   'FEED_GRACE_MINUTES',
   'INSTANCE_NICKNAME',
+  'COMMENTS_ENABLED',
+  'COMMENTS_TEXT_ENABLED',
+  'COMMENTS_REACTIONS_ENABLED',
+  'COMMENTS_TRUST_THRESHOLD',
 ] as const;
 export async function getSetting(key: string) {
   if (isDemo())

@@ -13,6 +13,7 @@ import { pendingFriendCount } from '@/lib/federation';
 import { Navigation, Logout, RestoreScroll } from '@/components/navigation';
 import { ScrollTop } from '@/components/scroll-top';
 import { FacetRecoveryNotice } from '@/components/facet-recovery-notice';
+import { pendingCommentCount } from '@/lib/review-comments';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   metadataBase: process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL) : undefined,
@@ -27,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const admin = await isAdmin();
   const year = new Date().getFullYear();
   const pendingFriends = admin ? await pendingFriendCount() : 0;
+  const pendingComments = admin ? await pendingCommentCount() : 0;
   return (
     <html lang="de" data-scroll-behavior="smooth">
       <body>
@@ -37,7 +39,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               geza<span className="brand-dot">.</span>
             </span>
           </Link>
-          <Navigation admin={admin} pending={pendingFriends} feed={!isDemo() && !!process.env.PUBLIC_URL} />
+          <Navigation
+            admin={admin}
+            pending={pendingFriends}
+            pendingComments={pendingComments}
+            feed={!isDemo() && !!process.env.PUBLIC_URL}
+          />
           <div className="account">
             {admin ? (
               <>
