@@ -6,6 +6,10 @@ Die [README](../README.md) erklärt Installation, Sicherung und Verbindungen. Di
 
 Über die Suche einen Film oder eine Serie öffnen. Auf der Detailseite lassen sich Bewertungen, Reviews und Anschauereignisse verwalten. Öffentliche Besucher sehen veröffentlichte Inhalte; das vollständige Anschautagebuch bleibt privat.
 
+Unter öffentlichen Reviews können Besucher ohne persönliche Angaben mit einem von sechs Symbolen reagieren. Für einen Textkommentar sind Name und E-Mail-Adresse erforderlich; die Website ist optional. Neue Absender landen zunächst in der Moderation. Unter **Admin → Kommentare** lassen sich Beiträge veröffentlichen, ablehnen, als Spam markieren und Absender sperren. Aktivierung, Vertrauensschwelle und Datenschutzangaben werden zentral auf der Admin-Startseite gepflegt.
+
+Die öffentliche Statistik zeigt Gesamtdaten und Ranglisten für Aufrufe, Reaktionen und veröffentlichte Kommentare. Auf der öffentlichen Startseite kann zwischen frisch besprochenen und zuletzt kommentierten Titeln gewechselt werden. Eigene Admin-Aufrufe und automatisierte Abrufe werden nicht mitgezählt.
+
 Angemeldete Admins finden bei **Details bearbeiten** und **Datensatz löschen** auch **Teilen**. Unterstützt der Browser den nativen Teilen-Dialog, öffnet Geza ihn mit Titel und Detailadresse. Andernfalls wird die Adresse ohne Suchparameter oder Sprungmarke kopiert; „Link kopiert“ bestätigt den Vorgang. Geteilt wird ausschließlich die öffentliche Detailseite, nicht der private Tagebuchbereich.
 
 - [Reviews schreiben und Filme oder Personen verlinken](reviews.md)
@@ -82,4 +86,4 @@ Im Adminbereich **Länder und Genres** öffnen. Schreibweisen können einem geme
 
 ## Aktualisieren und sichern
 
-Vor dem Update eine Sicherung erstellen und die [Updateanleitung](../README.md#sicherung-und-updates) befolgen. App und Worker gemeinsam aktualisieren. Migrationen laufen beim Start automatisch. [Releasehinweise zu v1.7.0](releases/v1.7.0.md) beschreiben den Umfang und die Datenbankänderungen.
+Vor dem Update eine Sicherung erstellen und die [Updateanleitung](../README.md#sicherung-und-updates) befolgen. App und Worker gemeinsam aktualisieren. Migrationen laufen beim Start automatisch. [Releasehinweise zu v1.8.0](releases/v1.8.0.md) beschreiben den Umfang und die Datenbankänderungen.
