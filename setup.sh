@@ -5,7 +5,7 @@ mode="${1:-production}"
 case "$mode" in production|demo) ;; *) echo "Use production or demo"; exit 1;; esac
 flag=""
 if [ "$mode" = demo ]; then flag="--demo"; fi
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" -w /workspace node:22-alpine node scripts/setup-env.mjs $flag
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" -w /workspace node:26-alpine node scripts/setup-env.mjs $flag
 mkdir -p data
 if [ "$mode" = demo ]; then
   docker compose --env-file .env.demo -p geza-demo up --build -d
