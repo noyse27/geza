@@ -20,6 +20,9 @@ export const dataTables = [
   'rumpel_deleted',
   'facet_terms',
   'plex_match_decisions',
+  'review_commenters',
+  'review_comments',
+  'review_reactions',
 ] as const;
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
 export const MAX_JSON_BYTES = 512 * 1024 * 1024;
@@ -31,7 +34,13 @@ const tablesSchema = z
       z.ZodArray<typeof row>
     >,
   )
-  .extend({ facet_terms: z.array(row).optional(), plex_match_decisions: z.array(row).optional() })
+  .extend({
+    facet_terms: z.array(row).optional(),
+    plex_match_decisions: z.array(row).optional(),
+    review_commenters: z.array(row).optional(),
+    review_comments: z.array(row).optional(),
+    review_reactions: z.array(row).optional(),
+  })
   .strict();
 const sealedSchema = z
   .object({
@@ -56,6 +65,9 @@ export type Archive = Omit<z.infer<typeof archiveSchema>, 'tables'> & {
   tables: z.infer<typeof tablesSchema> & {
     facet_terms: Record<string, unknown>[];
     plex_match_decisions: Record<string, unknown>[];
+    review_commenters: Record<string, unknown>[];
+    review_comments: Record<string, unknown>[];
+    review_reactions: Record<string, unknown>[];
   };
 };
 export const credentialsSchema = z
@@ -135,6 +147,9 @@ export function decodeArchive(bytes: Buffer): Archive {
         ...value.tables,
         facet_terms: value.tables.facet_terms ?? [],
         plex_match_decisions: value.tables.plex_match_decisions ?? [],
+        review_commenters: value.tables.review_commenters ?? [],
+        review_comments: value.tables.review_comments ?? [],
+        review_reactions: value.tables.review_reactions ?? [],
       },
     };
   } catch {

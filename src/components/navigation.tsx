@@ -7,10 +7,12 @@ export function Navigation({
   admin,
   feed = false,
   pending = 0,
+  pendingComments = 0,
 }: {
   admin: boolean;
   feed?: boolean;
   pending?: number;
+  pendingComments?: number;
 }) {
   const path = usePathname();
   const links = admin
@@ -22,6 +24,7 @@ export function Navigation({
         ['/bucketlist', 'Bucketliste'],
         ['/admin/rumpelkammer', 'Rumpelkammer'],
         ['/stats', 'Statistik'],
+        ['/admin/comments', 'Kommentare'],
         ['/admin', 'Admin'],
       ]
     : [
@@ -41,6 +44,11 @@ export function Navigation({
           }
         >
           {label}
+          {url === '/admin/comments' && pendingComments > 0 && (
+            <span className="nav-badge" title="Offene Kommentare">
+              {pendingComments}
+            </span>
+          )}
           {url === '/admin' && pending > 0 && (
             <span className="nav-badge" title="Offene Freundschaftsanfragen">
               {pending}
