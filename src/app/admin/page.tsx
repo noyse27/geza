@@ -14,6 +14,8 @@ import { jobOverview } from '@/lib/job-overview';
 import { JobDashboard } from '@/components/job-status';
 import { diagnosticState } from '@/lib/diagnostics';
 import { webhookHealth } from '@/lib/webhook-health';
+import { commentSettings } from '@/lib/review-comments';
+import { CommentSettings } from '@/components/comment-moderation';
 export const metadata = { title: 'Admin', robots: { index: false, follow: false } };
 export default async function Page() {
   await requireAdmin();
@@ -45,7 +47,7 @@ export default async function Page() {
     nickname,
     status,
   }));
-  const [overview, imports, rumpel, diagnostics, webhookRows] = await Promise.all([
+  const [overview, imports, rumpel, diagnostics, webhookRows, comments] = await Promise.all([
     jobOverview(),
     query('SELECT started_at,finished_at,report FROM import_runs ORDER BY id DESC LIMIT 3'),
     rumpelCounts(),
@@ -58,6 +60,7 @@ export default async function Page() {
         ORDER BY id DESC
         LIMIT 1`,
     ),
+    commentSettings(),
   ]);
   const webhookConfigured = !!(
     settings.PLEX_WEBHOOK_SECRET &&
@@ -119,6 +122,7 @@ export default async function Page() {
         nickname={await instanceNickname()}
         demo={isDemo()}
       />
+      <CommentSettings initial={comments} />
       <AdminControls
         demo={isDemo()}
         configured={configured}

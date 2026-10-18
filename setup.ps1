@@ -4,7 +4,7 @@ Set-Location -LiteralPath $PSScriptRoot
 $demoArgs = @()
 $composeArgs = @()
 if ($Mode -eq 'demo') { $demoArgs = @('--demo'); $composeArgs = @('--env-file', '.env.demo', '-p', 'geza-demo') }
-docker run --rm --mount "type=bind,source=$PSScriptRoot,target=/workspace" --workdir /workspace node:22-alpine node scripts/setup-env.mjs @demoArgs
+docker run --rm --mount "type=bind,source=$PSScriptRoot,target=/workspace" --workdir /workspace node:26-alpine node scripts/setup-env.mjs @demoArgs
 if ($LASTEXITCODE -ne 0) { throw 'Configuration failed.' }
 New-Item -ItemType Directory -Path data -Force | Out-Null
 docker compose @composeArgs up --build -d
