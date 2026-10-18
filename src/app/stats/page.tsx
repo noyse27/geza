@@ -9,10 +9,10 @@ export default async function Page() {
         `SELECT count(*)::int AS events,count(DISTINCT m.id) FILTER(WHERE m.kind='movie')::int AS movies,count(*) FILTER(WHERE m.kind='episode')::int AS episodes,COALESCE(sum(m.runtime),0)::int AS minutes,count(*) FILTER(WHERE m.runtime IS NOT NULL)::int AS with_runtime FROM watches w JOIN media m ON m.id=w.media_id WHERE NOT m.rumpel AND NOT m.bucketlist`,
       ),
       query(
-        `SELECT m.id,m.title,m.year,r.rating FROM ratings r JOIN media m ON m.id=r.media_id WHERE m.kind='movie' AND NOT m.rumpel AND NOT m.bucketlist ORDER BY r.rating DESC,m.title LIMIT 8`,
+        `SELECT m.id,m.title,m.year,r.rating FROM ratings r JOIN media m ON m.id=r.media_id WHERE m.kind='movie' AND NOT m.rumpel AND NOT m.bucketlist ORDER BY r.rating DESC,random() LIMIT 8`,
       ),
       query(
-        `SELECT m.id,m.title,m.year,r.rating FROM ratings r JOIN media m ON m.id=r.media_id WHERE m.kind='movie' AND NOT m.rumpel AND NOT m.bucketlist ORDER BY r.rating ASC,m.title LIMIT 8`,
+        `SELECT m.id,m.title,m.year,r.rating FROM ratings r JOIN media m ON m.id=r.media_id WHERE m.kind='movie' AND NOT m.rumpel AND NOT m.bucketlist ORDER BY r.rating ASC,random() LIMIT 8`,
       ),
       query(
         `SELECT genre AS name,count(*)::int AS count FROM media m CROSS JOIN unnest(m.genres) genre WHERE m.kind='movie' AND NOT m.rumpel AND NOT m.bucketlist AND EXISTS(SELECT 1 FROM watches w WHERE w.media_id=m.id) GROUP BY genre ORDER BY count DESC LIMIT 8`,
@@ -48,7 +48,7 @@ export default async function Page() {
   return (
     <div className="page">
       <div className="page-heading">
-        <span className="eyebrow accent">DEIN FILMLEBEN IN ZAHLEN</span>
+        <span className="eyebrow accent">MEIN FILMLEBEN IN ZAHLEN</span>
         <h1>
           Statistik<span className="accent">.</span>
         </h1>
@@ -102,7 +102,7 @@ export default async function Page() {
         ))}
       </div>
       <section className="panel chart-panel">
-        <span className="eyebrow">DEINE LETZTEN 12 AKTIVEN MONATE</span>
+        <span className="eyebrow">MEINE LETZTEN 12 AKTIVEN MONATE</span>
         <h2>Ein guter Monat für Geschichten</h2>
         <div className="bar-chart">
           {[...monthly].reverse().map((r) => (
@@ -122,8 +122,8 @@ export default async function Page() {
       </section>
       <div className="stats-columns">
         {[
-          [best, 'Deine Favoriten', 'Die höchsten persönlichen Bewertungen'],
-          [worst, 'Nicht ganz dein Film', 'Die niedrigsten persönlichen Bewertungen'],
+          [best, 'Meine Favoriten', 'Die höchsten persönlichen Bewertungen'],
+          [worst, 'Nicht ganz mein Film', 'Die niedrigsten persönlichen Bewertungen'],
         ].map(([rows, title, sub]) => (
           <section className="panel" key={String(title)}>
             <h2>{String(title)}</h2>
@@ -147,7 +147,7 @@ export default async function Page() {
       </div>
       <div className="stats-columns">
         {[
-          [genres, 'Deine Genres'],
+          [genres, 'Meine Genres'],
           [countries, 'Kino ohne Grenzen'],
         ].map(([rows, title]) => (
           <section className="panel" key={String(title)}>
