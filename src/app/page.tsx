@@ -1,14 +1,24 @@
-import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
 import { Search } from '@/components/search';
-import { MediaCard } from '@/components/media';
 import { query } from '@/lib/db';
 import { publicColumns } from '@/lib/catalog';
 import type { Media } from '@/lib/types';
+import { HomeShelf } from '@/components/home-shelf';
 export default async function Page() {
-  const reviewed = await query<Media>(
-    `SELECT ${publicColumns},rating.rating FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings rating ON rating.media_id=m.id WHERE EXISTS(SELECT 1 FROM reviews r WHERE r.media_id=m.id AND r.is_public) ORDER BY (SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public) DESC,m.title LIMIT 12`,
-  );
+  const [reviewed, commented] = await Promise.all([
+    query<Media>(
+      `SELECT ${publicColumns},rating.rating FROM media m LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings rating ON rating.media_id=m.id WHERE NOT m.rumpel AND NOT m.bucketlist AND EXISTS(SELECT 1 FROM reviews r WHERE r.media_id=m.id AND r.is_public) ORDER BY (SELECT max(r.updated_at) FROM reviews r WHERE r.media_id=m.id AND r.is_public) DESC,m.title LIMIT 12`,
+    ),
+    query<Media>(
+      `WITH latest AS (
+         SELECT r.media_id,max(c.published_at) AS commented_at
+         FROM review_comments c JOIN reviews r ON r.id=c.review_id
+         WHERE c.status='published' AND r.is_public GROUP BY r.media_id
+       )
+       SELECT ${publicColumns},rating.rating FROM latest l JOIN media m ON m.id=l.media_id
+       LEFT JOIN media p ON p.id=m.parent_id LEFT JOIN ratings rating ON rating.media_id=m.id
+       WHERE NOT m.rumpel AND NOT m.bucketlist ORDER BY l.commented_at DESC,m.title LIMIT 12`,
+    ),
+  ]);
   const items = reviewed.length
     ? reviewed
     : await query<Media>(
@@ -31,26 +41,11 @@ export default async function Page() {
         </div>
       </section>
       <section>
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">DAS KATALOGREGAL</span>
-            <h2>{reviewed.length ? 'Frisch besprochen' : 'Filme entdecken'}</h2>
-          </div>
-          <Link className="text-link" href="/search">
-            Alle Titel <ArrowUpRight size={16} />
-          </Link>
-        </div>
-        {items.length ? (
-          <div className="poster-grid">
-            {items.map((m) => (
-              <MediaCard key={m.id} item={m} />
-            ))}
-          </div>
-        ) : (
-          <div className="empty">
-            Der Katalog wird gerade eingerichtet. Bald findest du hier die ersten Titel.
-          </div>
-        )}
+        <HomeShelf
+          fresh={JSON.parse(JSON.stringify(items))}
+          commented={JSON.parse(JSON.stringify(commented))}
+          freshLabel={reviewed.length ? 'Frisch besprochen' : 'Filme entdecken'}
+        />
       </section>
     </div>
   );

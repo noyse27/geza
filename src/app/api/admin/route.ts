@@ -397,6 +397,16 @@ export async function POST(req: Request) {
         await query('UPDATE media SET plex_checked_at=NULL');
         await requestPlexScan();
       }
+    } else if (body.action === 'privacy-settings') {
+      const data = z
+        .object({
+          PRIVACY_CONTROLLER_NAME: z.string().trim().max(300),
+          PRIVACY_CONTROLLER_ADDRESS: z.string().trim().max(1000),
+          PRIVACY_CONTROLLER_EMAIL: z.union([z.literal(''), z.string().trim().email().max(254)]),
+          PRIVACY_HOSTING_PROVIDER: z.string().trim().max(500),
+        })
+        .parse(body.data);
+      for (const [key, value] of Object.entries(data)) await setSetting(key, value);
     } else if (body.action === 'diagnostic-logging') {
       const hours = z.union([z.literal(0), z.literal(1), z.literal(6), z.literal(24)]).parse(body.hours);
       const until = hours ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : '';

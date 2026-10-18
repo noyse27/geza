@@ -80,6 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Served with style by <a href="https://polze.net/geza.html">PolzeSoft</a>
           </span>
           <Link href="/credits">Daten & Quellen</Link>
+          <Link href="/datenschutz">Datenschutz</Link>
           <span className="footer-note">{admin ? 'Privater Bereich verfügbar' : 'Film & Serie'}</span>
         </footer>
         <RestoreScroll />

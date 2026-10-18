@@ -6,6 +6,7 @@ import { mergeMetadata } from '../src/lib/providers';
 import { processPlex } from '../src/lib/plex';
 import { GET as sitemapIndex } from '../src/app/sitemap.xml/route';
 import { GET as sitemapPage } from '../src/app/sitemaps/[page]/route';
+import { recordPublicView } from '../src/lib/page-views';
 test('ratings and published reviews are public; drafts and watch events remain private', async () => {
   const suffix = crypto.randomUUID().replaceAll('-', '');
   const term = 'privateterm' + suffix,
@@ -31,6 +32,22 @@ test('ratings and published reviews are public; drafts and watch events remain p
     assert.equal(privateResult.items[0].id, id);
     assert.equal(privateResult.items[0].rating, 8);
     await query('UPDATE reviews SET is_public=true,body=$1 WHERE id=$2', [publicTerm, review.id]);
+    const previousSecret = process.env.SESSION_SECRET;
+    process.env.SESSION_SECRET = 'integration-view-secret-at-least-32-characters';
+    try {
+      const request = new Request('https://geza.example/api/views', {
+        headers: { 'user-agent': 'Integration Browser', 'x-forwarded-for': '203.0.113.10' },
+      });
+      assert.equal(await recordPublicView(request, id!), 1);
+      assert.equal(await recordPublicView(request, id!), 1);
+      const other = new Request('https://geza.example/api/views', {
+        headers: { 'user-agent': 'Another Browser', 'x-forwarded-for': '203.0.113.10' },
+      });
+      assert.equal(await recordPublicView(other, id!), 2);
+    } finally {
+      if (previousSecret === undefined) delete process.env.SESSION_SECRET;
+      else process.env.SESSION_SECRET = previousSecret;
+    }
     const pub = await searchCatalog(new URLSearchParams({ q: publicTerm }), false);
     assert.equal(pub.items[0].id, id);
     assert.equal(pub.items[0].rating, 8);

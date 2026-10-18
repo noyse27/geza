@@ -32,6 +32,7 @@ export function Navigation({
         ['/search', 'Suche'],
         ['/history', 'History'],
         ['/collections', 'Sammlungen'],
+        ['/stats', 'Statistik'],
       ];
   return (
     <nav aria-label="Hauptnavigation">

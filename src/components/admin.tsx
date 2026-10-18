@@ -317,6 +317,80 @@ export function AdminControls({
           </button>
         </div>
       </form>
+      <form
+        className="panel"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          void action({ action: 'privacy-settings', data: Object.fromEntries(form) });
+        }}
+      >
+        <h2>Datenschutzangaben</h2>
+        <p className="muted">
+          Diese Angaben erscheinen auf der öffentlichen Datenschutzseite. Name und ladungsfähige Anschrift
+          müssen zum Betreiber dieser Geza-Instanz passen.
+        </p>
+        {(!formValues.PRIVACY_CONTROLLER_NAME ||
+          !formValues.PRIVACY_CONTROLLER_ADDRESS ||
+          !formValues.PRIVACY_CONTROLLER_EMAIL) && (
+          <p className="error" role="alert">
+            Verantwortlicher, Anschrift und Kontakt-E-Mail müssen vor der öffentlichen Nutzung ergänzt
+            werden.
+          </p>
+        )}
+        <div className="form-grid">
+          <label>
+            Verantwortlicher
+            <input
+              name="PRIVACY_CONTROLLER_NAME"
+              maxLength={300}
+              value={formValues.PRIVACY_CONTROLLER_NAME || ''}
+              onChange={(event) =>
+                setFormValues((current) => ({ ...current, PRIVACY_CONTROLLER_NAME: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Kontakt-E-Mail
+            <input
+              name="PRIVACY_CONTROLLER_EMAIL"
+              type="email"
+              maxLength={254}
+              value={formValues.PRIVACY_CONTROLLER_EMAIL || ''}
+              onChange={(event) =>
+                setFormValues((current) => ({ ...current, PRIVACY_CONTROLLER_EMAIL: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Ladungsfähige Anschrift
+            <textarea
+              name="PRIVACY_CONTROLLER_ADDRESS"
+              rows={4}
+              maxLength={1000}
+              value={formValues.PRIVACY_CONTROLLER_ADDRESS || ''}
+              onChange={(event) =>
+                setFormValues((current) => ({ ...current, PRIVACY_CONTROLLER_ADDRESS: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Hosting-Anbieter und Standort
+            <textarea
+              name="PRIVACY_HOSTING_PROVIDER"
+              rows={4}
+              maxLength={500}
+              value={formValues.PRIVACY_HOSTING_PROVIDER || ''}
+              onChange={(event) =>
+                setFormValues((current) => ({ ...current, PRIVACY_HOSTING_PROVIDER: event.target.value }))
+              }
+            />
+          </label>
+        </div>
+        <button className="button primary" disabled={busy || demo}>
+          Datenschutzangaben speichern
+        </button>
+      </form>
       {plexConfigured ? (
         <div className="panel">
           <h2>Plex-Webhook</h2>

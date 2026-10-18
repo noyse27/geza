@@ -28,11 +28,15 @@ import { commentSettings, reviewDiscussions } from '@/lib/review-comments';
 import { ReviewDiscussion } from '@/components/review-discussion';
 import { isDemo } from '@/lib/demo-mode';
 import { PlexWatchLoader } from './editor';
+import { mediaViewCount } from '@/lib/page-views';
+import { ViewCounter } from '@/components/view-counter';
 export async function MediaDetail({ id, modal = false }: { id: string; modal?: boolean }) {
   const admin = await isAdmin();
-  const plexConfigured = admin && !isDemo() && !!(await getSetting('PLEX_URL')) && !!(await getSetting('PLEX_TOKEN'));
+  const plexConfigured =
+    admin && !isDemo() && !!(await getSetting('PLEX_URL')) && !!(await getSetting('PLEX_TOKEN'));
   const m = await getMedia(id, admin);
   if (!m) notFound();
+  const viewCount = await mediaViewCount(id);
   const navigation = ['show', 'season', 'episode'].includes(m.kind) ? await seasonNavigation(m, admin) : null;
   const poster = m.poster || (m.kind === 'season' ? navigation?.show.poster : null);
   const seasonNumber = navigation?.season?.season ?? m.season;
@@ -198,6 +202,7 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
                 {countryLabel(country)}
               </Link>
             ))}
+            <ViewCounter mediaId={id} initial={viewCount} count={!admin} />
           </div>
           <div className="tags">
             {m.genres.map((g) => (
