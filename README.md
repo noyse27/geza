@@ -4,17 +4,17 @@
 
 Selbst gehostetes Film- und Serienportal: ein öffentlicher Katalog mit Bewertungen und Reviews und ein privates Anschautagebuch. Besucher stöbern, suchen und lesen ohne Anmeldung; nach dem Login siehst nur du das vollständige Tagebuch samt Statistik und Bearbeitung. Next.js, PostgreSQL und Docker Compose. Die Schrift Syne wird lokal ausgeliefert.
 
-**Aktuelle Version: v1.7.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
+**Aktuelle Version: v1.8.0** · [Releases](https://github.com/noyse27/geza/releases) · [Changelog](#changelog)
 
 ## Funktionen im Überblick
 
 | Bereich                    | Was Geza kann                                                                                                                                                                                                                      |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Katalog**                | Suche, Detailseiten, [Sammlungen](#sammlungen-und-filmreihen) (Filmreihen, Genres, FSK, Länder, Jahre, Bewertungen, Regie, Besetzung), [Serien mit Staffeln und vollständigem Episodenkatalog](#serien-staffeln-und-serienkatalog) |
-| **Bewerten und schreiben** | Zehnerbewertung und Reviews je Film, Serie und Staffel; Entwürfe bleiben privat                                                                                                                                                    |
+| **Bewerten und schreiben** | Zehnerbewertung und Reviews je Film, Serie und Staffel; öffentliche Reviews unterstützen moderierte Kommentare und Reaktionen                                                                                                      |
 | **Teilen**                 | Teilen-Button auf Admin-Detailseiten, [Link-Vorschau](#link-vorschau) mit Cover, Bewertung und Review-Teaser; [RSS-Feed „ABO“](#rss-feed-abo) für neue Bewertungen und Reviews                                                     |
 | **Friends of Geza**        | [Befreundete Instanzen](#friends-of-geza) zeigen sich gegenseitig Bewertung und „Review vorhanden“                                                                                                                                 |
-| **Tagebuch**               | Anschauereignisse, History, Statistik, [Trakt-Import](#trakt-import), Plex-Webhook und [Now Playing](#metadaten-und-plex)                                                                                                          |
+| **Tagebuch**               | Anschauereignisse, History, öffentliche Statistik, [Trakt-Import](#trakt-import), Plex-Webhook und [Now Playing](#metadaten-und-plex)                                                                                              |
 | **Ordnung**                | [Bucketliste](#metadaten-und-plex) für Ungesehenes, [Rumpelkammer](#rumpelkammer) für Titel ohne Aktivität                                                                                                                         |
 | **Andere Perspektiven**    | [Externe Reviews und Anbieterbewertungen](#externe-reviews-und-anbieterbewertungen) (TMDB, IMDb via Plex, Filmdienst, wortvogel.de, eigene Quellen)                                                                                |
 | **Betrieb**                | [Demomodus](#demomodus), [Serverumzug und Sicherung](#sicherung-und-updates), [Hosting mit Sitemap](#hosting-und-google)                                                                                                           |
@@ -80,9 +80,13 @@ Demo und Produktion immer getrennt installieren. Für die Website `PUBLIC_URL` i
 
 ## Sichtbarkeit
 
-**Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen, Reviews, RSS-Feed und die Bewertungsauskunft für befreundete Instanzen (ohne Review-Text). Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
+**Öffentlich:** Katalog, Suche, Sammlungen, Detailseiten, Zehnerbewertungen, Reviews, Kommentare, Reaktionen, Statistik, RSS-Feed und die Bewertungsauskunft für befreundete Instanzen (ohne Review-Text). Neue und importierte Reviews sind standardmäßig öffentlich; ein Review kann im Editor bewusst als Entwurf gespeichert werden. Die History zeigt ohne Login nur Anschauereignisse mit mindestens einer Bewertung oder einem öffentlichen Review; alle anderen Einträge sind ausgeblendet.
 
-**Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, persönliche Statistik, Bearbeitung und Export. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
+**Nach Login:** Alle Anschauereignisse ohne Filterung, Home, Data, Bearbeitung, Export sowie Kommentar-Moderation und die zentrale Konfiguration. Ein erneuter Import behält die bestehende Review-Sichtbarkeit bei.
+
+Öffentliche Reviews können mit sechs Symbolen ohne Namens- oder E-Mail-Angabe bewertet werden. Textkommentare benötigen Name und E-Mail-Adresse; die Website ist optional. Neue Absender werden zunächst moderiert und nach der im Adminbereich festgelegten Anzahl freigegebener Beiträge automatisch veröffentlicht. Honeypot, Zeitprüfung, Ratenbegrenzung sowie pseudonyme Browser- und Netzwerkmerkmale erschweren Spam. Kommentare, Reaktionen und der nötige Browser-Cookie lassen sich zentral unter **Admin** deaktivieren.
+
+Die öffentliche Statistik zeigt unter anderem die meistaufgerufenen, meistkommentierten und am häufigsten mit Reaktionen versehenen Filmseiten. Aufrufe werden ohne Analyse-Cookie täglich pro Titel und pseudonymer Browser-/Netzwerkkombination entdoppelt. Die dafür verwendeten HMAC-Werte werden nach spätestens 48 Stunden gelöscht; dauerhaft bleiben nur Summen. Betreiber- und Hostingangaben für die eigene Datenschutzseite werden zentral im Adminbereich gepflegt.
 
 ## Film- und Personenverweise in Reviews
 
@@ -399,6 +403,15 @@ Der HTTP-Test nutzt die lokale Admin-Zugangsdatei. Der Skalierungstest erzeugt u
 Lokaler HTTP-Funktionstest für zusätzliche Quellen: `npx tsx scripts/friend-check.ts` (nutzt den lokalen Adminzugang, legt eine temporäre Testquelle an und entfernt sie wieder).
 
 ## Changelog
+
+### v1.8.0
+
+- **Kommentare und Reaktionen:** Besucher können öffentliche Reviews mit sechs Symbolen bewerten oder Textkommentare verfassen. Neue Absender werden moderiert; nach einer konfigurierbaren Zahl freigegebener Beiträge ist eine automatische Veröffentlichung möglich. Migration 030.
+- **Zentrale Moderation:** Kommentarfreigabe, Spam-Einstufung, Sperren und sämtliche Schalter liegen im Adminbereich. Name und E-Mail sind für Textbeiträge erforderlich, eine Website bleibt optional.
+- **Öffentliche Statistik:** Aufrufzahlen für öffentliche Detailseiten sowie Top-10-Listen nach Aufrufen, Reaktionen und veröffentlichten Kommentaren. Die Startseite ergänzt „Zuletzt kommentiert“. Migration 031.
+- **Datensparsame Reichweitenmessung:** tägliche HMAC-Entdoppelung ohne Analyse-Cookie, Bot- und Prefetch-Filter sowie automatische Löschung der kurzlebigen Deduplizierungswerte.
+- **Datenschutz:** neue öffentliche Datenschutzseite mit zentral gepflegten Betreiber- und Hostingangaben.
+- Neue [Releasehinweise](docs/releases/v1.8.0.md) mit Details zu Update und Migration.
 
 ### v1.7.0
 
