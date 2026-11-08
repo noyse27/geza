@@ -253,6 +253,7 @@ export async function importTrakt(
       )
     ).rows;
     await client.query('SELECT ensure_known_seasons()');
+    await client.query('SELECT refresh_season_completions()');
     await client.query('SELECT rumpel_refresh(NULL)');
     const rumpel = (
       await client.query("SELECT count(*)::int AS n FROM media WHERE rumpel AND kind IN ('movie','show')")

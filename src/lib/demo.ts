@@ -45,6 +45,7 @@ export async function maintainDemo() {
                     bucket_preference: 'auto',
                     plex_watched: null,
                     plex_automatic: false,
+                    season_completion_derived: false,
                     assignment_reason: 'Demo-Bestand',
                     ...row,
                   }))

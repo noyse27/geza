@@ -25,6 +25,7 @@ export type Media = {
   poster: string | null;
   rating?: number;
   watched_at?: string;
+  season_completed_at?: string;
   has_watch?: boolean;
   plex_watched?: boolean;
   seen_evidence?: boolean;

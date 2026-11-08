@@ -150,7 +150,12 @@ export async function ensurePlexMedia(
     : query;
   const kind = m.type;
   if (!['movie', 'show', 'season', 'episode'].includes(kind)) throw Error('Nicht unterstützter Medientyp');
-  const values = plexIdValues(m);
+  const rawValues = plexIdValues(m);
+  // Plex season payloads often repeat show-level IMDb/TMDB/TVDB GUIDs. Those
+  // identify the parent show, not the season. The season is canonicalized by
+  // parent + number; only its own Plex GUID may be attached to it.
+  const values =
+    kind === 'season' && parentId ? { ...(rawValues.plex ? { plex: rawValues.plex } : {}) } : rawValues;
   const ids = Object.fromEntries(Object.entries(values).map(([key, list]) => [key, list[list.length - 1]]));
   const decision = await decidedPlexMedia(m, client, serverScope);
   if (decision) {
@@ -293,6 +298,17 @@ export async function processPlex(payload: {
     if (data?.MediaContainer?.Metadata?.[0]) m = { ...m, ...data.MediaContainer.Metadata[0] };
   }
   let parent: string | undefined;
+  if (m.type === 'season' && m.parentRatingKey) {
+    const p = await plexRequest(
+      `/library/metadata/${encodeURIComponent(String(m.parentRatingKey))}?includeGuids=1`,
+      { purpose: 'webhook-parent-metadata' },
+    );
+    const show = p?.MediaContainer?.Metadata?.find(
+      (item: PlexMetadata) => item.type === 'show' && String(item.ratingKey) === String(m.parentRatingKey),
+    );
+    if (!show) throw Error('Plex-Serienmetadaten für die Staffel fehlen.');
+    parent = await ensurePlexMedia(show);
+  }
   if (m.type === 'episode' && m.grandparentRatingKey) {
     const p = await plexRequest(
       `/library/metadata/${encodeURIComponent(String(m.grandparentRatingKey))}?includeGuids=1`,
@@ -314,18 +330,9 @@ export async function processPlex(payload: {
       `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
       [id, payload.eventId, at || payload.receivedAt, !at],
     );
+    if (m.type === 'episode' && parent) await query('SELECT refresh_season_completions($1)', [[parent]]);
   } else if (payload.event === 'media.rate') {
-    if (m.userRating === undefined)
-      throw Error('Plex liefert keine persönliche Bewertung; Serverzugriff prüfen.');
-    const n = Number(m.userRating);
-    if (!Number.isFinite(n) || n < 0 || n > 10) throw Error('Unbekannte Plex-Bewertungsskala');
-    if (n === 0)
-      await query('DELETE FROM ratings WHERE media_id=$1 AND rated_at<=$2', [id, payload.receivedAt]);
-    else
-      await query(
-        `INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,$2,$3,'plex') ON CONFLICT(media_id) DO UPDATE SET rating=excluded.rating,rated_at=excluded.rated_at,source='plex' WHERE ratings.rated_at<=excluded.rated_at`,
-        [id, Math.round(n), payload.receivedAt],
-      );
+    await syncPlexUserRating(id, m.userRating, payload.receivedAt, true);
     await syncPlexReview(id, plexIds(m).plex).catch((e) =>
       logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
         mediaId: id,
@@ -349,4 +356,34 @@ export async function processPlex(payload: {
           ? 'Bewertungsereignis verarbeitet.'
           : 'Plex-Ereignis verarbeitet.',
   });
+}
+
+export async function syncPlexUserRating(
+  mediaId: string,
+  value: unknown,
+  receivedAt: string,
+  event = false,
+  client?: PoolClient,
+) {
+  if (value === undefined) {
+    if (event) throw Error('Plex liefert keine persönliche Bewertung; Serverzugriff prüfen.');
+    return;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 10) throw Error('Unbekannte Plex-Bewertungsskala');
+  const run = client
+    ? async (sql: string, values: unknown[]) => client.query(sql, values)
+    : async (sql: string, values: unknown[]) => query(sql, values);
+  if (n === 0)
+    await run(`DELETE FROM ratings WHERE media_id=$1 AND ${event ? '' : "source='plex' AND "}rated_at<=$2`, [
+      mediaId,
+      receivedAt,
+    ]);
+  else
+    await run(
+      `INSERT INTO ratings(media_id,rating,rated_at,source) VALUES($1,$2,$3,'plex')
+       ON CONFLICT(media_id) DO UPDATE SET rating=excluded.rating,rated_at=excluded.rated_at,source='plex'
+       WHERE ${event ? '' : "ratings.source='plex' AND "}ratings.rated_at<=excluded.rated_at`,
+      [mediaId, Math.round(n), receivedAt],
+    );
 }

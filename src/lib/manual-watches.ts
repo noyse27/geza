@@ -3,6 +3,16 @@ import { getSetting } from './settings';
 import { syncSeriesCatalog } from './series-catalog';
 import { isDemo } from './demo-mode';
 
+export async function refreshSeasonCompletionsForMedia(mediaId: string) {
+  const [row] = await query<{ show_id: string | null }>(
+    `SELECT CASE m.kind WHEN 'show' THEN m.id WHEN 'season' THEN m.parent_id
+      WHEN 'episode' THEN CASE WHEN p.kind='show' THEN p.id ELSE p.parent_id END END AS show_id
+     FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE m.id=$1`,
+    [mediaId],
+  );
+  if (row?.show_id) await query('SELECT refresh_season_completions($1)', [[row.show_id]]);
+}
+
 export async function createManualWatch(
   mediaId: string,
   watchedAt: string | null,
@@ -61,6 +71,7 @@ export async function createManualWatch(
       [media.kind === 'season' ? media.parent_id : mediaId],
     ]);
     await client.query('COMMIT');
+    await refreshSeasonCompletionsForMedia(mediaId);
     return { added };
   } catch (error) {
     await client.query('ROLLBACK');
