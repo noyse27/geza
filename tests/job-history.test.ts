@@ -17,9 +17,52 @@ import { processPlexScan } from '../src/lib/plex-scan';
 import { ensurePlexMedia, plexIds, processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { plexServerScope } from '../src/lib/plex-decisions';
 import { scheduleNextScan } from '../src/lib/plex-jobs';
+import { cleanupJobHistory } from '../src/lib/job-retention';
 import pg from 'pg';
 
 after(() => pool.end());
+test('job retention keeps five successful neighbors until a failure is viewed and expires failures at 31 days', async () => {
+  const kind = `retention-${crypto.randomUUID()}`;
+  const jobIds: string[] = [];
+  const add = async (status: 'done' | 'failed') => {
+    const [job] = await query(
+      "INSERT INTO jobs(kind,status,updated_at) VALUES($1,$2,now()-interval '8 days') RETURNING id",
+      [kind, status],
+    );
+    jobIds.push(job.id);
+    return (
+      await query(
+        `INSERT INTO job_runs(job_id,kind,attempt,status,started_at,finished_at,error)
+         VALUES($1,$2,1,$3,now()-interval '8 days',now()-interval '8 days',$4) RETURNING id`,
+        [job.id, kind, status, status === 'failed' ? 'Testfehler' : null],
+      )
+    )[0].id as string;
+  };
+  try {
+    for (let i = 0; i < 7; i++) await add('done');
+    const failed = await add('failed');
+    for (let i = 0; i < 7; i++) await add('done');
+    await cleanupJobHistory();
+    assert.equal(
+      Number((await query('SELECT count(*) FROM job_runs WHERE kind=$1', [kind]))[0].count),
+      11,
+      'failure plus five successful runs on either side remain',
+    );
+    await query('UPDATE job_runs SET viewed_at=now() WHERE id=$1', [failed]);
+    await cleanupJobHistory();
+    assert.deepEqual(await query('SELECT status FROM job_runs WHERE kind=$1', [kind]), [
+      { status: 'failed' },
+    ]);
+    assert.deepEqual(await query('SELECT status FROM jobs WHERE kind=$1', [kind]), [{ status: 'failed' }]);
+    await query("UPDATE job_runs SET finished_at=now()-interval '32 days' WHERE id=$1", [failed]);
+    await query("UPDATE jobs SET updated_at=now()-interval '32 days' WHERE kind=$1", [kind]);
+    await cleanupJobHistory();
+    assert.equal((await query('SELECT 1 FROM job_runs WHERE id=$1', [failed])).length, 0);
+    assert.equal((await query('SELECT 1 FROM jobs WHERE kind=$1', [kind])).length, 0);
+  } finally {
+    await query('DELETE FROM jobs WHERE id=ANY($1::bigint[])', [jobIds]);
+  }
+});
 test('batched results preserve ordering, redaction and transaction rollback across chunks', async () => {
   const [job] = await query("INSERT INTO jobs(kind) VALUES('plex-scan') RETURNING id");
   const [run] = await query(

@@ -26,6 +26,16 @@ export function TimeAgo({ value }: { value: string }) {
     </time>
   );
 }
+export function MarkJobViewed({ runId }: { runId: string }) {
+  useEffect(() => {
+    void fetch('/api/admin/jobs', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId }),
+    });
+  }, [runId]);
+  return null;
+}
 export function RunProgress({ job }: { job: Row }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {

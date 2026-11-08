@@ -75,10 +75,19 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
       )
     : [];
   const rating = (await query('SELECT rating FROM ratings WHERE media_id=$1', [id]))[0]?.rating;
+  const completion =
+    admin && m.kind === 'season'
+      ? (
+          await query<{ season_completed_at: string | null; season_completion_source: string | null }>(
+            'SELECT season_completed_at,season_completion_source FROM media WHERE id=$1',
+            [id],
+          )
+        )[0]
+      : null;
   const children =
     m.kind === 'show' || m.kind === 'season'
       ? await query<Media>(
-          `SELECT ${publicColumns},m.plex_watched,cardinality(m.seen_sources)>0 AS seen_evidence,
+          `SELECT ${publicColumns},m.plex_watched,m.season_completed_at,cardinality(m.seen_sources)>0 AS seen_evidence,
            (SELECT max(watched_at) FROM watches WHERE media_id=m.id) AS watched_at,
            EXISTS(SELECT 1 FROM watches WHERE media_id=m.id) AS has_watch
            FROM media m LEFT JOIN media p ON p.id=m.parent_id WHERE
@@ -375,6 +384,17 @@ export async function MediaDetail({ id, modal = false }: { id: string; modal?: b
             <span className="eyebrow accent">NUR FÜR DICH</span>
             <h2>Dein Tagebuch</h2>
             <RatingEditor id={id} rating={rating ?? null} />
+            {completion?.season_completed_at && (
+              <p>
+                Staffel vollständig gesehen:{' '}
+                {new Date(completion.season_completed_at).toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })}{' '}
+                <span className="muted small">(aus Episodensichtungen abgeleitet)</span>
+              </p>
+            )}
             <h3>Anschauereignisse</h3>
             {watches.length ? (
               <ul className="watch-dates">

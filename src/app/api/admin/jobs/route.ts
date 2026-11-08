@@ -31,6 +31,19 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PATCH(req: Request) {
+  if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401 });
+  if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });
+  const { runId } = z.object({ runId: z.string().regex(/^[1-9]\d{0,17}$/) }).parse(await req.json());
+  const rows = await query(
+    "UPDATE job_runs SET viewed_at=COALESCE(viewed_at,now()) WHERE id=$1 AND status='failed' RETURNING id",
+    [runId],
+  );
+  if (!rows.length)
+    return Response.json({ error: 'Fehlgeschlagene Ausführung nicht gefunden' }, { status: 404 });
+  return Response.json({ viewed: true });
+}
+
 export async function DELETE(req: Request) {
   if (!(await isAdmin())) return Response.json({ error: 'Anmeldung erforderlich' }, { status: 401 });
   if (!validOrigin(req)) return Response.json({ error: 'Ungültige Anfrage' }, { status: 403 });

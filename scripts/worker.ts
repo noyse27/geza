@@ -14,6 +14,7 @@ import { installationReady } from '../src/lib/setup';
 import { processSeriesCatalog } from '../src/lib/manual-watches';
 import { processFacetRecovery, resumeFacetRecovery } from '../src/lib/facet-recovery';
 import { runContext, mediaSnapshot, changeOutcome, saveJobResult } from '../src/lib/job-history';
+import { cleanupJobHistory } from '../src/lib/job-retention';
 let running = true;
 process.on('SIGTERM', () => {
   running = false;
@@ -49,9 +50,7 @@ while (running) {
     }
     if (Date.now() - lastCleanup > 3600000) {
       await query("DELETE FROM event_logs WHERE created_at < now() - interval '14 days'");
-      await query(
-        "DELETE FROM job_runs r WHERE r.finished_at < now()-interval '90 days' AND (r.status='done' OR EXISTS(SELECT 1 FROM job_runs newer WHERE newer.job_id=r.job_id AND newer.id>r.id AND newer.status='done')) AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.active_run_id=r.id)",
-      );
+      await cleanupJobHistory();
       lastCleanup = Date.now();
     }
     if (!facetRecoveryResumed) {
