@@ -24,7 +24,7 @@ import { fetchTmdbDetails, refreshProviderRatings } from '@/lib/providers';
 import { saveProviderRating } from '@/lib/provider-ratings';
 import { redact } from '@/lib/logging';
 import { queueSeriesCatalog, syncSeriesCatalog } from '@/lib/series-catalog';
-import { createManualWatch } from '@/lib/manual-watches';
+import { createManualWatch, refreshSeasonCompletionsForMedia } from '@/lib/manual-watches';
 import { recordFeedEntrySafely } from '@/lib/feed';
 import { acceptFriendship, removeFriend, requestFriendship } from '@/lib/federation';
 import { DIAGNOSTIC_LOG_UNTIL } from '@/lib/diagnostics';
@@ -319,6 +319,7 @@ export async function POST(req: Request) {
          ON CONFLICT(source,source_id) DO NOTHING RETURNING id`,
         [mediaId, `manual-sync:${mediaId}:${timestamp}`, at],
       );
+      await refreshSeasonCompletionsForMedia(mediaId);
       return Response.json({ added: added.length > 0 }, { headers: { 'Cache-Control': 'no-store' } });
     } else if (body.action === 'watch') {
       const data = z
@@ -337,6 +338,7 @@ export async function POST(req: Request) {
         [body.id, data.watched_at, body.mediaId],
       );
       if (!updated.length) throw Error('Anschauereignis nicht gefunden');
+      await refreshSeasonCompletionsForMedia(String(body.mediaId));
     } else if (body.action === 'watch-delete') {
       const deleted = await query(
         `WITH root AS (SELECT id FROM watches WHERE id=$1 AND media_id=$2 FOR UPDATE)
@@ -344,6 +346,7 @@ export async function POST(req: Request) {
         [body.id, body.mediaId],
       );
       if (!deleted.length) throw Error('Anschauereignis nicht gefunden');
+      await refreshSeasonCompletionsForMedia(String(body.mediaId));
     } else if (body.action === 'series-catalog') {
       return Response.json(await syncSeriesCatalog(z.string().regex(/^\d+$/).parse(body.mediaId)));
     } else if (body.action === 'watch-expand') {

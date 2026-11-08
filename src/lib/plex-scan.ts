@@ -1,8 +1,8 @@
 import { isDemo } from './demo-mode';
 import { logEvent } from './logging';
 import { pool } from './db';
-import { getSetting } from './settings';
-import { plexRequest, ensurePlexMedia, plexIds } from './plex';
+import { getSetting, setSetting } from './settings';
+import { plexRequest, ensurePlexMedia, plexIds, syncPlexUserRating } from './plex';
 import { loadTombstones, forgetTombstones } from './rumpel';
 import { prepareMetadataMerge, fromPlex } from './providers';
 import { resolvePlexEpisodes } from './plex-episodes';
@@ -16,6 +16,7 @@ type Entry = {
   library: string;
   automatic: boolean;
   episodes?: Metadata[];
+  seasons?: Metadata[];
   incomplete?: boolean;
   issue?: string;
 };
@@ -23,6 +24,7 @@ type Entry = {
 export async function plexList(
   path: string,
   read: (path: string) => Promise<any> = plexRequest,
+  allowDuplicateRatingKeys = false,
 ): Promise<Metadata[]> {
   const result: Metadata[] = [];
   let expectedTotal: number | undefined;
@@ -47,7 +49,8 @@ export async function plexList(
     for (const item of page)
       if (item.ratingKey != null) {
         const key = String(item.ratingKey);
-        if (ratingKeys.has(key)) throw Error('Doppelte Plex-Seite; Bestand bleibt unverändert');
+        if (!allowDuplicateRatingKeys && ratingKeys.has(key))
+          throw Error('Doppelte Plex-Seite; Bestand bleibt unverändert');
         ratingKeys.add(key);
       }
     if (c.offset !== undefined && Number(c.offset) !== offset) throw Error('Plex-Seitenfolge unvollständig');
@@ -93,6 +96,7 @@ async function readScanEntries(
         if (detail) item = { ...item, ...detail };
       }
       let episodes: Metadata[] | undefined;
+      let seasons: Metadata[] | undefined;
       let incomplete = false;
       if (item.type === 'show') {
         if (!item.ratingKey) {
@@ -115,6 +119,31 @@ async function readScanEntries(
           return records.find((record: Metadata) => String(record.ratingKey) === key);
         });
         episodes = resolved.episodes;
+        const seasonChildren = await plexList(
+          `/library/metadata/${encodeURIComponent(item.ratingKey)}/children?includeGuids=1`,
+          read,
+        ).catch((error) => {
+          if (/HTTP 404/.test(String(error?.message))) return [];
+          throw error;
+        });
+        const seasonKeys = [
+          ...new Set(
+            [
+              ...seasonChildren
+                .filter((season) => season.type === 'season')
+                .map((season) => season.ratingKey),
+              ...episodes.map((episode) => episode.parentRatingKey),
+            ].filter((key): key is string | number => key !== undefined && key !== null),
+          ),
+        ];
+        seasons = [];
+        for (const key of seasonKeys) {
+          const response = await read(`/library/metadata/${encodeURIComponent(String(key))}?includeGuids=1`);
+          const season = response?.MediaContainer?.Metadata?.find(
+            (record: Metadata) => record.type === 'season' && String(record.ratingKey) === String(key),
+          );
+          if (season) seasons.push(season);
+        }
         incomplete = resolved.issues.length > 0;
         if (incomplete) {
           const detail = {
@@ -145,6 +174,7 @@ async function readScanEntries(
         library: String(section.title),
         automatic,
         episodes,
+        seasons,
         incomplete,
         issue,
       });
@@ -183,6 +213,27 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       'Keine ausgewählte Film- oder Serienbibliothek verfügbar. Bitte die Bibliotheksauswahl prüfen; der Bestand bleibt unverändert.',
     );
   const { entries, incompleteSeries } = await readScanEntries(sections, automatic, read);
+  const accountId = await getSetting('PLEX_ACCOUNT_ID');
+  const previousHistorySync = Number(await getSetting('PLEX_HISTORY_SYNCED_AT'));
+  const historyStartedAt = Math.floor(Date.now() / 1000);
+  const historyPath = new URLSearchParams({
+    ...(accountId ? { accountID: accountId } : {}),
+    sort: 'viewedAt:asc',
+    ...(Number.isSafeInteger(previousHistorySync) && previousHistorySync > 0
+      ? { viewedAt: `>=${Math.max(1, previousHistorySync - 300)}` }
+      : {}),
+  });
+  let history: Metadata[] = [];
+  let historyComplete = false;
+  if (accountId)
+    try {
+      history = await plexList(`/status/sessions/history/all?${historyPath}`, read, true);
+      historyComplete = true;
+    } catch (error) {
+      await logEvent('warn', 'plex-scan', 'Plex-Wiedergabehistorie konnte nicht abgeglichen werden', {
+        error,
+      });
+    }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -209,7 +260,18 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         automatic: auto || !!prior?.automatic,
       });
     };
-    for (const { item, library, automatic: auto, episodes, incomplete, issue } of entries) {
+    const reconciledAt = new Date().toISOString();
+    const touchedShows = new Set<string>();
+    const plexMedia = new Map<string, string>();
+    for (const {
+      item,
+      library,
+      automatic: auto,
+      episodes,
+      seasons: plexSeasons,
+      incomplete,
+      issue,
+    } of entries) {
       await reportProgress(`Titel zuordnen: ${item.title}`, processed++, entries.length);
       await client.query('SAVEPOINT plex_entry');
       pendingMatches = new Map();
@@ -249,6 +311,8 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         }
         await forgetTombstones(deleted, client);
         const id = await ensurePlexMedia(item, undefined, client, scope);
+        if (item.ratingKey != null) plexMedia.set(String(item.ratingKey), id);
+        if (item.type === 'show') touchedShows.add(id);
         entryRootId = id;
         await merge(id, fromPlex(item));
         if (incomplete) {
@@ -278,16 +342,32 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
             seasons.set(episode.parentIndex, leaves);
           }
           for (const [number, leaves] of seasons) {
+            const plexSeason = plexSeasons?.find((season) => Number(season.index) === number);
             const sid = await ensurePlexMedia(
-              { type: 'season', index: number, title: `Staffel ${number}` },
+              plexSeason || { type: 'season', index: number, title: `Staffel ${number}` },
               id,
               client,
               scope,
             );
+            if (plexSeason) await syncPlexUserRating(sid, plexSeason.userRating, reconciledAt, false, client);
             remember(sid, library, leaves.some(seen), auto);
             for (const episode of leaves) {
               const eid = await ensurePlexMedia(episode, id, client, scope);
+              if (episode.ratingKey != null) plexMedia.set(String(episode.ratingKey), eid);
               remember(eid, library, seen(episode), false);
+              if (
+                seen(episode) &&
+                episode.ratingKey != null &&
+                typeof episode.lastViewedAt === 'number' &&
+                Number.isFinite(episode.lastViewedAt)
+              ) {
+                await client.query(
+                  `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated)
+                   VALUES($1,'plex-scan',$2,to_timestamp($3),false)
+                   ON CONFLICT(source,source_id) DO NOTHING`,
+                  [eid, `plex-scan:${episode.ratingKey}:${episode.lastViewedAt}`, episode.lastViewedAt],
+                );
+              }
               if (await queuePlexRestore(client, restoreContext, eid, episode)) watchedRestores++;
             }
           }
@@ -339,6 +419,25 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         await client.query('RELEASE SAVEPOINT plex_entry');
       }
     }
+    const historyRows = history.flatMap((entry) => {
+      const mediaId = entry.ratingKey == null ? undefined : plexMedia.get(String(entry.ratingKey));
+      const viewedAt = Number(entry.viewedAt);
+      if (!mediaId || !Number.isSafeInteger(viewedAt) || viewedAt <= 0) return [];
+      const sourceId = entry.historyKey
+        ? String(entry.historyKey)
+        : `${entry.accountID || accountId}:${entry.ratingKey}:${viewedAt}`;
+      return [
+        { media_id: mediaId, source_id: sourceId, watched_at: new Date(viewedAt * 1000).toISOString() },
+      ];
+    });
+    for (let start = 0; start < historyRows.length; start += 1000)
+      await client.query(
+        `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated)
+         SELECT media_id,'plex-history',source_id,watched_at,false
+         FROM jsonb_to_recordset($1::jsonb) AS h(media_id bigint,source_id text,watched_at timestamptz)
+         ON CONFLICT(source,source_id) DO NOTHING`,
+        [JSON.stringify(historyRows.slice(start, start + 1000))],
+      );
     // Absence is not an unwatched event: retain known seen evidence for missing items.
     const protectedIds = new Set<string>(
       (
@@ -381,6 +480,7 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
       origins=ARRAY(SELECT DISTINCT unnest(array_remove(origins,'legacy-bucket')||ARRAY['plex'])) WHERE id=$1`,
           [id, [...match.libraries].sort(), match.watched, match.automatic],
         );
+    if (touchedShows.size) await client.query('SELECT refresh_season_completions($1)', [[...touchedShows]]);
     await client.query('SELECT rumpel_refresh(NULL)');
     await reportProgress('Einordnung abschließen', entries.length, entries.length, true);
     const old = new Map(before.map((r) => [r.id, r]));
@@ -465,6 +565,17 @@ export async function processPlexScan(payload: { manual?: boolean; preview?: boo
         [[...matches.keys()]],
       );
       await client.query('COMMIT');
+      if (historyComplete)
+        await setSetting('PLEX_HISTORY_SYNCED_AT', String(historyStartedAt)).catch((error) =>
+          logEvent(
+            'warn',
+            'plex-scan',
+            'Checkpoint der Plex-Wiedergabehistorie konnte nicht gespeichert werden',
+            {
+              error,
+            },
+          ),
+        );
       await logEvent(
         incompleteSeries.length || conflicts ? 'warn' : 'info',
         'plex-scan',

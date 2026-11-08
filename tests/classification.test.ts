@@ -227,6 +227,97 @@ test('classification: seasons, provenance, preview, retries, disappearance and i
   }
 });
 
+test('Plex season ratings attach to the canonical season and episode dates derive completion', async () => {
+  assert.match(process.env.DATABASE_URL || '', /geza_test/);
+  await setSetting('PLEX_URL', 'http://plex.test:32400');
+  await setSetting('PLEX_TOKEN', 'season-test');
+  const suffix = crypto.randomUUID().replaceAll('-', '');
+  const [show] = await query("INSERT INTO media(kind,title,ids) VALUES('show',$1,$2) RETURNING id", [
+    `Season parent ${suffix}`,
+    JSON.stringify({ tvdb: `s${suffix}` }),
+  ]);
+  const [season] = await query(
+    "INSERT INTO media(kind,title,parent_id,season,ids) VALUES('season','Staffel 1',$1,1,'{}') RETURNING id",
+    [show.id],
+  );
+  const episodes = await query(
+    `INSERT INTO media(kind,title,parent_id,season,episode,ids) VALUES
+      ('episode','E1',$1,1,1,'{}'),('episode','E2',$1,1,2,'{}') RETURNING id`,
+    [show.id],
+  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const path = new URL(String(input)).pathname;
+    const Metadata =
+      path === '/library/metadata/season-key'
+        ? [
+            {
+              type: 'season',
+              title: 'Staffel 1',
+              ratingKey: 'season-key',
+              parentRatingKey: 'show-key',
+              index: 1,
+              guid: `plex://season/${suffix}`,
+              Guid: [{ id: `tvdb://s${suffix}` }],
+              userRating: 8,
+            },
+          ]
+        : path === '/library/metadata/show-key'
+          ? [
+              {
+                type: 'show',
+                title: `Season parent ${suffix}`,
+                ratingKey: 'show-key',
+                guid: `plex://show/${suffix}`,
+                Guid: [{ id: `tvdb://s${suffix}` }],
+              },
+            ]
+          : [];
+    return Response.json({ MediaContainer: { Metadata } });
+  }) as typeof fetch;
+  try {
+    await processPlex({
+      event: 'media.rate',
+      metadata: { type: 'season', ratingKey: 'season-key', parentRatingKey: 'show-key' },
+      receivedAt: new Date().toISOString(),
+      eventId: `season-rate-${suffix}`,
+    });
+    const seasons = await query(
+      "SELECT id,parent_id,ids FROM media WHERE kind='season' AND season=1 AND (id=$1 OR parent_id=$2)",
+      [season.id, show.id],
+    );
+    assert.equal(seasons.length, 1);
+    assert.equal(seasons[0].id, season.id);
+    assert.equal(seasons[0].ids.plex, suffix);
+    assert.equal(
+      (await query('SELECT rating,source FROM ratings WHERE media_id=$1', [season.id]))[0].rating,
+      8,
+    );
+    await query(
+      `INSERT INTO watches(media_id,source,source_id,watched_at) VALUES
+       ($1,'plex-history',$3,'2026-01-01T10:00:00Z'),($2,'plex-history',$4,'2026-01-02T11:00:00Z')`,
+      [episodes[0].id, episodes[1].id, `history-a-${suffix}`, `history-b-${suffix}`],
+    );
+    await query('SELECT refresh_season_completions($1)', [[show.id]]);
+    const [completed] = await query(
+      'SELECT season_completed_at,season_completion_derived FROM media WHERE id=$1',
+      [season.id],
+    );
+    assert.equal(completed.season_completed_at.toISOString(), '2026-01-02T11:00:00.000Z');
+    assert.equal(completed.season_completion_derived, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await query("DELETE FROM jobs WHERE payload->>'mediaId' IN ($1,$2)", [season.id, show.id]);
+    await query('DELETE FROM ratings WHERE media_id=$1', [season.id]);
+    await query('DELETE FROM watches WHERE media_id=ANY($1::bigint[])', [
+      episodes.map((episode) => episode.id),
+    ]);
+    await query('DELETE FROM media WHERE id=ANY($1::bigint[])', [episodes.map((episode) => episode.id)]);
+    await query('DELETE FROM media WHERE id=$1', [season.id]);
+    await query('DELETE FROM media WHERE id=$1', [show.id]);
+  }
+});
+
 test('Plex restore: Geza watches survive moves, previews, retries and Plex status loss', async () => {
   assert.match(process.env.DATABASE_URL || '', /geza_test/);
   process.env.SESSION_SECRET = 'classification-test-secret-with-at-least-32-characters';

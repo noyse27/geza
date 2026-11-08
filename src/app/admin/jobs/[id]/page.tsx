@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { exactTime, errorHelp, jobNames, jobState, outcomeNames } from '@/lib/job-display';
-import { RefreshRuns, RetryJob, RunProgress, TimeAgo } from '@/components/job-status';
+import { MarkJobViewed, RefreshRuns, RetryJob, RunProgress, TimeAgo } from '@/components/job-status';
 import { JobConflict } from '@/components/job-conflict';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Verarbeitungsergebnis', robots: { index: false, follow: false } };
@@ -37,6 +37,7 @@ export default async function Run({
   ]);
   return (
     <div className="page">
+      {run.status === 'failed' && !run.viewed_at && <MarkJobViewed runId={id} />}
       <h1>{jobNames[run.kind] || run.kind}</h1>
       <p>
         <Link href="/admin/jobs">← Aufträge</Link> ·{' '}
