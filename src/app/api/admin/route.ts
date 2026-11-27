@@ -7,7 +7,7 @@ import { processPlexScan } from '@/lib/plex-scan';
 import { z } from 'zod';
 import { reviewModule } from '@/lib/review-modules';
 import { friendUrl } from '@/lib/friend-reviews';
-import { fetchPlexReview, findPlex } from '@/lib/plex';
+import { ensurePlexId, fetchPlexReview, findPlex } from '@/lib/plex';
 import { randomBytes } from 'node:crypto';
 import { correctAssignment } from '@/lib/assignment';
 import { deleteMedia } from '@/lib/delete-media';
@@ -276,12 +276,17 @@ export async function POST(req: Request) {
       }
       if (reviewMediaId) await recordFeedEntrySafely(reviewMediaId);
     } else if (body.action === 'plex-review') {
-      const [media] = await query<{ ids: Record<string, string> }>('SELECT ids FROM media WHERE id=$1', [
-        body.mediaId,
-      ]);
-      const plexId = media?.ids?.plex;
-      if (!plexId)
-        return Response.json({ error: 'Kein Plex-Verweis für diesen Titel vorhanden.' }, { status: 400 });
+      const [media] = await query<{ ids: Record<string, string>; kind: string }>(
+        'SELECT ids,kind FROM media WHERE id=$1',
+        [body.mediaId],
+      );
+      if (!media) return Response.json({ error: 'Titel nicht gefunden.' }, { status: 404 });
+      let plexId: string;
+      try {
+        plexId = (await ensurePlexId(String(body.mediaId), media.ids, media.kind, 'review-sync')).plex;
+      } catch (e) {
+        return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+      }
       try {
         const review = await fetchPlexReview(plexId);
         if (!review?.message) return Response.json({ error: 'Keine Plex-Review gefunden.' }, { status: 404 });
@@ -304,8 +309,8 @@ export async function POST(req: Request) {
         throw Error('Plex ist nicht konfiguriert.');
       const [media] = await query('SELECT ids,kind FROM media WHERE id=$1', [mediaId]);
       if (!media) throw Error('Titel nicht gefunden.');
-      if (!media.ids?.plex) throw Error('Kein Plex-Verweis für diesen Titel vorhanden.');
-      const metadata = await findPlex(media.ids, media.kind, 'manual-watch-import');
+      const ids = await ensurePlexId(mediaId, media.ids, media.kind, 'manual-watch-import');
+      const metadata = await findPlex(ids, media.kind, 'manual-watch-import');
       if (!metadata) throw Error('Titel in Plex nicht gefunden.');
       const timestamp = Number(metadata.lastViewedAt);
       const date = new Date(timestamp * 1000);
