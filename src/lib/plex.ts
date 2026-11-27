@@ -9,6 +9,7 @@ import { saveJobResult } from './job-history';
 import { decidedPlexMedia, plexServerScope } from './plex-decisions';
 import { diagnosticState } from './diagnostics';
 type PlexMetadata = Record<string, any>;
+const PLEX_DEFAULT_CONTAINER_SIZE = 2000;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
   const consistent = matches.filter((r) =>
     Object.entries(ids).every(
@@ -62,13 +63,23 @@ export async function plexRequest(
   if (!base || !token) return null;
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
+  // Plex warns that requests without X-Plex-Container-Size will be rejected with HTTP 400.
+  // Paged callers pass start/size as query parameters; mirror them, otherwise use a generous cap.
+  const explicitSize = url.searchParams.get('X-Plex-Container-Size');
+  const containerSize = explicitSize || String(PLEX_DEFAULT_CONTAINER_SIZE);
+  const containerStart = url.searchParams.get('X-Plex-Container-Start') || '0';
   const diagnostics = await diagnosticState();
   const r = await loggedFetch(
     'Plex',
     url.toString(),
     {
       cache: 'no-store',
-      headers: { 'X-Plex-Token': token, Accept: 'application/json' },
+      headers: {
+        'X-Plex-Token': token,
+        Accept: 'application/json',
+        'X-Plex-Container-Start': containerStart,
+        'X-Plex-Container-Size': containerSize,
+      },
       signal: AbortSignal.timeout(12000),
       redirect: 'error',
     },
@@ -85,7 +96,14 @@ export async function plexRequest(
     await r.text();
     return true;
   }
-  return r.json();
+  const data = await r.json();
+  const container = data?.MediaContainer;
+  const total = Number(container?.totalSize);
+  const received = (container?.Metadata?.length || 0) + (container?.Directory?.length || 0);
+  // Without explicit paging the default cap must never silently truncate a list.
+  if (!explicitSize && Number.isFinite(total) && total > received && received >= PLEX_DEFAULT_CONTAINER_SIZE)
+    throw Error(`Plex-Antwort unvollständig: ${received} von ${total} Einträgen`);
+  return data;
 }
 export async function findPlex(ids: Record<string, unknown>, kind: string, purpose = 'media-lookup') {
   if (!ids.plex) return null;
