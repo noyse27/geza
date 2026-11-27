@@ -113,18 +113,46 @@ export async function ensurePlexId(
   const sections = (await plexRequest('/library/sections', { purpose }))?.MediaContainer?.Directory;
   if (!Array.isArray(sections)) throw Error('Plex-Bibliotheken konnten nicht gelesen werden.');
   const found = new Set<string>();
-  for (const section of sections.filter((s: PlexMetadata) => s.type === kind)) {
-    const data = await plexRequest(
-      `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1&type=${kind === 'movie' ? 1 : 2}`,
-      { purpose },
-    );
-    for (const item of data?.MediaContainer?.Metadata || []) {
+  const collect = (items: PlexMetadata[]) => {
+    for (const item of items) {
       const values = plexIdValues(item);
       const has = (key: string) => (values[key] || []).includes(String(current[key]));
       if (keys.some(has) && keys.every((key) => !values[key] || has(key)))
         for (const plex of values.plex || []) found.add(plex);
     }
-  }
+  };
+  const libraries = sections.filter((s: PlexMetadata) => s.type === kind);
+  const base = (key: string) =>
+    `/library/sections/${encodeURIComponent(key)}/all?includeGuids=1&type=${kind === 'movie' ? 1 : 2}`;
+  // Fast path: Plex's title filter keeps the response small even for large libraries.
+  const [row] = await query<{ title: string; original_title: string }>(
+    'SELECT title,original_title FROM media WHERE id=$1',
+    [mediaId],
+  );
+  const titles = [...new Set([row?.title, row?.original_title].map((t) => t?.trim()).filter(Boolean))];
+  for (const section of libraries)
+    for (const title of titles as string[])
+      collect(
+        (await plexRequest(`${base(section.key)}&title=${encodeURIComponent(title)}`, { purpose }))
+          ?.MediaContainer?.Metadata || [],
+      );
+  // Fallback for titles named differently in Plex: read the library page by page, since a
+  // single request with GUIDs for the whole library can exceed the request timeout.
+  const pageSize = 200;
+  if (!found.size)
+    for (const section of libraries)
+      for (let offset = 0; ; offset += pageSize) {
+        const container = (
+          await plexRequest(
+            `${base(section.key)}&X-Plex-Container-Start=${offset}&X-Plex-Container-Size=${pageSize}`,
+            { purpose },
+          )
+        )?.MediaContainer;
+        const items: PlexMetadata[] = container?.Metadata || [];
+        collect(items);
+        const total = Number(container?.totalSize);
+        if (items.length < pageSize || (Number.isFinite(total) && offset + items.length >= total)) break;
+      }
   if (!found.size) throw Error('Titel mit diesen IMDb-/TMDB-/TVDB-IDs in Plex nicht gefunden.');
   if (found.size > 1) throw Error('Mehrere Plex-Titel passen zu diesen IDs: manuelle Zuordnung erforderlich.');
   const [plex] = found;
