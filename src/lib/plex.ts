@@ -94,6 +94,55 @@ export async function findPlex(ids: Record<string, unknown>, kind: string, purpo
   });
   return data?.MediaContainer?.Metadata?.[0] || null;
 }
+/**
+ * Manually created titles carry IMDb/TMDB/TVDB IDs but no Plex GUID. Look the title up in the
+ * Plex libraries by those provider IDs and store the Plex GUID once it is unambiguous.
+ */
+export async function ensurePlexId(
+  mediaId: string,
+  ids: Record<string, string> | null | undefined,
+  kind: string,
+  purpose = 'plex-link',
+): Promise<Record<string, string>> {
+  const current = ids || {};
+  if (current.plex) return current;
+  if (!['movie', 'show'].includes(kind)) throw Error('Kein Plex-Verweis für diesen Titel vorhanden.');
+  const keys = ['imdb', 'tmdb', 'tvdb'].filter((key) => current[key]);
+  if (!keys.length)
+    throw Error('Kein Plex-Verweis für diesen Titel vorhanden und keine IMDb-/TMDB-/TVDB-ID zum Nachschlagen.');
+  const sections = (await plexRequest('/library/sections', { purpose }))?.MediaContainer?.Directory;
+  if (!Array.isArray(sections)) throw Error('Plex-Bibliotheken konnten nicht gelesen werden.');
+  const found = new Set<string>();
+  for (const section of sections.filter((s: PlexMetadata) => s.type === kind)) {
+    const data = await plexRequest(
+      `/library/sections/${encodeURIComponent(section.key)}/all?includeGuids=1&type=${kind === 'movie' ? 1 : 2}`,
+      { purpose },
+    );
+    for (const item of data?.MediaContainer?.Metadata || []) {
+      const values = plexIdValues(item);
+      const has = (key: string) => (values[key] || []).includes(String(current[key]));
+      if (keys.some(has) && keys.every((key) => !values[key] || has(key)))
+        for (const plex of values.plex || []) found.add(plex);
+    }
+  }
+  if (!found.size) throw Error('Titel mit diesen IMDb-/TMDB-/TVDB-IDs in Plex nicht gefunden.');
+  if (found.size > 1) throw Error('Mehrere Plex-Titel passen zu diesen IDs: manuelle Zuordnung erforderlich.');
+  const [plex] = found;
+  const [other] = await query<{ id: string; title: string }>(
+    "SELECT id,title FROM media WHERE kind=$1 AND ids->>'plex'=$2 AND id<>$3 LIMIT 1",
+    [kind, plex, mediaId],
+  );
+  if (other)
+    throw Error(
+      `Der passende Plex-Titel ist bereits mit „${other.title}“ (ID ${other.id}) verknüpft. Bitte die Dubletten zusammenführen.`,
+    );
+  const [updated] = await query<{ ids: Record<string, string> }>(
+    "UPDATE media SET ids=ids||jsonb_build_object('plex',$2::text) WHERE id=$1 RETURNING ids",
+    [mediaId, plex],
+  );
+  await logEvent('info', 'plex', 'Plex-Verweis über Provider-IDs ergänzt', { mediaId, plex, keys });
+  return updated?.ids || { ...current, plex };
+}
 const reviewQuery = `query GetReview($metadataID: ID!) {
   metadataReviewV2(metadata: { id: $metadataID }) {
     ... on ActivityReview { rating hasSpoilers message status }
