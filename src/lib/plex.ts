@@ -215,7 +215,7 @@ export async function fetchPlexReview(metadataID: string) {
   if (data.errors) throw Error(data.errors[0]?.message || 'Plex Community GraphQL-Fehler');
   return data.data?.metadataReviewV2 || null;
 }
-async function syncPlexReview(mediaId: string, plexId: string | undefined) {
+export async function syncPlexReview(mediaId: string, plexId: string | undefined) {
   if (!plexId) return;
   const review = await fetchPlexReview(plexId);
   if (review?.message)
@@ -384,7 +384,53 @@ export async function processPlex(payload: {
     const { isPlexRestoreEcho } = await import('./plex-watch-restore');
     if (await isPlexRestoreEcho(payload.metadata, payload.receivedAt)) return;
   }
-  let m = payload.metadata;
+  const { id, m, parent } = await resolvePlexMetadata(payload.metadata);
+
+  if (payload.event === 'media.scrobble') {
+    const at =
+      typeof m.lastViewedAt === 'number' ? watchedTime(new Date(m.lastViewedAt * 1000).toISOString()) : null;
+    await query(
+      `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
+      [id, payload.eventId, at || payload.receivedAt, !at],
+    );
+    if (m.type === 'episode' && parent) await query('SELECT refresh_season_completions($1)', [[parent]]);
+  } else if (payload.event === 'media.rate') {
+    await syncPlexUserRating(id, m.userRating, payload.receivedAt, true);
+    await syncPlexReview(id, plexIds(m).plex).catch((e) =>
+      logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
+        mediaId: id,
+        error: e,
+      }),
+    );
+    await recordFeedEntrySafely(id);
+  }
+  await queueEnrich(id);
+  await saveJobResult({
+    mediaId: id,
+    title: m.title || 'Plex-Titel',
+    outcome: 'checked',
+    reason:
+      payload.event === 'media.scrobble'
+        ? 'Anschauereignis übernommen oder bereits vorhanden.'
+        : payload.event === 'media.rate'
+          ? 'Bewertungsereignis verarbeitet.'
+          : 'Plex-Ereignis verarbeitet.',
+  });
+}
+
+export async function queueEnrich(id: string) {
+  await query(
+    `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,
+    ['enrich:' + id, JSON.stringify({ mediaId: id })],
+  );
+}
+
+/**
+ * Loads current Plex metadata for a webhook or history item, creates or finds the Geza title
+ * (including show/season parents) and refreshes Plex-provided metadata and ratings.
+ */
+export async function resolvePlexMetadata(metadata: PlexMetadata) {
+  let m = metadata;
   if (m.ratingKey) {
     const data = await plexRequest(
       `/library/metadata/${encodeURIComponent(String(m.ratingKey))}?includeGuids=1`,
@@ -417,40 +463,7 @@ export async function processPlex(payload: {
   await savePlexRatings(id, m, plexIds(m));
   const { mergeMetadata, fromPlex } = await import('./providers');
   await mergeMetadata(id, fromPlex(m));
-
-  if (payload.event === 'media.scrobble') {
-    const at =
-      typeof m.lastViewedAt === 'number' ? watchedTime(new Date(m.lastViewedAt * 1000).toISOString()) : null;
-    await query(
-      `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
-      [id, payload.eventId, at || payload.receivedAt, !at],
-    );
-    if (m.type === 'episode' && parent) await query('SELECT refresh_season_completions($1)', [[parent]]);
-  } else if (payload.event === 'media.rate') {
-    await syncPlexUserRating(id, m.userRating, payload.receivedAt, true);
-    await syncPlexReview(id, plexIds(m).plex).catch((e) =>
-      logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
-        mediaId: id,
-        error: e,
-      }),
-    );
-    await recordFeedEntrySafely(id);
-  }
-  await query(
-    `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,
-    ['enrich:' + id, JSON.stringify({ mediaId: id })],
-  );
-  await saveJobResult({
-    mediaId: id,
-    title: m.title || 'Plex-Titel',
-    outcome: 'checked',
-    reason:
-      payload.event === 'media.scrobble'
-        ? 'Anschauereignis übernommen oder bereits vorhanden.'
-        : payload.event === 'media.rate'
-          ? 'Bewertungsereignis verarbeitet.'
-          : 'Plex-Ereignis verarbeitet.',
-  });
+  return { id, m, parent };
 }
 
 export async function syncPlexUserRating(

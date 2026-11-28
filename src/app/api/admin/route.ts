@@ -462,6 +462,9 @@ export async function POST(req: Request) {
         "SELECT id FROM jobs WHERE dedupe_key='plex-scan-daily' AND status<>'running'",
       );
       if (daily) await scheduleNextScan(daily.id);
+    } else if (body.action === 'plex-sync-settings') {
+      const data = z.object({ enabled: z.boolean() }).parse(body.data);
+      await setSetting('PLEX_SYNC_ENABLED', data.enabled ? '1' : '0');
     } else if (body.action === 'plex-scan') {
       await requestPlexScan();
       return Response.json({

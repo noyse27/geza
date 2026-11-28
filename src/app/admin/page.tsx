@@ -79,6 +79,7 @@ export default async function Page() {
   const [nextScan] = await query(
     "SELECT available_at,updated_at,status,error FROM jobs WHERE dedupe_key='plex-scan-daily'",
   );
+  const [plexSync] = await query("SELECT updated_at,status,error FROM jobs WHERE dedupe_key='plex-sync'");
   return (
     <div className="page">
       <div className="page-heading">
@@ -138,6 +139,9 @@ export default async function Page() {
                 error: nextScan.error,
               }
             : null
+        }
+        plexSync={
+          plexSync ? { updatedAt: plexSync.updated_at, status: plexSync.status, error: plexSync.error } : null
         }
         diagnosticUntil={diagnostics.until}
       />
