@@ -9,6 +9,7 @@ import { saveJobResult } from './job-history';
 import { decidedPlexMedia, plexServerScope } from './plex-decisions';
 import { diagnosticState } from './diagnostics';
 type PlexMetadata = Record<string, any>;
+const PLEX_DEFAULT_CONTAINER_SIZE = 2000;
 export function selectPlexMatch(matches: PlexMetadata[], ids: Record<string, string>) {
   const consistent = matches.filter((r) =>
     Object.entries(ids).every(
@@ -62,13 +63,23 @@ export async function plexRequest(
   if (!base || !token) return null;
   const url = new URL(path, base);
   if (url.origin !== new URL(base).origin) throw Error('Ungültiger Plex-Pfad');
+  // Plex warns that requests without X-Plex-Container-Size will be rejected with HTTP 400.
+  // Paged callers pass start/size as query parameters; mirror them, otherwise use a generous cap.
+  const explicitSize = url.searchParams.get('X-Plex-Container-Size');
+  const containerSize = explicitSize || String(PLEX_DEFAULT_CONTAINER_SIZE);
+  const containerStart = url.searchParams.get('X-Plex-Container-Start') || '0';
   const diagnostics = await diagnosticState();
   const r = await loggedFetch(
     'Plex',
     url.toString(),
     {
       cache: 'no-store',
-      headers: { 'X-Plex-Token': token, Accept: 'application/json' },
+      headers: {
+        'X-Plex-Token': token,
+        Accept: 'application/json',
+        'X-Plex-Container-Start': containerStart,
+        'X-Plex-Container-Size': containerSize,
+      },
       signal: AbortSignal.timeout(12000),
       redirect: 'error',
     },
@@ -85,7 +96,14 @@ export async function plexRequest(
     await r.text();
     return true;
   }
-  return r.json();
+  const data = await r.json();
+  const container = data?.MediaContainer;
+  const total = Number(container?.totalSize);
+  const received = (container?.Metadata?.length || 0) + (container?.Directory?.length || 0);
+  // Without explicit paging the default cap must never silently truncate a list.
+  if (!explicitSize && Number.isFinite(total) && total > received && received >= PLEX_DEFAULT_CONTAINER_SIZE)
+    throw Error(`Plex-Antwort unvollständig: ${received} von ${total} Einträgen`);
+  return data;
 }
 export async function findPlex(ids: Record<string, unknown>, kind: string, purpose = 'media-lookup') {
   if (!ids.plex) return null;
@@ -197,7 +215,7 @@ export async function fetchPlexReview(metadataID: string) {
   if (data.errors) throw Error(data.errors[0]?.message || 'Plex Community GraphQL-Fehler');
   return data.data?.metadataReviewV2 || null;
 }
-async function syncPlexReview(mediaId: string, plexId: string | undefined) {
+export async function syncPlexReview(mediaId: string, plexId: string | undefined) {
   if (!plexId) return;
   const review = await fetchPlexReview(plexId);
   if (review?.message)
@@ -366,7 +384,53 @@ export async function processPlex(payload: {
     const { isPlexRestoreEcho } = await import('./plex-watch-restore');
     if (await isPlexRestoreEcho(payload.metadata, payload.receivedAt)) return;
   }
-  let m = payload.metadata;
+  const { id, m, parent } = await resolvePlexMetadata(payload.metadata);
+
+  if (payload.event === 'media.scrobble') {
+    const at =
+      typeof m.lastViewedAt === 'number' ? watchedTime(new Date(m.lastViewedAt * 1000).toISOString()) : null;
+    await query(
+      `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
+      [id, payload.eventId, at || payload.receivedAt, !at],
+    );
+    if (m.type === 'episode' && parent) await query('SELECT refresh_season_completions($1)', [[parent]]);
+  } else if (payload.event === 'media.rate') {
+    await syncPlexUserRating(id, m.userRating, payload.receivedAt, true);
+    await syncPlexReview(id, plexIds(m).plex).catch((e) =>
+      logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
+        mediaId: id,
+        error: e,
+      }),
+    );
+    await recordFeedEntrySafely(id);
+  }
+  await queueEnrich(id);
+  await saveJobResult({
+    mediaId: id,
+    title: m.title || 'Plex-Titel',
+    outcome: 'checked',
+    reason:
+      payload.event === 'media.scrobble'
+        ? 'Anschauereignis übernommen oder bereits vorhanden.'
+        : payload.event === 'media.rate'
+          ? 'Bewertungsereignis verarbeitet.'
+          : 'Plex-Ereignis verarbeitet.',
+  });
+}
+
+export async function queueEnrich(id: string) {
+  await query(
+    `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,
+    ['enrich:' + id, JSON.stringify({ mediaId: id })],
+  );
+}
+
+/**
+ * Loads current Plex metadata for a webhook or history item, creates or finds the Geza title
+ * (including show/season parents) and refreshes Plex-provided metadata and ratings.
+ */
+export async function resolvePlexMetadata(metadata: PlexMetadata) {
+  let m = metadata;
   if (m.ratingKey) {
     const data = await plexRequest(
       `/library/metadata/${encodeURIComponent(String(m.ratingKey))}?includeGuids=1`,
@@ -399,40 +463,7 @@ export async function processPlex(payload: {
   await savePlexRatings(id, m, plexIds(m));
   const { mergeMetadata, fromPlex } = await import('./providers');
   await mergeMetadata(id, fromPlex(m));
-
-  if (payload.event === 'media.scrobble') {
-    const at =
-      typeof m.lastViewedAt === 'number' ? watchedTime(new Date(m.lastViewedAt * 1000).toISOString()) : null;
-    await query(
-      `INSERT INTO watches(media_id,source,source_id,watched_at,time_estimated) VALUES($1,'plex',$2,$3,$4) ON CONFLICT(source,source_id) DO NOTHING`,
-      [id, payload.eventId, at || payload.receivedAt, !at],
-    );
-    if (m.type === 'episode' && parent) await query('SELECT refresh_season_completions($1)', [[parent]]);
-  } else if (payload.event === 'media.rate') {
-    await syncPlexUserRating(id, m.userRating, payload.receivedAt, true);
-    await syncPlexReview(id, plexIds(m).plex).catch((e) =>
-      logEvent('warn', 'plex', 'Bewertung gespeichert, Review konnte nicht synchronisiert werden', {
-        mediaId: id,
-        error: e,
-      }),
-    );
-    await recordFeedEntrySafely(id);
-  }
-  await query(
-    `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('enrich',$1,$2) ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0 WHERE jobs.status IN ('done','failed')`,
-    ['enrich:' + id, JSON.stringify({ mediaId: id })],
-  );
-  await saveJobResult({
-    mediaId: id,
-    title: m.title || 'Plex-Titel',
-    outcome: 'checked',
-    reason:
-      payload.event === 'media.scrobble'
-        ? 'Anschauereignis übernommen oder bereits vorhanden.'
-        : payload.event === 'media.rate'
-          ? 'Bewertungsereignis verarbeitet.'
-          : 'Plex-Ereignis verarbeitet.',
-  });
+  return { id, m, parent };
 }
 
 export async function syncPlexUserRating(

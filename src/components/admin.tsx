@@ -10,6 +10,7 @@ type Props = {
   plexSections: { key: string; title: string; type: string }[];
   lastScan?: { createdAt: string; context: Record<string, number> } | null;
   nextScan?: { availableAt: string; updatedAt: string; error: string | null } | null;
+  plexSync?: { updatedAt: string; status: string; error: string | null } | null;
   diagnosticUntil?: string | null;
 };
 type ImportReport = {
@@ -43,6 +44,7 @@ export function AdminControls({
   plexSections,
   lastScan,
   nextScan,
+  plexSync,
   diagnosticUntil,
   demo = false,
 }: Props) {
@@ -55,6 +57,7 @@ export function AdminControls({
     [watchedOnly, setWatchedOnly] = useState(values.PLEX_SCAN_WATCHED_ONLY !== '0'),
     [scanEnabled, setScanEnabled] = useState(values.PLEX_SCAN_ENABLED !== '0'),
     [scanHour, setScanHour] = useState(Number(values.PLEX_SCAN_HOUR || '3')),
+    [syncEnabled, setSyncEnabled] = useState(values.PLEX_SYNC_ENABLED !== '0'),
     [scanPreview, setScanPreview] = useState<{
       changed: number;
       incompleteSeries?: number;
@@ -228,6 +231,47 @@ export function AdminControls({
               onChange={(e) =>
                 void saveScanSettings({ watchedOnly, enabled: e.target.checked, sections: scanSections })
               }
+            />
+            Aktiv
+          </label>
+        </div>
+        <div className="job-row">
+          <div>
+            <strong>Plex-Sicherheitsnetz</strong>
+            <p className="muted small">
+              Holt alle 15 Minuten neue Sichtungen aus der Plex-Wiedergabehistorie sowie neue Bewertungen
+              mit Review – auch wenn Plex keine Webhooks sendet. Bereits per Webhook erfasste Ereignisse
+              werden nicht doppelt übernommen.
+            </p>
+          </div>
+          <div className="job-meta">
+            <span>Intervall: alle 15 Minuten</span>
+            <span>
+              Letzte Ausführung:{' '}
+              {plexSync?.updatedAt
+                ? new Date(plexSync.updatedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
+                : '–'}
+            </span>
+            <span className={plexSync?.error ? 'error' : ''}>
+              Status:{' '}
+              {!plexSync
+                ? 'Noch keine Ausführung.'
+                : plexSync.error
+                  ? `Fehlgeschlagen: ${plexSync.error}`
+                  : plexSync.status === 'running'
+                    ? 'Läuft gerade.'
+                    : 'Erfolgreich.'}
+            </span>
+          </div>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={syncEnabled}
+              disabled={busy}
+              onChange={async (e) => {
+                const enabled = e.target.checked;
+                if (await action({ action: 'plex-sync-settings', data: { enabled } })) setSyncEnabled(enabled);
+              }}
             />
             Aktiv
           </label>
