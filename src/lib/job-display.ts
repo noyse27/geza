@@ -4,6 +4,7 @@ export const jobNames: Record<string, string> = {
   'plex-review-sync': 'Plex-Reviews',
   'plex-scan': 'Bibliotheks-Scan',
   'plex-presence': 'Plex-Abgleich',
+  'plex-sync': 'Plex-Sicherheitsnetz',
   'plex-watch-restore': 'Gesehen-Status',
   'series-catalog': 'Serienkatalog',
   'facet-recovery': 'Länder und Genres',

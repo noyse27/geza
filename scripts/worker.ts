@@ -8,6 +8,7 @@ import { processPlex, processPlexReviewSync } from '../src/lib/plex';
 import { processPlexScan } from '../src/lib/plex-scan';
 import { processPlexRestore } from '../src/lib/plex-watch-restore';
 import { processPlexPresence } from '../src/lib/plex-presence';
+import { PLEX_SYNC_INTERVAL_MINUTES, plexSyncEnabled, processPlexSync } from '../src/lib/plex-sync';
 import { nextPlexRun, scheduleNextScan } from '../src/lib/plex-jobs';
 import { getSetting } from '../src/lib/settings';
 import { installationReady } from '../src/lib/setup';
@@ -25,6 +26,7 @@ process.on('SIGINT', () => {
 console.log('Geza worker ready');
 let lastCleanup = 0;
 let lastCatalogSeed = 0;
+let lastPlexSyncSeed = 0;
 let plexScanSeeded = false;
 let facetRecoveryResumed = false;
 const friendsLoop = (async () => {
@@ -63,6 +65,16 @@ while (running) {
         FROM media WHERE kind='show' AND catalog_backfill_before IS NOT NULL
         ON CONFLICT(dedupe_key) DO NOTHING`);
       lastCatalogSeed = Date.now();
+    }
+    if (Date.now() - lastPlexSyncSeed > PLEX_SYNC_INTERVAL_MINUTES * 60000) {
+      // Safety net for missing Plex webhooks; dedupe keeps at most one pending run.
+      if (await plexSyncEnabled())
+        await query(
+          `INSERT INTO jobs(kind,dedupe_key,payload) VALUES('plex-sync','plex-sync','{}')
+           ON CONFLICT(dedupe_key) DO UPDATE SET status='pending',available_at=now(),attempts=0,error=NULL
+           WHERE jobs.status IN ('done','failed')`,
+        );
+      lastPlexSyncSeed = Date.now();
     }
     if (!plexScanSeeded) {
       // Seeded here instead of a migration so fresh installs keep an empty jobs table (required by demo setup).
@@ -127,6 +139,7 @@ while (running) {
               else if (job.kind === 'plex-scan') await processPlexScan(job.payload);
               else if (job.kind === 'plex-watch-restore') await processPlexRestore(job.payload);
               else if (job.kind === 'plex-presence') await processPlexPresence(job.payload);
+              else if (job.kind === 'plex-sync') await processPlexSync();
               else throw Error('Unbekannter Aufgabentyp');
               if (measured) {
                 const after = await mediaSnapshot(String(job.payload.mediaId), job.kind);
